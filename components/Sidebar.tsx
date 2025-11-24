@@ -219,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-sm text-slate-400 line-clamp-2 mb-3 leading-relaxed">"{note.userNote}"</p>
               
               <div className="flex items-center justify-between mt-2">
-                 <div className="flex gap-2">
+                 <div className="flex gap-2 items-center">
                     <span className="text-[10px] font-medium bg-slate-800 px-2 py-1 rounded-full text-slate-500 border border-slate-700">
                         {new Date(note.createdAt).toLocaleDateString()}
                     </span>
@@ -233,6 +233,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             Not Caught
                         </span>
                     )}
+
+                    {/* Quick Navigation Button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToNote(note);
+                        }}
+                        className="flex items-center gap-1 text-[10px] font-bold bg-blue-900/30 text-blue-400 px-2 py-1 rounded-full border border-blue-900/50 hover:bg-blue-600 hover:text-white transition-colors ml-1"
+                        title="Navigate Here"
+                    >
+                        <Navigation2 size={10} /> GO
+                    </button>
                  </div>
 
                  {!note.aiAnalysis && (
