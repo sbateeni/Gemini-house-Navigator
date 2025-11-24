@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, Hand } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ interface SidebarProps {
   isRouting: boolean;
   onAnalyzeNote: (note: MapNote) => void;
   isAnalyzing: boolean;
+  onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,7 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   routeData,
   isRouting,
   onAnalyzeNote,
-  isAnalyzing
+  isAnalyzing,
+  onUpdateStatus
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -55,6 +57,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return `${(meters / 1000).toFixed(1)} km`;
     }
     return `${Math.round(meters)} m`;
+  };
+
+  const getStatusStyle = (status?: string) => {
+    if (status === 'caught') return 'border-green-500/50 bg-green-900/10';
+    if (status === 'not_caught') return 'border-red-500/50 bg-red-900/10';
+    return '';
   };
 
   return (
@@ -134,24 +142,66 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div 
               key={note.id}
               onClick={() => onFlyToNote(note)}
-              className={`p-4 rounded-2xl border cursor-pointer transition-all active:scale-[0.98] group relative ${selectedNote?.id === note.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg ring-1 ring-blue-500/20' : 'bg-slate-800/40 border-slate-700 hover:bg-slate-800'}`}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all active:scale-[0.98] group relative 
+                ${selectedNote?.id === note.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg ring-1 ring-blue-500/20' : 'bg-slate-800/40 border-slate-700 hover:bg-slate-800'}
+                ${getStatusStyle(note.status)}
+              `}
             >
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-semibold text-base text-blue-100 truncate pr-6">
+                <h3 className="font-semibold text-base text-blue-100 truncate pr-20">
                   {note.locationName}
                 </h3>
-                <button 
-                  onClick={(e) => onDeleteNote(note.id, e)} 
-                  className="absolute right-3 top-4 p-1.5 rounded-full hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors"
-                >
-                  <Trash2 size={16} />
-                </button>
+                
+                {/* Action Buttons Row */}
+                <div className="absolute right-3 top-3 flex items-center gap-1">
+                  
+                  {/* Status Buttons */}
+                  <div className="flex bg-slate-900/50 rounded-lg p-0.5 border border-slate-700/50 mr-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'caught'); }}
+                        className={`p-1.5 rounded-md transition-colors ${note.status === 'caught' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-500 hover:text-green-400 hover:bg-slate-800'}`}
+                        title="تم القبض"
+                    >
+                        <CheckCircle2 size={16} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'not_caught'); }}
+                        className={`p-1.5 rounded-md transition-colors ${note.status === 'not_caught' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-500 hover:text-red-400 hover:bg-slate-800'}`}
+                        title="لم يتم القبض"
+                    >
+                        <XCircle size={16} />
+                    </button>
+                  </div>
+
+                  {/* Delete Button */}
+                  <button 
+                    onClick={(e) => onDeleteNote(note.id, e)} 
+                    className="p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-900/50"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
+
               <p className="text-sm text-slate-400 line-clamp-2 mb-3 leading-relaxed">"{note.userNote}"</p>
+              
               <div className="flex items-center justify-between mt-2">
-                 <span className="text-[10px] font-medium bg-slate-800 px-2 py-1 rounded-full text-slate-500">
-                    {new Date(note.createdAt).toLocaleDateString()}
-                 </span>
+                 <div className="flex gap-2">
+                    <span className="text-[10px] font-medium bg-slate-800 px-2 py-1 rounded-full text-slate-500 border border-slate-700">
+                        {new Date(note.createdAt).toLocaleDateString()}
+                    </span>
+                    {note.status === 'caught' && (
+                        <span className="text-[10px] font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded-full border border-green-900/50">
+                            تم القبض
+                        </span>
+                    )}
+                    {note.status === 'not_caught' && (
+                        <span className="text-[10px] font-bold bg-red-900/30 text-red-400 px-2 py-1 rounded-full border border-red-900/50">
+                            لم يتم القبض
+                        </span>
+                    )}
+                 </div>
+
                  {!note.aiAnalysis && (
                    <span className="flex items-center gap-1 text-[10px] text-yellow-500/80">
                      <Sparkles size={10} /> Needs Analysis

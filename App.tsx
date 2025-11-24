@@ -144,6 +144,23 @@ export default function App() {
     }
   };
 
+  const handleUpdateStatus = async (id: string, status: 'caught' | 'not_caught') => {
+    const noteToUpdate = notes.find(n => n.id === id);
+    if (!noteToUpdate) return;
+
+    // Toggle logic: if clicking the same status, revert to undefined (optional, or just update)
+    // For now, simple update
+    const updatedNote: MapNote = { ...noteToUpdate, status };
+
+    try {
+      await db.addNote(updatedNote);
+      setNotes(prev => prev.map(n => n.id === id ? updatedNote : n));
+      if (selectedNote?.id === id) setSelectedNote(updatedNote);
+    } catch (error) {
+      console.error("Failed to update status", error);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -239,6 +256,7 @@ export default function App() {
         isRouting={isRouting}
         onAnalyzeNote={handleAnalyzeNote}
         isAnalyzing={isAnalyzing}
+        onUpdateStatus={handleUpdateStatus}
       />
 
       <div className="flex-1 relative w-full h-full">

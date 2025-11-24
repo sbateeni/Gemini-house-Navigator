@@ -7,6 +7,7 @@ export interface MapNote {
   aiAnalysis: string;
   createdAt: number;
   sources?: GroundingSource[];
+  status?: 'caught' | 'not_caught'; // New field for status
 }
 
 export interface GroundingSource {
