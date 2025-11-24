@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@google/genai": "*",
-    "firebase": "^10.8.0",
+    "@supabase/supabase-js": "^2.39.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
