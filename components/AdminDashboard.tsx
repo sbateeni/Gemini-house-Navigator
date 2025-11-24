@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { X, Shield, User, CheckCircle2, XCircle, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
@@ -129,8 +130,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                </thead>
                <tbody className="divide-y divide-slate-800 text-sm">
                  {profiles.map(user => {
-                   const isOnline = onlineUsers.has(user.id);
                    const isMe = user.id === currentUserId;
+                   // FIX: If it is ME, I am definitely online. Otherwise check the server list.
+                   const isOnline = isMe || onlineUsers.has(user.id);
 
                    return (
                      <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
