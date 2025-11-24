@@ -13,6 +13,7 @@ create table if not exists profiles (
   username text,
   role text default 'user',
   is_approved boolean default false,
+  email text, -- Added for Admin Dashboard
   primary key (id)
 );
 
@@ -24,12 +25,18 @@ create policy "Public profiles" on profiles for select using (true);
 drop policy if exists "Self insert" on profiles;
 create policy "Self insert" on profiles for insert with check (auth.uid() = id);
 
+drop policy if exists "Admin update" on profiles;
+create policy "Admin update" on profiles for update using (
+  auth.uid() = id OR 
+  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
+
 -- 3. Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, username, role, is_approved)
-  values (new.id, new.raw_user_meta_data->>'username', 'user', false);
+  insert into public.profiles (id, username, role, is_approved, email)
+  values (new.id, new.raw_user_meta_data->>'username', 'user', false, new.email);
   return new;
 end;
 $$ language plpgsql security definer;

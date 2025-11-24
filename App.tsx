@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { getRoute } from './services/routing';
 import { MapNote, RouteData } from './types';
+import { supabase } from './services/supabase'; // Import for Presence
 
 // Components
 import { Sidebar } from './components/Sidebar';
@@ -11,6 +12,7 @@ import { LeafletMap } from './components/LeafletMap';
 import { DatabaseSetupModal } from './components/DatabaseSetupModal';
 import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
+import { AdminDashboard } from './components/AdminDashboard'; // Import Dashboard
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -46,6 +48,7 @@ export default function App() {
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false); // Admin Dashboard State
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userNoteInput, setUserNoteInput] = useState("");
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -77,6 +80,34 @@ export default function App() {
     updateRoute();
   }, [userLocation, navigationTarget]);
 
+  // PRESENCE TRACKING (Online Status)
+  useEffect(() => {
+    if (!session?.user?.id || !hasAccess) return;
+
+    // Create a presence channel
+    const channel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: session.user.id,
+        },
+      },
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        // Broadcast "I am online"
+        await channel.track({
+          user_id: session.user.id,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, hasAccess]);
+
   // UI Actions
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
@@ -104,8 +135,6 @@ export default function App() {
         const updatedNote: MapNote = {
           ...selectedNote,
           userNote: userNoteInput,
-          // We keep locationName and AI analysis as is, or clear them if you want re-analysis
-          // For now, let's just update the user's text.
         };
         await updateNote(updatedNote);
         setSelectedNote(updatedNote);
@@ -274,6 +303,7 @@ export default function App() {
         isConnected={isConnected}
         userRole={userRole}
         onLogout={handleLogout}
+        onOpenDashboard={() => setShowDashboard(true)} // Open Dashboard
       />
 
       <div className="flex-1 relative w-full h-full">
@@ -307,6 +337,15 @@ export default function App() {
           isAnalyzing={isAnalyzing}
           mode={isEditingNote ? 'edit' : 'create'}
         />
+
+        {/* Admin Dashboard Modal */}
+        {userRole === 'admin' && (
+          <AdminDashboard 
+            isOpen={showDashboard} 
+            onClose={() => setShowDashboard(false)} 
+            currentUserId={session.user.id}
+          />
+        )}
       </div>
     </div>
   );

@@ -39,4 +39,5 @@ export interface UserProfile {
   username: string;
   role: 'admin' | 'user';
   isApproved: boolean; // New field for approval status
+  email?: string; // Added email for admin dashboard
 }

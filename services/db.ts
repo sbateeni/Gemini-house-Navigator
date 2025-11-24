@@ -99,11 +99,54 @@ export const db = {
         id: data.id,
         username: data.username,
         role: data.role,
-        isApproved: data.is_approved === true // Default to false if null/undefined
+        isApproved: data.is_approved === true, // Default to false if null/undefined
+        email: data.email
       };
     } catch (error) {
       console.error("Error fetching profile", error);
       return null;
+    }
+  },
+
+  // Admin: Get All Profiles
+  async getAllProfiles(): Promise<UserProfile[]> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('role', { ascending: true }); // Admins first usually implies sorting logic, or handle in UI
+
+      if (error) throw error;
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        username: row.username,
+        role: row.role,
+        isApproved: row.is_approved === true,
+        email: row.email
+      }));
+    } catch (error) {
+      console.error("Error fetching all profiles", error);
+      return [];
+    }
+  },
+
+  // Admin: Update Profile Role/Approval
+  async updateProfile(id: string, updates: Partial<UserProfile>): Promise<void> {
+    try {
+      const dbUpdates: any = {};
+      if (updates.role) dbUpdates.role = updates.role;
+      if (updates.isApproved !== undefined) dbUpdates.is_approved = updates.isApproved;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(dbUpdates)
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error updating profile", error);
+      throw error;
     }
   }
 };

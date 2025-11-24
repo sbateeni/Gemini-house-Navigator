@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3 } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,7 +24,8 @@ interface SidebarProps {
   isConnected: boolean;
   userRole: 'admin' | 'user' | null;
   onLogout: () => void;
-  onEditNote: (note: MapNote, e: React.MouseEvent) => void; // New Prop
+  onEditNote: (note: MapNote, e: React.MouseEvent) => void;
+  onOpenDashboard: () => void; // New prop
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -49,7 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isConnected,
   userRole,
   onLogout,
-  onEditNote
+  onEditNote,
+  onOpenDashboard
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -259,7 +261,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Logout Footer */}
-      <div className="p-3 border-t border-slate-800 bg-slate-900/50">
+      <div className="p-3 border-t border-slate-800 bg-slate-900/50 space-y-2">
+         {/* Admin Dashboard Button */}
+         {userRole === 'admin' && (
+           <button 
+             onClick={onOpenDashboard}
+             className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-purple-400 bg-purple-900/10 hover:bg-purple-900/20 hover:text-purple-300 transition-colors text-sm border border-purple-900/30 font-semibold"
+           >
+             <LayoutDashboard size={16} /> Admin Dashboard
+           </button>
+         )}
+
          <button 
            onClick={onLogout}
            className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-colors text-sm"
