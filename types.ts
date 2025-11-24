@@ -38,4 +38,5 @@ export interface UserProfile {
   id: string;
   username: string;
   role: 'admin' | 'user';
+  isApproved: boolean; // New field for approval status
 }

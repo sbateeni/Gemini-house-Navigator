@@ -84,7 +84,7 @@ export const db = {
     }
   },
 
-  // Get User Profile (Role)
+  // Get User Profile (Role & Approval)
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await supabase
@@ -93,9 +93,14 @@ export const db = {
         .eq('id', userId)
         .single();
       
-      if (error) return null; // Profile might not exist yet if just signed up
+      if (error) return null; 
       
-      return data as UserProfile;
+      return {
+        id: data.id,
+        username: data.username,
+        role: data.role,
+        isApproved: data.is_approved === true // Default to false if null/undefined
+      };
     } catch (error) {
       console.error("Error fetching profile", error);
       return null;

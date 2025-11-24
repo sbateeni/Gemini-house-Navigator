@@ -9,15 +9,16 @@ import { Sidebar } from './components/Sidebar';
 import { CreateNoteModal } from './components/CreateNoteModal';
 import { MapControls } from './components/MapControls';
 import { LeafletMap } from './components/LeafletMap';
-// Fix import to be explicit relative path
 import { DatabaseSetupModal } from './components/DatabaseSetupModal';
 import { AuthPage } from './components/AuthPage';
+import { PendingApproval } from './components/PendingApproval';
 
 export default function App() {
   // Auth State
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(false);
 
   // Application State
   const [notes, setNotes] = useState<MapNote[]>([]);
@@ -38,7 +39,6 @@ export default function App() {
   
   // Navigation State
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [initialCenterSet, setInitialCenterSet] = useState(false); // Track if we've centered on user yet
   const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
@@ -65,7 +65,10 @@ export default function App() {
       setSession(session);
       if (session?.user) {
         db.getUserProfile(session.user.id).then(profile => {
-            if (profile) setUserRole(profile.role);
+            if (profile) {
+                setUserRole(profile.role);
+                setIsApproved(profile.isApproved);
+            }
         });
       }
       setAuthLoading(false);
@@ -75,19 +78,23 @@ export default function App() {
       setSession(session);
       if (session?.user) {
         db.getUserProfile(session.user.id).then(profile => {
-            if (profile) setUserRole(profile.role);
+            if (profile) {
+                setUserRole(profile.role);
+                setIsApproved(profile.isApproved);
+            }
         });
       } else {
         setUserRole(null);
+        setIsApproved(false);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load notes from DB on mount (only if logged in)
+  // Load notes from DB on mount (only if logged in AND approved)
   useEffect(() => {
-    if (!session) return;
+    if (!session || !isApproved) return;
 
     const initData = async () => {
       try {
@@ -106,11 +113,11 @@ export default function App() {
       }
     };
     initData();
-  }, [session]);
+  }, [session, isApproved]);
 
   // Get user location initially and watch it with High Accuracy
   useEffect(() => {
-    if (!session) return;
+    if (!session || !isApproved) return;
     if (navigator.geolocation) {
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
@@ -128,28 +135,12 @@ export default function App() {
         );
         return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [session]);
-
-  // Auto-center on user location when found for the first time
-  useEffect(() => {
-    if (userLocation && !initialCenterSet) {
-        setFlyToTarget({ 
-            lat: userLocation.lat, 
-            lng: userLocation.lng, 
-            zoom: 16, 
-            timestamp: Date.now(),
-            showPulse: true 
-        });
-        setInitialCenterSet(true);
-    }
-  }, [userLocation, initialCenterSet]);
+  }, [session, isApproved]);
 
   const handleLogout = async () => {
     await auth.signOut();
     setNotes([]);
     setSelectedNote(null);
-    setInitialCenterSet(false); // Reset auto-center flag
-    setUserLocation(null);
   };
 
   const handleMapClick = (lat: number, lng: number) => {
@@ -320,6 +311,11 @@ export default function App() {
 
   if (!session) {
     return <AuthPage />;
+  }
+
+  // New check: If user is logged in but NOT approved, show pending screen
+  if (!isApproved) {
+      return <PendingApproval />;
   }
 
   if (tableMissing) {

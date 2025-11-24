@@ -11,7 +11,6 @@ export const AuthPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [rememberMe, setRememberMe] = useState(true); // Default to true
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +23,7 @@ export const AuthPage: React.FC = () => {
         if (error) throw error;
         setMessage({ type: 'success', text: 'Password reset link sent to your email!' });
       } else if (isLogin) {
-        // Pass rememberMe state to signIn
-        const { error } = await auth.signIn(email, password, rememberMe);
+        const { error } = await auth.signIn(email, password);
         if (error) throw error;
         // App.tsx handles state change via onAuthStateChange
       } else {
@@ -113,28 +111,6 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
 
-          {/* Remember Me & Forgot Password Row */}
-          {isLogin && !isReset && (
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-slate-400 hover:text-slate-300 cursor-pointer select-none">
-                <input 
-                  type="checkbox" 
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500/20 focus:ring-offset-0"
-                />
-                Remember me
-              </label>
-              <button
-                type="button"
-                onClick={() => { setIsReset(true); setMessage(null); }}
-                className="text-slate-500 hover:text-blue-400 transition-colors"
-              >
-                Forgot Password?
-              </button>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
@@ -156,6 +132,12 @@ export const AuthPage: React.FC = () => {
                   {isLogin ? 'Sign Up' : 'Sign In'}
                 </button>
               </p>
+              <button
+                onClick={() => { setIsReset(true); setMessage(null); }}
+                className="text-slate-500 hover:text-slate-300 text-xs"
+              >
+                Forgot Password?
+              </button>
             </>
           ) : (
             <button

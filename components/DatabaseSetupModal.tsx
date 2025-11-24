@@ -12,20 +12,24 @@ create table if not exists profiles (
   id uuid references auth.users on delete cascade,
   username text,
   role text default 'user',
+  is_approved boolean default false,
   primary key (id)
 );
 
 -- 2. Enable Security on Profiles
 alter table profiles enable row level security;
+drop policy if exists "Public profiles" on profiles;
 create policy "Public profiles" on profiles for select using (true);
+
+drop policy if exists "Self insert" on profiles;
 create policy "Self insert" on profiles for insert with check (auth.uid() = id);
 
 -- 3. Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, username, role)
-  values (new.id, new.raw_user_meta_data->>'username', 'user');
+  insert into public.profiles (id, username, role, is_approved)
+  values (new.id, new.raw_user_meta_data->>'username', 'user', false);
   return new;
 end;
 $$ language plpgsql security definer;
@@ -38,13 +42,32 @@ create trigger on_auth_user_created
 -- 4. Secure the Notes Table
 alter table notes enable row level security;
 
--- Remove old public access if it exists
+-- Remove old policies
 drop policy if exists "Public Access" on notes;
+drop policy if exists "Auth read" on notes;
+drop policy if exists "Authenticated users can read notes" on notes;
+drop policy if exists "Auth insert" on notes;
+drop policy if exists "Auth update" on notes;
+drop policy if exists "Admin delete" on notes;
 
 -- Add Authenticated Policies
-create policy "Auth read" on notes for select using (auth.role() = 'authenticated');
-create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
-create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
+-- Read: Only approved users
+create policy "Auth read" on notes for select using (
+  auth.role() = 'authenticated' and 
+  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
+);
+
+-- Insert: Only approved users
+create policy "Auth insert" on notes for insert with check (
+  auth.role() = 'authenticated' and
+  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
+);
+
+-- Update: Only approved users
+create policy "Auth update" on notes for update using (
+  auth.role() = 'authenticated' and
+  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
+);
 
 -- 5. Admin-Only Delete Policy
 create policy "Admin delete" on notes for delete using (
@@ -59,8 +82,6 @@ create policy "Admin delete" on notes for delete using (
   };
 
   const openSupabaseSQL = () => {
-    // Attempt to guess the project ID from the URL to provide a direct link
-    // URL format: https://<project_id>.supabase.co
     const projectUrl = (supabase as any).supabaseUrl || '';
     const projectId = projectUrl.split('//')[1]?.split('.')[0];
     const dashboardUrl = projectId 
@@ -83,7 +104,7 @@ create policy "Admin delete" on notes for delete using (
             <h1 className="text-xl font-bold text-white mb-1">Security Update Required</h1>
             <p className="text-slate-400 text-sm">
               Your app needs to update the database structure to support the new 
-              <span className="text-blue-400 font-bold mx-1">Secure Login System</span>.
+              <span className="text-blue-400 font-bold mx-1">Secure Login & Approval System</span>.
             </p>
           </div>
         </div>
