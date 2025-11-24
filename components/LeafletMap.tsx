@@ -55,6 +55,20 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkersRef = useRef<{ [key: string]: any }>({});
 
+  // --- FIX FOR STALE CLOSURES ---
+  // We use refs to keep track of the latest props, so the map event listeners
+  // (which are created once) can always access the freshest data.
+  const notesRef = useRef(notes);
+  const onNavigateRef = useRef(onNavigate);
+  const onDispatchRef = useRef(onDispatch);
+
+  useEffect(() => {
+    notesRef.current = notes;
+    onNavigateRef.current = onNavigate;
+    onDispatchRef.current = onDispatch;
+  }, [notes, onNavigate, onDispatch]);
+  // ------------------------------
+
   // Initialize Map
   useEffect(() => {
     if (mapContainerRef.current && !mapInstanceRef.current && window.L) {
@@ -70,22 +84,37 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         onMapClick(e.latlng.lat, e.latlng.lng);
       });
       
+      // Dynamic Button Handling inside Popups
       map.on('popupopen', (e: any) => {
          const popupNode = e.popup._contentNode;
+         
+         // Attach click listener to NAVIGATE button
          const navBtn = popupNode.querySelector('.btn-navigate');
-         if (navBtn && onNavigate) {
-            navBtn.onclick = () => {
+         if (navBtn) {
+            navBtn.onclick = (evt: any) => {
+                evt.stopPropagation(); // Prevent map click
                 const noteId = navBtn.getAttribute('data-id');
-                const note = notes.find(n => n.id === noteId);
-                if (note) onNavigate(note);
+                // Use REF to get the LATEST notes array
+                const note = notesRef.current.find(n => n.id === noteId);
+                if (note && onNavigateRef.current) {
+                    onNavigateRef.current(note);
+                } else {
+                    console.warn("Could not find note data for navigation:", noteId);
+                }
             };
          }
+
+         // Attach click listener to DISPATCH button
          const dispatchBtn = popupNode.querySelector('.btn-dispatch');
-         if (dispatchBtn && onDispatch) {
-            dispatchBtn.onclick = () => {
+         if (dispatchBtn) {
+            dispatchBtn.onclick = (evt: any) => {
+                evt.stopPropagation(); // Prevent map click
                 const noteId = dispatchBtn.getAttribute('data-id');
-                const note = notes.find(n => n.id === noteId);
-                if (note) onDispatch(note);
+                // Use REF to get the LATEST notes array
+                const note = notesRef.current.find(n => n.id === noteId);
+                if (note && onDispatchRef.current) {
+                    onDispatchRef.current(note);
+                }
             };
          }
       });
@@ -122,15 +151,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
                 } else {
                     // 2. If not in DB, fallback to network
                     tile.src = this.getTileUrl(coords);
-                    
-                    // If online and we want to cache passively (optional, disabled for now to save space)
-                    /* 
-                    if (navigator.onLine) {
-                         fetch(tile.src).then(res => res.blob()).then(blob => {
-                             offlineMaps.saveTile(coords.x, coords.y, coords.z, blob);
-                         });
-                    }
-                    */
                 }
             }).catch(() => {
                 // Fallback on error
@@ -144,12 +164,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     });
 
     if (isSatellite) {
-      // Use standard URL for "online" path, but our custom class intercepts it
       const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri',
         maxZoom: 19
       });
-      // We keep labels online-only for now as they are complex to cache separately without significant storage
       const labels = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19
       });
@@ -160,7 +178,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       layerGroupRef.current.addLayer(transport);
       layerGroupRef.current.addLayer(labels);
     } else {
-       // Also attempt offline support for standard map if desired, but user asked for Satellite specifically usually
        const darkLayer = new OfflineTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap, &copy; CARTO',
         subdomains: 'abcd',
