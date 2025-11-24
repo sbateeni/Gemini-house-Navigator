@@ -12,7 +12,8 @@ import { LeafletMap } from './components/LeafletMap';
 import { DatabaseSetupModal } from './components/DatabaseSetupModal';
 import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
-import { AdminDashboard } from './components/AdminDashboard'; // Import Dashboard
+import { AdminDashboard } from './components/AdminDashboard';
+import { SettingsModal } from './components/SettingsModal'; // New Import
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -49,6 +50,7 @@ export default function App() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false); // Admin Dashboard State
+  const [showSettings, setShowSettings] = useState(false); // Settings Modal State
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userNoteInput, setUserNoteInput] = useState("");
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -303,7 +305,8 @@ export default function App() {
         isConnected={isConnected}
         userRole={userRole}
         onLogout={handleLogout}
-        onOpenDashboard={() => setShowDashboard(true)} // Open Dashboard
+        onOpenDashboard={() => setShowDashboard(true)} 
+        onOpenSettings={() => setShowSettings(true)} // Pass settings handler
       />
 
       <div className="flex-1 relative w-full h-full">
@@ -344,6 +347,18 @@ export default function App() {
             isOpen={showDashboard} 
             onClose={() => setShowDashboard(false)} 
             currentUserId={session.user.id}
+          />
+        )}
+
+        {/* Settings Modal (Admin Only) */}
+        {userRole === 'admin' && (
+          <SettingsModal 
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            user={session.user}
+            userRole={userRole}
+            isSatellite={isSatellite}
+            setIsSatellite={setIsSatellite}
           />
         )}
       </div>
