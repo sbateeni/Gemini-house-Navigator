@@ -38,8 +38,11 @@ export default function App() {
   // Search & Navigation State
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Navigation State
   const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
+  const [navigationTarget, setNavigationTarget] = useState<{lat: number, lng: number} | null>(null);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -61,12 +64,26 @@ export default function App() {
     localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
   }, [isSatellite]);
 
+  // Dynamic Rerouting Effect
+  // Whenever userLocation updates (GPS moves), recalculate route to the target
+  useEffect(() => {
+    if (!userLocation || !navigationTarget) return;
+
+    const updateRoute = async () => {
+        // We don't set isRouting(true) here to avoid UI flickering on every GPS update
+        const route = await getRoute(userLocation.lat, userLocation.lng, navigationTarget.lat, navigationTarget.lng);
+        if (route) setCurrentRoute(route);
+    };
+
+    updateRoute();
+  }, [userLocation, navigationTarget]);
+
   // UI Actions
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
     setUserNoteInput("");
     setShowModal(true);
-    setCurrentRoute(null);
+    handleStopNavigation(); // Clear nav when clicking elsewhere
   };
 
   const handleSaveNote = async () => {
@@ -128,14 +145,14 @@ export default function App() {
     if (result) {
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
-      setCurrentRoute(null);
+      handleStopNavigation();
       if (window.innerWidth < 768) setSidebarOpen(false);
     }
   };
 
   const flyToNote = (note: MapNote) => {
     setSelectedNote(note);
-    setCurrentRoute(null);
+    handleStopNavigation();
     setFlyToTarget({ lat: note.lat, lng: note.lng, zoom: 16, timestamp: Date.now() });
     if (window.innerWidth < 768) setSidebarOpen(false);
   };
@@ -145,7 +162,7 @@ export default function App() {
     try {
       await deleteNote(id);
       if (selectedNote?.id === id) setSelectedNote(null);
-      if (currentRoute) setCurrentRoute(null);
+      if (currentRoute) handleStopNavigation();
     } catch (error) {
       alert("Failed to delete note. Ensure you have admin permissions.");
     }
@@ -157,11 +174,25 @@ export default function App() {
           locateUser();
           return;
       }
+      
+      // Start navigation loop
       setIsRouting(true);
+      setNavigationTarget({ lat: note.lat, lng: note.lng });
+      
+      // Initial fetch
       const route = await getRoute(userLocation.lat, userLocation.lng, note.lat, note.lng);
       setIsRouting(false);
+      
       if (route) setCurrentRoute(route);
-      else alert("Could not find a driving route.");
+      else {
+        alert("Could not find a driving route.");
+        setNavigationTarget(null); // Cancel if failed
+      }
+  };
+
+  const handleStopNavigation = () => {
+    setNavigationTarget(null);
+    setCurrentRoute(null);
   };
 
   const locateUser = () => {
@@ -215,6 +246,7 @@ export default function App() {
         onFlyToNote={flyToNote}
         onDeleteNote={handleDeleteNote}
         onNavigateToNote={handleNavigateToNote}
+        onStopNavigation={handleStopNavigation}
         routeData={currentRoute}
         isRouting={isRouting}
         onAnalyzeNote={handleAnalyzeNote}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ interface SidebarProps {
   onFlyToNote: (note: MapNote) => void;
   onDeleteNote: (id: string, e: React.MouseEvent) => void;
   onNavigateToNote: (note: MapNote) => void;
+  onStopNavigation: () => void;
   routeData: RouteData | null;
   isRouting: boolean;
   onAnalyzeNote: (note: MapNote) => void;
@@ -38,6 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onFlyToNote,
   onDeleteNote,
   onNavigateToNote,
+  onStopNavigation,
   routeData,
   isRouting,
   onAnalyzeNote,
@@ -263,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="mb-4 space-y-2">
              {/* Navigation Status */}
              {routeData && selectedNote ? (
-               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between">
+               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
                  <div className="flex gap-4">
                    <div className="flex items-center gap-1.5 text-green-400">
                      <Clock size={16} />
@@ -274,6 +276,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                      <span className="font-mono font-bold">{formatDistance(routeData.distance)}</span>
                    </div>
                  </div>
+                 <button 
+                   onClick={onStopNavigation}
+                   className="bg-red-900/30 hover:bg-red-900/50 text-red-400 p-1.5 rounded-lg transition-colors"
+                   title="Stop Navigation"
+                 >
+                   <XSquare size={18} />
+                 </button>
                </div>
              ) : (
                 <button 
