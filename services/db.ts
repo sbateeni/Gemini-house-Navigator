@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabase';
 import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
 
@@ -13,7 +14,6 @@ const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
 
 export const db = {
   // --- OFFLINE SYNC LOGIC ---
-  
   async syncPendingNotes() {
     if (!navigator.onLine) return;
     
@@ -25,32 +25,48 @@ export const db = {
 
     console.log(`Syncing ${pendingNotes.length} offline notes...`);
     
-    // Process sync sequentially
     for (const note of pendingNotes) {
       try {
-        await this.addNote(note, true); // true = force online save
+        await this.addNote(note, true);
       } catch (e) {
         console.error("Failed to sync note", note.id, e);
       }
     }
 
-    // Clear queue
     localStorage.removeItem(CACHE_KEY_PENDING_NOTES);
-    // Refresh cache
-    await this.getAllNotes();
+    // Refresh cache implicitly handled by UI reload
   },
 
   // --- CORE FUNCTIONS ---
 
-  async getAllNotes(): Promise<MapNote[]> {
-    // 1. Try to fetch from Supabase
+  async getAllNotes(currentUserProfile?: UserProfile): Promise<MapNote[]> {
     try {
       if (!navigator.onLine) throw new Error("Offline");
 
-      const { data, error } = await supabase
+      // Build Query based on Hierarchy
+      let query = supabase
         .from('notes')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Apply Hierarchical Filters
+      if (currentUserProfile) {
+        const role = currentUserProfile.role;
+        // Super Admin sees ALL
+        if (role === 'super_admin') {
+           // No filter
+        } 
+        // Governorate Admin sees ONLY their governorate
+        else if (role === 'governorate_admin' && currentUserProfile.governorate) {
+           query = query.eq('governorate', currentUserProfile.governorate);
+        }
+        // Center Admin/User sees ONLY their center
+        else if ((role === 'center_admin' || role === 'user') && currentUserProfile.center) {
+           query = query.eq('center', currentUserProfile.center);
+        }
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -63,27 +79,26 @@ export const db = {
         aiAnalysis: row.ai_analysis,
         createdAt: row.created_at,
         status: row.status,
-        sources: row.sources
+        sources: row.sources,
+        governorate: row.governorate,
+        center: row.center
       })) as MapNote[];
 
-      // Cache successful response
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
       
       return notes;
 
     } catch (error: any) {
-      // 2. Fallback to Local Cache
       console.warn("Fetching failed or offline, loading from cache...", error);
       const cached = localStorage.getItem(CACHE_KEY_NOTES);
       
       if (cached) {
         const localNotes = JSON.parse(cached);
-        // Also merge any pending offline notes for display
         const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
         return [...pending, ...localNotes];
       }
 
-      if (error.message === "Offline") throw error; // Allow UI to know we are purely offline
+      if (error.message === "Offline") throw error;
       
       if (error.code === 'PGRST205' || error.code === '42P01') {
         const missingError: any = new Error('Table Missing');
@@ -95,7 +110,6 @@ export const db = {
   },
 
   async addNote(note: MapNote, forceOnline = false): Promise<void> {
-    // Offline Check
     if (!navigator.onLine && !forceOnline) {
       console.log("Offline: Saving note to pending queue");
       const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
@@ -114,7 +128,9 @@ export const db = {
         ai_analysis: note.aiAnalysis,
         created_at: note.createdAt,
         status: note.status || null,
-        sources: note.sources || []
+        sources: note.sources || [],
+        governorate: note.governorate, // Add Hierarchy Tags
+        center: note.center
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
@@ -122,10 +138,8 @@ export const db = {
       
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
-      // If error is network related, save to pending
       if (!navigator.onLine || error.message?.includes('fetch')) {
          const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
-         // Avoid duplicates
          if (!pending.find((n: MapNote) => n.id === note.id)) {
             pending.push(note);
             localStorage.setItem(CACHE_KEY_PENDING_NOTES, JSON.stringify(pending));
@@ -136,19 +150,12 @@ export const db = {
   },
 
   async deleteNote(id: string): Promise<void> {
-    if (!navigator.onLine) {
-        throw new Error("Cannot delete notes while offline.");
-    }
-    try {
-      const { error } = await supabase.from('notes').delete().eq('id', id);
-      if (error) throw error;
-    } catch (error: any) {
-      console.error("Error deleting note", error);
-      throw error;
-    }
+    if (!navigator.onLine) throw new Error("Cannot delete notes while offline.");
+    const { error } = await supabase.from('notes').delete().eq('id', id);
+    if (error) throw error;
   },
 
-  // Get User Profile (Role & Approval)
+  // Get User Profile
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await supabase
@@ -165,20 +172,36 @@ export const db = {
         role: data.role,
         isApproved: data.is_approved === true,
         email: data.email,
-        permissions: data.permissions || DEFAULT_PERMISSIONS
+        permissions: data.permissions || DEFAULT_PERMISSIONS,
+        governorate: data.governorate,
+        center: data.center
       };
     } catch (error) {
       return null;
     }
   },
 
-  // Admin: Get All Profiles
-  async getAllProfiles(): Promise<UserProfile[]> {
+  // Admin: Get All Profiles (Filtered by Rank)
+  async getAllProfiles(currentUserProfile?: UserProfile): Promise<UserProfile[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*')
-        .order('role', { ascending: true }); 
+        .order('role', { ascending: true });
+
+      // Apply Filters
+      if (currentUserProfile) {
+        const role = currentUserProfile.role;
+        if (role === 'governorate_admin' && currentUserProfile.governorate) {
+           // See users in my gov OR unassigned users
+           query = query.or(`governorate.eq.${currentUserProfile.governorate},governorate.is.null`);
+        } else if (role === 'center_admin' && currentUserProfile.center) {
+           // See users in my center
+           query = query.eq('center', currentUserProfile.center);
+        }
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -188,7 +211,9 @@ export const db = {
         role: row.role,
         isApproved: row.is_approved === true,
         email: row.email,
-        permissions: row.permissions || DEFAULT_PERMISSIONS
+        permissions: row.permissions || DEFAULT_PERMISSIONS,
+        governorate: row.governorate,
+        center: row.center
       }));
     } catch (error) {
       return [];
@@ -201,6 +226,8 @@ export const db = {
       if (updates.role) dbUpdates.role = updates.role;
       if (updates.isApproved !== undefined) dbUpdates.is_approved = updates.isApproved;
       if (updates.permissions) dbUpdates.permissions = updates.permissions;
+      if (updates.governorate !== undefined) dbUpdates.governorate = updates.governorate;
+      if (updates.center !== undefined) dbUpdates.center = updates.center;
 
       const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', id);
       if (error) throw error;
@@ -210,69 +237,57 @@ export const db = {
   },
 
   async createAssignment(assignment: Omit<Assignment, 'id' | 'createdAt' | 'status'>): Promise<void> {
-    try {
-      const { error } = await supabase.from('assignments').insert({
-          target_user_id: assignment.targetUserId,
-          location_id: assignment.locationId,
-          location_name: assignment.locationName,
-          lat: assignment.lat,
-          lng: assignment.lng,
-          instructions: assignment.instructions,
-          created_by: assignment.createdBy,
-          created_at: Date.now(),
-          status: 'pending'
-        });
-      if (error) throw error;
-    } catch (error) {
-      throw error;
-    }
+    const { error } = await supabase.from('assignments').insert({
+        target_user_id: assignment.targetUserId,
+        location_id: assignment.locationId,
+        location_name: assignment.locationName,
+        lat: assignment.lat,
+        lng: assignment.lng,
+        instructions: assignment.instructions,
+        created_by: assignment.createdBy,
+        created_at: Date.now(),
+        status: 'pending'
+    });
+    if (error) throw error;
   },
 
   async getMyAssignments(userId: string): Promise<Assignment[]> {
-    try {
-      const { data, error } = await supabase
-        .from('assignments')
-        .select('*')
-        .eq('target_user_id', userId)
-        .neq('status', 'completed')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('target_user_id', userId)
+      .neq('status', 'completed')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        targetUserId: row.target_user_id,
-        locationId: row.location_id,
-        locationName: row.location_name,
-        lat: row.lat,
-        lng: row.lng,
-        instructions: row.instructions,
-        status: row.status,
-        createdBy: row.created_by,
-        createdAt: row.created_at
-      }));
-    } catch (error) {
-      return [];
-    }
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      targetUserId: row.target_user_id,
+      locationId: row.location_id,
+      locationName: row.location_name,
+      lat: row.lat,
+      lng: row.lng,
+      instructions: row.instructions,
+      status: row.status,
+      createdBy: row.created_by,
+      createdAt: row.created_at
+    }));
   },
 
   async updateAssignmentStatus(id: string, status: 'accepted' | 'completed'): Promise<void> {
-    try {
-      const { error } = await supabase.from('assignments').update({ status }).eq('id', id);
-      if (error) throw error;
-    } catch (error) {
-      throw error;
-    }
+    const { error } = await supabase.from('assignments').update({ status }).eq('id', id);
+    if (error) throw error;
   },
 
-  // --- LOGGING SYSTEM ---
   async createLogEntry(entry: Omit<LogEntry, 'id'>): Promise<void> {
     try {
       await supabase.from('logs').insert({
         message: entry.message,
         type: entry.type,
         user_id: entry.userId,
-        timestamp: entry.timestamp
+        timestamp: entry.timestamp,
+        governorate: entry.governorate
       });
     } catch (error) {
       console.error("Log failed", error);
@@ -280,24 +295,21 @@ export const db = {
   },
 
   async getRecentLogs(limit = 20): Promise<LogEntry[]> {
-    try {
-      const { data, error } = await supabase
-        .from('logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(limit);
-      
-      if (error) throw error;
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+    
+    if (error) throw error;
 
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        message: row.message,
-        type: row.type,
-        userId: row.user_id,
-        timestamp: row.timestamp
-      }));
-    } catch (error) {
-      return [];
-    }
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      message: row.message,
+      type: row.type,
+      userId: row.user_id,
+      timestamp: row.timestamp,
+      governorate: row.governorate
+    }));
   }
 };

@@ -1,10 +1,11 @@
 
+
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
-import { MapNote } from '../types';
+import { MapNote, UserProfile } from '../types';
 
-export function useNotes(session: any, isApproved: boolean, isAccountDeleted: boolean) {
+export function useNotes(session: any, isApproved: boolean, isAccountDeleted: boolean, userProfile: UserProfile | null) {
   const [notes, setNotes] = useState<MapNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
@@ -12,8 +13,9 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
 
   // Sync function
   const refreshNotes = async () => {
+      if (!userProfile) return;
       try {
-        const savedNotes = await db.getAllNotes();
+        const savedNotes = await db.getAllNotes(userProfile);
         setNotes(savedNotes);
         setIsConnected(true);
       } catch (error: any) {
@@ -29,7 +31,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
   };
 
   useEffect(() => {
-    if (!session || !isApproved || isAccountDeleted) return;
+    if (!session || !isApproved || isAccountDeleted || !userProfile) return;
 
     // Initial load
     refreshNotes();
@@ -65,7 +67,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
        window.removeEventListener('offline', handleOffline);
     };
 
-  }, [session, isApproved, isAccountDeleted]);
+  }, [session, isApproved, isAccountDeleted, userProfile?.id]); // Depend on Profile ID
 
   const addNote = async (note: MapNote) => {
     // Optimistic UI update

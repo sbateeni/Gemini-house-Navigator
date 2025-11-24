@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapNote, RouteData, UnitStatus, UserProfile } from '../types';
+import { MapNote, RouteData, UnitStatus, UserProfile, UserRole } from '../types';
 import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings, CircleDot, Users, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
 
@@ -23,7 +23,7 @@ interface SidebarProps {
   isAnalyzing: boolean;
   onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
   isConnected: boolean;
-  userRole: 'admin' | 'user' | 'banned' | null;
+  userRole: UserRole | null;
   onLogout: () => void;
   onEditNote: (note: MapNote, e: React.MouseEvent) => void;
   onOpenDashboard: () => void;
@@ -67,12 +67,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+  const isAdmin = userRole === 'super_admin' || userRole === 'governorate_admin' || userRole === 'center_admin';
+
   // Fetch all profiles if admin (to show offline users too)
   useEffect(() => {
-    if (userRole === 'admin') {
+    if (isAdmin) {
       db.getAllProfiles().then(setAllProfiles);
     }
-  }, [userRole, isOpen]);
+  }, [isAdmin, isOpen]);
 
   // --- AUTO CLOSE LOGIC ---
   useEffect(() => {
@@ -235,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* --- UNITS LIST (ADMIN ONLY) --- */}
-        {userRole === 'admin' && (
+        {isAdmin && (
             <div className="mb-4 space-y-1">
                 <h3 className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1 flex items-center justify-between">
                     <span>حالة القوات ({onlineUsers.length} متصل)</span>
@@ -286,7 +288,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 
                 {/* Actions */}
                 <div className="absolute left-2 top-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                   {userRole === 'admin' && (
+                   {isAdmin && (
                         <>
                             <button onClick={(e) => onDeleteNote(note.id, e)} className="p-1.5 rounded hover:bg-red-900/30 text-slate-500 hover:text-red-400">
                                 <Trash2 size={12} />
@@ -331,7 +333,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer */}
       <div className="p-3 border-t border-slate-800 bg-slate-900/50 space-y-2">
-         {userRole === 'admin' && (
+         {isAdmin && (
            <div className="grid grid-cols-2 gap-2">
              <button onClick={onOpenDashboard} className="flex items-center justify-center gap-2 p-2 rounded-lg text-purple-400 bg-purple-900/10 hover:bg-purple-900/20 border border-purple-900/30 text-xs font-bold">
                <LayoutDashboard size={14} /> الإدارة

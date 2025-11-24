@@ -1,4 +1,5 @@
 
+
 export interface MapNote {
   id: string;
   lat: number;
@@ -9,6 +10,9 @@ export interface MapNote {
   createdAt: number;
   sources?: GroundingSource[];
   status?: 'caught' | 'not_caught';
+  // Hierarchy Fields
+  governorate?: string;
+  center?: string;
 }
 
 export interface GroundingSource {
@@ -34,13 +38,18 @@ export interface UserPermissions {
   can_navigate: boolean;
 }
 
+export type UserRole = 'super_admin' | 'governorate_admin' | 'center_admin' | 'user' | 'banned';
+
 export interface UserProfile {
   id: string;
   username: string;
-  role: 'admin' | 'user' | 'banned';
+  role: UserRole;
   isApproved: boolean;
   email?: string;
   permissions: UserPermissions;
+  // Hierarchy Fields
+  governorate?: string;
+  center?: string;
 }
 
 export type UnitStatus = 'patrol' | 'busy' | 'pursuit' | 'offline';
@@ -76,4 +85,5 @@ export interface LogEntry {
   type: 'alert' | 'info' | 'dispatch' | 'status';
   userId?: string;
   timestamp: number;
+  governorate?: string;
 }

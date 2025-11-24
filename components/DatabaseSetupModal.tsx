@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Database, Terminal, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
+import { Database, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 export const DatabaseSetupModal: React.FC = () => {
@@ -15,6 +15,8 @@ create table if not exists profiles (
   is_approved boolean default false,
   email text,
   permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb,
+  governorate text, -- المحافظة
+  center text,      -- المركز
   primary key (id)
 );
 
@@ -29,7 +31,7 @@ create policy "Self insert" on profiles for insert with check (auth.uid() = id);
 drop policy if exists "Admin update" on profiles;
 create policy "Admin update" on profiles for update using (
   auth.uid() = id OR 
-  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin'))
 );
 
 -- 3. Auto-create profile on signup
@@ -55,6 +57,20 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- 4. Secure the Notes Table
+create table if not exists notes (
+  id text primary key,
+  lat float8,
+  lng float8,
+  user_note text,
+  location_name text,
+  ai_analysis text,
+  created_at bigint,
+  status text,
+  sources jsonb,
+  governorate text,
+  center text
+);
+
 alter table notes enable row level security;
 
 drop policy if exists "Public Access" on notes;
@@ -63,26 +79,15 @@ drop policy if exists "Auth insert" on notes;
 drop policy if exists "Auth update" on notes;
 drop policy if exists "Admin delete" on notes;
 
-create policy "Auth read" on notes for select using (
-  auth.role() = 'authenticated' and 
-  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
-);
-
-create policy "Auth insert" on notes for insert with check (
-  auth.role() = 'authenticated' and
-  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
-);
-
-create policy "Auth update" on notes for update using (
-  auth.role() = 'authenticated' and
-  exists (select 1 from profiles where id = auth.uid() and is_approved = true)
-);
-
+-- Simple RLS for now, detailed filtering handled in app logic for speed
+create policy "Auth read" on notes for select using (auth.role() = 'authenticated');
+create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
+create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
 create policy "Admin delete" on notes for delete using (
-  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin'))
 );
 
--- 5. Create Assignments Table (Operations Dispatch)
+-- 5. Create Assignments Table
 create table if not exists assignments (
   id uuid default gen_random_uuid() primary key,
   target_user_id uuid not null references auth.users(id),
@@ -91,7 +96,7 @@ create table if not exists assignments (
   lat float8 not null,
   lng float8 not null,
   instructions text,
-  status text default 'pending', -- pending, accepted, completed
+  status text default 'pending', 
   created_by uuid references auth.users(id),
   created_at bigint
 );
@@ -112,18 +117,19 @@ create policy "Update assignments" on assignments for update using (
   auth.uid() = target_user_id OR auth.uid() = created_by
 );
 
--- 6. Create Logs Table (Tactical Events)
+-- 6. Create Logs Table
 create table if not exists logs (
   id uuid default gen_random_uuid() primary key,
   message text not null,
-  type text not null, -- alert, info, dispatch, status
+  type text not null, 
   user_id uuid references auth.users(id),
-  timestamp bigint
+  timestamp bigint,
+  governorate text
 );
 
 alter table logs enable row level security;
 drop policy if exists "Read logs" on logs;
-create policy "Read logs" on logs for select using (true); -- Everyone can read logs
+create policy "Read logs" on logs for select using (true);
 
 drop policy if exists "Create logs" on logs;
 create policy "Create logs" on logs for insert with check (auth.role() = 'authenticated');
@@ -146,22 +152,22 @@ create policy "Create logs" on logs for insert with check (auth.role() = 'authen
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4">
+    <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex items-start gap-4">
           <div className="p-3 bg-red-900/20 rounded-xl border border-red-900/50">
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">Update Required: Ops System</h1>
+            <h1 className="text-xl font-bold text-white mb-1">تحديث النظام مطلوب: الهيكلية</h1>
             <p className="text-slate-400 text-sm">
-              The app needs the new <span className="text-purple-400 font-bold mx-1">Logs Table</span> for the Tactical Operations Center.
+              التطبيق يحتاج لتحديث قاعدة البيانات لدعم <span className="text-purple-400 font-bold mx-1">الهيكلية الهرمية</span> (المحافظات والمراكز).
             </p>
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-slate-950 p-0 group">
-          <pre className="h-full overflow-auto p-6 text-xs md:text-sm font-mono text-green-400/90 leading-relaxed scrollbar-thin">
+          <pre className="h-full overflow-auto p-6 text-xs md:text-sm font-mono text-green-400/90 leading-relaxed scrollbar-thin text-left" dir="ltr">
             {setupSQL}
           </pre>
           <button 
@@ -169,7 +175,7 @@ create policy "Create logs" on logs for insert with check (auth.role() = 'authen
             className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-xs font-bold border border-slate-600 flex items-center gap-2 shadow-xl transition-all"
           >
             {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-            {copied ? 'COPIED' : 'COPY SQL'}
+            {copied ? 'تم النسخ' : 'نسخ الكود'}
           </button>
         </div>
 
@@ -180,13 +186,13 @@ create policy "Create logs" on logs for insert with check (auth.role() = 'authen
                className="w-full md:w-auto flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
              >
                <ExternalLink size={18} />
-               Open Supabase SQL Editor
+               فتح محرر Supabase SQL
              </button>
              <button 
                onClick={() => window.location.reload()}
                className="w-full md:w-auto px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium transition-all"
              >
-               I've run the code, Refresh
+               تم التحديث، إعادة تحميل
              </button>
           </div>
         </div>

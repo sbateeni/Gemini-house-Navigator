@@ -1,9 +1,10 @@
 
+
 import { useState, useEffect, useCallback } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
-import { UserPermissions } from '../types';
+import { UserPermissions, UserProfile, UserRole } from '../types';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -14,10 +15,11 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
 export function useAuth() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'user' | 'banned' | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
   const [isAccountDeleted, setIsAccountDeleted] = useState(false);
   const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Define logic as a reusable function for manual checks
   const refreshAuth = useCallback(async () => {
@@ -37,11 +39,13 @@ export function useAuth() {
              // 2. Fetch Profile & Role
              const profile = await db.getUserProfile(session.user.id);
              if (profile) {
+                 setUserProfile(profile);
                  setUserRole(profile.role);
                  setPermissions(profile.permissions);
                  
-                 // ADMIN OVERRIDE: If role is admin, force approval to true regardless of DB flag
-                 const effectiveApproval = profile.role === 'admin' ? true : profile.isApproved;
+                 // ADMIN OVERRIDE (For Super/Gov/Center Admins)
+                 const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(profile.role);
+                 const effectiveApproval = isAdmin ? true : profile.isApproved;
                  setIsApproved(effectiveApproval);
                  
                  // If banned, treat as not approved (or handle in UI)
@@ -80,6 +84,7 @@ export function useAuth() {
           setIsApproved(false);
           setIsAccountDeleted(false);
           setPermissions(DEFAULT_PERMISSIONS);
+          setUserProfile(null);
           setAuthLoading(false);
       } else if (session?.user) {
         // Re-run full check on sign-in events
@@ -112,12 +117,13 @@ export function useAuth() {
         (payload: any) => {
           const newProfile = payload.new;
           if (newProfile) {
-             const isAdmin = userRole === 'admin'; 
+             const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
              
              // Update Approval
              if (isAdmin || newProfile.is_approved === true) {
                setIsApproved(true);
              }
+             
              if (newProfile.role === 'banned') {
                setIsApproved(false);
                setUserRole('banned');
@@ -129,6 +135,9 @@ export function useAuth() {
              if (newProfile.permissions) {
                setPermissions(newProfile.permissions);
              }
+             
+             // Update full profile object
+             setUserProfile(prev => prev ? ({ ...prev, ...newProfile, permissions: newProfile.permissions }) : null);
           }
         }
       )
@@ -163,6 +172,7 @@ export function useAuth() {
     permissions,
     isAccountDeleted,
     handleLogout,
-    refreshAuth 
+    refreshAuth,
+    userProfile
   };
 }

@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle, Trash2, Database, AlertTriangle } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
+import { UserRole } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: any; 
-  userRole: 'admin' | 'user' | null;
+  userRole: UserRole | null;
   isSatellite: boolean;
   setIsSatellite: (isSat: boolean) => void;
 }
@@ -21,6 +22,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  const isAdmin = userRole === 'super_admin' || userRole === 'governorate_admin' || userRole === 'center_admin';
 
   if (!isOpen) return null;
 
@@ -83,8 +86,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <div className="text-white font-bold text-lg">{user?.user_metadata?.username || 'مستخدم'}</div>
                   <div className="text-slate-400 text-sm flex items-center gap-1.5">
-                    <Shield size={12} className={userRole === 'admin' ? 'text-purple-400' : 'text-slate-500'} />
-                    <span className="capitalize">{userRole === 'admin' ? 'مدير النظام' : 'عنصر'}</span>
+                    <Shield size={12} className={isAdmin ? 'text-purple-400' : 'text-slate-500'} />
+                    <span className="capitalize">{isAdmin ? 'مدير النظام' : 'عنصر'}</span>
                   </div>
                 </div>
               </div>

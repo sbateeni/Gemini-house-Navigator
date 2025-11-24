@@ -1,12 +1,14 @@
+
 import { useState } from 'react';
-import { MapNote } from '../types';
+import { MapNote, UserProfile } from '../types';
 
 export function useNoteForm(
     addNote: (n: MapNote) => Promise<void>,
     updateNote: (n: MapNote) => Promise<void>,
     setIsConnected: (s: boolean) => void,
     setSelectedNote: (n: MapNote | null) => void,
-    setSidebarOpen: (o: boolean) => void
+    setSidebarOpen: (o: boolean) => void,
+    userProfile: UserProfile | null
 ) {
   const [showModal, setShowModal] = useState(false);
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
@@ -28,7 +30,6 @@ export function useNoteForm(
     setTempCoords({ lat: note.lat, lng: note.lng });
     setUserNoteInput(note.userNote);
     setEditingNoteData(note);
-    // We set selected note in parent usually, but here we track editing data
     setSelectedNote(note); 
     setIsEditingNote(true);
     setShowModal(true);
@@ -53,11 +54,14 @@ export function useNoteForm(
           lat: tempCoords.lat,
           lng: tempCoords.lng,
           userNote: userNoteInput,
-          locationName: "Saved Location",
+          locationName: "موقع محدد",
           aiAnalysis: "",
           sources: [],
           createdAt: Date.now(),
-          status: 'not_caught'
+          status: 'not_caught',
+          // Auto-tag hierarchy
+          governorate: userProfile?.governorate,
+          center: userProfile?.center
         };
         await addNote(newNote);
         setSelectedNote(newNote);

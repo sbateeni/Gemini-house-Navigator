@@ -1,22 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { MapNote, MapUser, Assignment, UnitStatus } from './types';
 import { db } from './services/db';
 
 // Components
+import { ModalContainer } from './components/ModalContainer';
 import { Sidebar } from './components/Sidebar';
-import { CreateNoteModal } from './components/CreateNoteModal';
 import { MapControls } from './components/MapControls';
 import { LeafletMap } from './components/LeafletMap';
 import { DatabaseSetupModal } from './components/DatabaseSetupModal';
 import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
-import { AdminDashboard } from './components/AdminDashboard';
-import { SettingsModal } from './components/SettingsModal';
-import { UserCommandModal } from './components/UserCommandModal';
-import { LocationPickerModal } from './components/LocationPickerModal';
-import { DispatchModal } from './components/DispatchModal';
 import { NotificationBell } from './components/NotificationBell';
 import { SOSButton } from './components/SOSButton';
 import { OperationsLog } from './components/OperationsLog';
@@ -32,16 +26,18 @@ import { useAssignments } from './hooks/useAssignments';
 
 export default function App() {
   // --- 1. Authentication & User Data ---
-  const { session, authLoading, userRole, isApproved, permissions, isAccountDeleted, handleLogout, refreshAuth } = useAuth();
+  const { session, authLoading, userRole, isApproved, permissions, isAccountDeleted, handleLogout, refreshAuth, userProfile } = useAuth();
   const isBanned = userRole === 'banned';
-  const hasAccess = !isAccountDeleted && !isBanned && (isApproved || userRole === 'admin');
+  // Super Admins, Gov Admins, Center Admins and generic Admins bypass certain checks
+  const isAnyAdmin = ['admin', 'super_admin', 'governorate_admin', 'center_admin'].includes(userRole || '');
+  const hasAccess = !isAccountDeleted && !isBanned && (isApproved || isAnyAdmin);
 
   // --- 2. Tactical State ---
   const [myStatus, setMyStatus] = useState<UnitStatus>('patrol');
   const [isSOS, setIsSOS] = useState(false);
 
   // --- 3. Core Data Hooks ---
-  const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted);
+  const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   const { userLocation } = useGeolocation(session, hasAccess);
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
@@ -83,7 +79,7 @@ export default function App() {
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
       handleMapClick, handleEditNote, handleSaveNote, closeModal 
-  } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen);
+  } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen, userProfile);
 
   // --- 7. Effects ---
   useEffect(() => {
@@ -100,20 +96,21 @@ export default function App() {
   useEffect(() => {
     if (session?.user && hasAccess) {
        db.createLogEntry({
-          message: `Unit ${session.user.user_metadata?.username || 'User'} is now ${myStatus.toUpperCase()}`,
+          message: `الوحدة ${session.user.user_metadata?.username || 'User'} غيرت الحالة إلى ${myStatus.toUpperCase()}`,
           type: 'status',
           userId: session.user.id,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          governorate: userProfile?.governorate // Log context
        });
     }
-  }, [myStatus]);
+  }, [myStatus, session?.user?.id, userProfile?.governorate]);
 
   // --- 8. Handlers ---
   const locateUser = () => {
     if (userLocation) {
         setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
     } else {
-        alert("Getting location...");
+        alert("جاري تحديد الموقع...");
     }
   };
 
@@ -123,11 +120,12 @@ export default function App() {
      if (session?.user) {
          db.createLogEntry({
              message: newState 
-                ? `🚨 SOS TRIGGERED BY ${session.user.user_metadata?.username?.toUpperCase()} 🚨` 
-                : `${session.user.user_metadata?.username} CANCELLED SOS`,
+                ? `🚨 استغاثة عاجلة من ${session.user.user_metadata?.username?.toUpperCase()} 🚨` 
+                : `${session.user.user_metadata?.username} ألغى الاستغاثة`,
              type: 'alert',
              userId: session.user.id,
-             timestamp: Date.now()
+             timestamp: Date.now(),
+             governorate: userProfile?.governorate
          });
      }
   };
@@ -167,7 +165,7 @@ export default function App() {
       setSelectedNote(updatedNote);
     } catch (error) {
       console.error("Analysis failed", error);
-      alert("AI Analysis failed. Please try again.");
+      alert("فشل التحليل الذكي.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -175,20 +173,20 @@ export default function App() {
 
   const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this note?")) {
+    if (confirm("هل أنت متأكد من حذف هذا الموقع؟")) {
       try {
         await deleteNote(id);
         if (selectedNote?.id === id) setSelectedNote(null);
         if (currentRoute) handleStopNavigation();
       } catch (error) {
-        alert("Failed to delete note. Ensure you have admin permissions.");
+        alert("فشل الحذف. تأكد من الصلاحيات.");
       }
     }
   };
 
   // Tactical Command Handlers
   const onUserClick = (user: MapUser) => {
-    if (userRole === 'admin') {
+    if (isAnyAdmin) {
       setCommandUser(user);
     }
   };
@@ -213,7 +211,7 @@ export default function App() {
         setSecondaryRoute(route);
         setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
     } else {
-        alert("Could not calculate dispatch route.");
+        alert("فشل حساب مسار التوجيه.");
     }
     setShowLocationPicker(false);
     setCommandUser(null);
@@ -238,15 +236,16 @@ export default function App() {
       });
       // Log it
       await db.createLogEntry({
-          message: `Dispatch order sent to user`,
+          message: `تم إرسال تكليف للوحدة`,
           type: 'dispatch',
           userId: session.user.id,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          governorate: userProfile?.governorate
       });
-      alert("Order Dispatched Successfully!");
+      alert("تم الإرسال بنجاح!");
     } catch (e) {
       console.error("Dispatch failed", e);
-      alert("Failed to send order.");
+      alert("فشل الإرسال.");
     }
   };
 
@@ -263,7 +262,7 @@ export default function App() {
         <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-medium animate-pulse">Initializing Tactical System...</p>
+                <p className="text-sm font-medium animate-pulse">جاري تحميل نظام القيادة...</p>
             </div>
         </div>
     );
@@ -285,7 +284,7 @@ export default function App() {
   if (tableMissing) return <DatabaseSetupModal />;
 
   return (
-    <div className="flex h-screen w-full bg-slate-950 overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-950 overflow-hidden" dir="rtl">
       <Sidebar 
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
@@ -301,7 +300,7 @@ export default function App() {
         onEditNote={handleEditNote} 
         onNavigateToNote={(note) => {
             if (permissions.can_navigate) handleNavigateToNote(note, locateUser);
-            else alert("Navigation permission required.");
+            else alert("ليس لديك صلاحية الملاحة.");
         }}
         onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
         routeData={currentRoute}
@@ -346,7 +345,7 @@ export default function App() {
           canSeeOthers={permissions.can_see_others}
           onNavigate={(note) => {
              if (permissions.can_navigate) handleNavigateToNote(note, locateUser);
-             else alert("Navigation permission denied.");
+             else alert("صلاحية الملاحة مرفوضة.");
           }}
           onDispatch={handleOpenDispatchModal}
           userRole={userRole}
@@ -363,63 +362,45 @@ export default function App() {
         {/* Live Operations Log */}
         <OperationsLog />
 
-        <CreateNoteModal 
-          isOpen={showModal}
-          onClose={closeModal}
-          tempCoords={tempCoords}
-          userNoteInput={userNoteInput}
-          setUserNoteInput={setUserNoteInput}
-          onSave={handleSaveNote}
-          isAnalyzing={isAnalyzing}
-          mode={isEditingNote ? 'edit' : 'create'}
-        />
-
-        <DispatchModal 
-            isOpen={!!dispatchTargetLocation}
-            onClose={() => setDispatchTargetLocation(null)}
-            targetLocation={dispatchTargetLocation}
-            onDispatch={handleSendDispatchOrder}
+        {/* Modals Container */}
+        <ModalContainer
+            showCreateModal={showModal}
+            closeCreateModal={closeModal}
+            tempCoords={tempCoords}
+            userNoteInput={userNoteInput}
+            setUserNoteInput={setUserNoteInput}
+            onSaveNote={handleSaveNote}
+            isAnalyzing={isAnalyzing}
+            isEditingNote={isEditingNote}
+            
+            showDashboard={showDashboard}
+            closeDashboard={() => setShowDashboard(false)}
             currentUserId={session.user.id}
-        />
-
-        {userRole === 'admin' && (
-          <AdminDashboard 
-            isOpen={showDashboard} 
-            onClose={() => setShowDashboard(false)} 
-            currentUserId={session.user.id}
-          />
-        )}
-
-        {userRole === 'admin' && (
-          <SettingsModal 
-            isOpen={showSettings}
-            onClose={() => setShowSettings(false)}
+            currentUserProfile={userProfile}
+            
+            showSettings={showSettings}
+            closeSettings={() => setShowSettings(false)}
             user={session.user}
             userRole={userRole}
             isSatellite={isSatellite}
             setIsSatellite={setIsSatellite}
-          />
-        )}
-
-        {userRole === 'admin' && (
-            <>
-                <UserCommandModal 
-                    isOpen={!!commandUser && !showLocationPicker}
-                    onClose={() => setCommandUser(null)}
-                    user={commandUser}
-                    onIntercept={handleIntercept}
-                    onDispatch={handleDispatch}
-                />
-                
-                <LocationPickerModal
-                    isOpen={showLocationPicker}
-                    onClose={() => { setShowLocationPicker(false); setCommandUser(null); }}
-                    notes={notes}
-                    onSelectLocation={handleSelectDispatchLocation}
-                    targetUserName={commandUser?.username}
-                />
-            </>
-        )}
+            
+            commandUser={commandUser}
+            closeCommandUser={() => setCommandUser(null)}
+            onIntercept={handleIntercept}
+            onDispatch={handleDispatch}
+            showLocationPicker={showLocationPicker} // Pass show logic
+            
+            showLocationPickerModal={showLocationPicker}
+            closeLocationPicker={() => { setShowLocationPicker(false); setCommandUser(null); }}
+            notes={notes}
+            onSelectDispatchLocation={handleSelectDispatchLocation}
+            commandUserName={commandUser?.username}
+            
+            dispatchTargetLocation={dispatchTargetLocation}
+            closeDispatchModal={() => setDispatchTargetLocation(null)}
+            onSendDispatch={handleSendDispatchOrder}
+        />
       </div>
     </div>
   );
