@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { MapNote } from '../types';
+import { MapNote, RouteData } from '../types';
 
 declare global {
   interface Window {
@@ -15,6 +15,8 @@ interface LeafletMapProps {
   onMapClick: (lat: number, lng: number) => void;
   flyToTarget: { lat: number; lng: number; zoom?: number; timestamp: number; showPulse?: boolean } | null;
   tempMarkerCoords: { lat: number; lng: number } | null;
+  userLocation: { lat: number; lng: number } | null;
+  currentRoute: RouteData | null;
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -24,11 +26,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   setSelectedNote,
   onMapClick,
   flyToTarget,
-  tempMarkerCoords
+  tempMarkerCoords,
+  userLocation,
+  currentRoute
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const layerGroupRef = useRef<any>(null);
+  const routeLayerRef = useRef<any>(null);
+  const userMarkerRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
 
   // Initialize Map
@@ -39,6 +45,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       }).setView([40.7128, -74.0060], 13);
       
       layerGroupRef.current = window.L.layerGroup().addTo(map);
+      routeLayerRef.current = window.L.layerGroup().addTo(map); // Separate layer for routes
       
       map.on('click', (e: any) => {
         onMapClick(e.latlng.lat, e.latlng.lng);
@@ -98,6 +105,71 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       }
     }
   }, [flyToTarget]);
+
+  // Handle User Location Marker
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation) return;
+    
+    if (userMarkerRef.current) {
+        mapInstanceRef.current.removeLayer(userMarkerRef.current);
+    }
+
+    const userIcon = window.L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+        <div style="position: relative; width: 24px; height: 24px;">
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #3b82f6; border: 2px solid white; border-radius: 50%; z-index: 2;"></div>
+            <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: rgba(59, 130, 246, 0.4); border-radius: 50%; animation: pulse 2s infinite;"></div>
+        </div>
+        <style>
+          @keyframes pulse {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+        </style>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    userMarkerRef.current = window.L.marker([userLocation.lat, userLocation.lng], { 
+        icon: userIcon,
+        zIndexOffset: 1000 
+    }).addTo(mapInstanceRef.current);
+
+  }, [userLocation]);
+
+  // Handle Route Drawing
+  useEffect(() => {
+    if (!mapInstanceRef.current || !routeLayerRef.current) return;
+    
+    // Clear previous route
+    routeLayerRef.current.clearLayers();
+
+    if (currentRoute && currentRoute.coordinates.length > 0) {
+        const polyline = window.L.polyline(currentRoute.coordinates, {
+            color: '#3b82f6', // Blue route
+            weight: 6,
+            opacity: 0.8,
+            lineCap: 'round',
+            lineJoin: 'round',
+            dashArray: '1, 10', // Initial dash for animation
+        }).addTo(routeLayerRef.current);
+
+        // Animate the line
+        let dashOffset = 0;
+        const animate = () => {
+             dashOffset -= 1;
+             polyline.setStyle({ dashArray: 'none' }); // Solid line after "loading" or keep simple
+             // For a simple solid line, just:
+             polyline.setStyle({ dashArray: null });
+        };
+        setTimeout(animate, 100);
+
+        // Fit bounds to show entire route
+        mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+    }
+  }, [currentRoute]);
 
   // Handle Notes Markers
   useEffect(() => {

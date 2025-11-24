@@ -1,6 +1,6 @@
 import React from 'react';
-import { MapNote } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink } from 'lucide-react';
+import { MapNote, RouteData } from '../types';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,6 +14,9 @@ interface SidebarProps {
   onSearch: (e: React.FormEvent) => void;
   onFlyToNote: (note: MapNote) => void;
   onDeleteNote: (id: string, e: React.MouseEvent) => void;
+  onNavigateToNote: (note: MapNote) => void;
+  routeData: RouteData | null;
+  isRouting: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,8 +30,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isSearching,
   onSearch,
   onFlyToNote,
-  onDeleteNote
+  onDeleteNote,
+  onNavigateToNote,
+  routeData,
+  isRouting
 }) => {
+  
+  const formatDuration = (seconds: number) => {
+    const min = Math.round(seconds / 60);
+    if (min > 60) {
+      const hrs = Math.floor(min / 60);
+      const mins = min % 60;
+      return `${hrs}h ${mins}m`;
+    }
+    return `${min} min`;
+  };
+
+  const formatDistance = (meters: number) => {
+    if (meters > 1000) {
+      return `${(meters / 1000).toFixed(1)} km`;
+    }
+    return `${Math.round(meters)} m`;
+  };
+
   return (
     <div 
       className={`
@@ -141,6 +165,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
              </button>
           </div>
           <h2 className="font-bold text-xl text-white mb-2">{selectedNote.locationName}</h2>
+          
+          {/* Navigation Controls */}
+          <div className="mb-4">
+             {routeData && selectedNote ? (
+               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between mb-2">
+                 <div className="flex gap-4">
+                   <div className="flex items-center gap-1.5 text-green-400">
+                     <Clock size={16} />
+                     <span className="font-mono font-bold">{formatDuration(routeData.duration)}</span>
+                   </div>
+                   <div className="flex items-center gap-1.5 text-green-400">
+                     <Ruler size={16} />
+                     <span className="font-mono font-bold">{formatDistance(routeData.distance)}</span>
+                   </div>
+                 </div>
+               </div>
+             ) : (
+                <button 
+                  onClick={() => onNavigateToNote(selectedNote)}
+                  disabled={isRouting}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                  {isRouting ? <Loader2 className="animate-spin" size={18} /> : <Navigation2 size={18} />}
+                  Navigate Here
+                </button>
+             )}
+          </div>
+
           <div className="max-h-32 overflow-y-auto mb-4 pr-2 scrollbar-thin">
             <p className="text-sm text-slate-300 leading-relaxed">
               {selectedNote.aiAnalysis}

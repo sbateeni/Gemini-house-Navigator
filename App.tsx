@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { db } from './services/db';
-import { MapNote } from './types';
+import { getRoute } from './services/routing';
+import { MapNote, RouteData } from './types';
 import { Sidebar } from './components/Sidebar';
 import { CreateNoteModal } from './components/CreateNoteModal';
 import { MapControls } from './components/MapControls';
@@ -23,6 +24,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   
+  // Navigation State
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
+  const [isRouting, setIsRouting] = useState(false);
+
   // Modal & Interaction State
   const [showModal, setShowModal] = useState(false);
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
@@ -55,10 +61,33 @@ export default function App() {
     initData();
   }, []);
 
+  // Get user location initially and watch it with High Accuracy
+  useEffect(() => {
+    if (navigator.geolocation) {
+        const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                setUserLocation({
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude
+                });
+            },
+            (err) => console.log("Location access denied or error", err),
+            { 
+              enableHighAccuracy: true, // Critical for navigation
+              maximumAge: 0,            // Do not use cached position
+              timeout: 10000            // Wait up to 10s for good fix
+            }
+        );
+        return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, []);
+
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
     setUserNoteInput("");
     setShowModal(true);
+    // Clear route on new interaction
+    setCurrentRoute(null);
   };
 
   const handleSaveNote = async () => {
@@ -107,6 +136,7 @@ export default function App() {
       // Trigger flyTo via state prop
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
+      setCurrentRoute(null);
       
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
@@ -116,6 +146,7 @@ export default function App() {
 
   const flyToNote = (note: MapNote) => {
     setSelectedNote(note);
+    setCurrentRoute(null); // Reset route when just clicking
     setFlyToTarget({ lat: note.lat, lng: note.lng, zoom: 16, timestamp: Date.now() });
     
     if (window.innerWidth < 768) {
@@ -129,18 +160,45 @@ export default function App() {
       await db.deleteNote(id);
       setNotes(prev => prev.filter(n => n.id !== id));
       if (selectedNote?.id === id) setSelectedNote(null);
+      if (currentRoute) setCurrentRoute(null);
     } catch (error) {
       console.error("Failed to delete note", error);
     }
   };
 
   const locateUser = () => {
-    if (navigator.geolocation) {
+    if (userLocation) {
+        setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
+    } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         const { latitude, longitude } = pos.coords;
-        setFlyToTarget({ lat: latitude, lng: longitude, zoom: 15, timestamp: Date.now() });
-      });
+        setUserLocation({ lat: latitude, lng: longitude });
+        setFlyToTarget({ lat: latitude, lng: longitude, zoom: 17, timestamp: Date.now() });
+      }, (err) => {
+          alert("Could not get your location. Please check permissions.");
+      }, { enableHighAccuracy: true });
+    } else {
+        alert("Geolocation is not supported by this browser.");
     }
+  };
+
+  const handleNavigateToNote = async (note: MapNote) => {
+      if (!userLocation) {
+          alert("We need your location to calculate a route. Please wait for GPS fix or check permissions.");
+          locateUser();
+          return;
+      }
+      
+      setIsRouting(true);
+      const route = await getRoute(userLocation.lat, userLocation.lng, note.lat, note.lng);
+      setIsRouting(false);
+
+      if (route) {
+          setCurrentRoute(route);
+          // Sidebar remains open to show distance/time
+      } else {
+          alert("Could not find a driving route to this location.");
+      }
   };
 
   return (
@@ -158,6 +216,9 @@ export default function App() {
         onSearch={handleSearch}
         onFlyToNote={flyToNote}
         onDeleteNote={deleteNote}
+        onNavigateToNote={handleNavigateToNote}
+        routeData={currentRoute}
+        isRouting={isRouting}
       />
 
       <div className="flex-1 relative w-full h-full">
@@ -169,6 +230,8 @@ export default function App() {
           onMapClick={handleMapClick}
           flyToTarget={flyToTarget}
           tempMarkerCoords={tempCoords}
+          userLocation={userLocation}
+          currentRoute={currentRoute}
         />
         
         <MapControls 

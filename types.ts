@@ -26,3 +26,9 @@ export interface FlightStatus {
   altitude: number;
   isFlying: boolean;
 }
+
+export interface RouteData {
+  coordinates: [number, number][]; // Array of [lat, lng]
+  distance: number; // in meters
+  duration: number; // in seconds
+}
