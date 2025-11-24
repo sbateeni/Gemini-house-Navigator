@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
-import { db } from './services/db';
-import { auth } from './services/auth';
-import { supabase } from './services/supabase';
 import { getRoute } from './services/routing';
-import { MapNote, RouteData, UserProfile } from './types';
+import { MapNote, RouteData } from './types';
+
+// Components
 import { Sidebar } from './components/Sidebar';
 import { CreateNoteModal } from './components/CreateNoteModal';
 import { MapControls } from './components/MapControls';
@@ -13,297 +12,84 @@ import { DatabaseSetupModal } from './components/DatabaseSetupModal';
 import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
 
+// Hooks
+import { useAuth } from './hooks/useAuth';
+import { useNotes } from './hooks/useNotes';
+import { useGeolocation } from './hooks/useGeolocation';
+
 export default function App() {
-  // Auth State
-  const [session, setSession] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
-  const [isApproved, setIsApproved] = useState<boolean>(false);
-  const [isAccountDeleted, setIsAccountDeleted] = useState(false);
+  // Custom Hooks
+  const { session, authLoading, userRole, isApproved, isAccountDeleted, handleLogout } = useAuth();
+  
+  // Calculate access rights: 
+  // 1. Account must exist (not deleted).
+  // 2. User must be approved OR be an admin (Admins bypass approval check for safety).
+  const hasAccess = !isAccountDeleted && (isApproved || userRole === 'admin');
 
-  // Application State
-  const [notes, setNotes] = useState<MapNote[]>([]);
-  const [loadingNotes, setLoadingNotes] = useState(true);
-  const [isConnected, setIsConnected] = useState(false); // DB Connection Status
-  const [tableMissing, setTableMissing] = useState(false);
+  const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted);
+  const { userLocation } = useGeolocation(session, hasAccess);
 
+  // Local UI State
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
-  // Sidebar & Map View State
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
-  const [isSatellite, setIsSatellite] = useState(() => {
-    return localStorage.getItem('gemini_map_mode') === 'satellite';
-  });
+  const [isSatellite, setIsSatellite] = useState(() => localStorage.getItem('gemini_map_mode') === 'satellite');
   
-  // Search State
+  // Search & Navigation State
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  
-  // Navigation State
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
-  // Modal & Interaction State
+  // Modal State
   const [showModal, setShowModal] = useState(false);
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userNoteInput, setUserNoteInput] = useState("");
 
-  // Map Control State (Used to trigger Leaflet actions)
+  // Map Animation State
   const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
 
-  // Handle window resize
+  // Handle Resize
   useEffect(() => {
-    const handleResize = () => {
-      setSidebarOpen(window.innerWidth >= 768);
-    };
+    const handleResize = () => setSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Save map mode preference
+  // Persist Map Mode
   useEffect(() => {
     localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
   }, [isSatellite]);
 
-  // Auth Initialization with Safety Timeout and Server Validation
-  useEffect(() => {
-    let mounted = true;
-
-    // Safety timeout: If Supabase doesn't respond in 3 seconds, force load to stop spinner
-    const safetyTimeout = setTimeout(() => {
-      if (mounted) {
-         console.warn("Auth check timed out, forcing UI load");
-         setAuthLoading(false);
-      }
-    }, 3000);
-
-    const checkUser = async () => {
-      try {
-        // 1. Check local session first
-        const { session } = await auth.getSession();
-        
-        if (!mounted) return;
-
-        if (session?.user) {
-          // 2. Validate with server (detect deleted account)
-          const { user: serverUser, error: userError } = await auth.getUser();
-          
-          if (userError || !serverUser) {
-             console.warn("Local session exists but user not found on server (Deleted?)");
-             setIsAccountDeleted(true);
-             // We keep session to allow PendingApproval screen to show "Deleted" state
-             // instead of falling back to AuthPage immediately
-             setSession(session);
-          } else {
-             // User exists, fetch profile
-             setSession(session);
-             const profile = await db.getUserProfile(session.user.id);
-             if (profile) {
-                 setUserRole(profile.role);
-                 setIsApproved(profile.isApproved);
-             }
-          }
-        } else {
-          setSession(null);
-        }
-      } catch (e) {
-        console.error("Auth check failed", e);
-      } finally {
-        if (mounted) {
-          clearTimeout(safetyTimeout);
-          setAuthLoading(false);
-        }
-      }
-    };
-
-    checkUser();
-
-    // Listen for auth changes (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
-      if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUserRole(null);
-          setIsApproved(false);
-          setIsAccountDeleted(false);
-      } else if (session?.user) {
-        setSession(session);
-        // On strict auth state change, re-fetch profile
-        const profile = await db.getUserProfile(session.user.id);
-        if (profile) {
-            setUserRole(profile.role);
-            setIsApproved(profile.isApproved);
-        }
-      }
-      setAuthLoading(false);
-    });
-
-    return () => {
-      mounted = false;
-      clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Realtime Subscription for Profile Approval
-  useEffect(() => {
-    if (!session?.user?.id) return;
-
-    // Listen for updates to the current user's profile
-    const channel = supabase
-      .channel('profile-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${session.user.id}`
-        },
-        (payload: any) => {
-          // payload.new contains the updated row (snake_case columns)
-          const newProfile = payload.new;
-          if (newProfile && newProfile.is_approved === true) {
-            setIsApproved(true);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session?.user?.id]);
-
-
-  // Load notes from DB on mount (only if logged in AND approved)
-  useEffect(() => {
-    if (!session || !isApproved || isAccountDeleted) return;
-
-    const initData = async () => {
-      try {
-        const savedNotes = await db.getAllNotes();
-        setNotes(savedNotes);
-        setIsConnected(true);
-      } catch (error: any) {
-        if (error.code === 'TABLE_MISSING') {
-            setTableMissing(true);
-        } else {
-            console.error("Failed to load notes from DB", error);
-            setIsConnected(false);
-        }
-      } finally {
-        setLoadingNotes(false);
-      }
-    };
-    initData();
-
-    // Notes Realtime Subscription
-    const notesChannel = supabase
-      .channel('notes-changes')
-      .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'notes' },
-        (payload) => {
-           // Refresh full list to keep it simple and consistent
-           initData(); 
-        }
-      )
-      .subscribe();
-
-    return () => {
-       supabase.removeChannel(notesChannel);
-    };
-
-  }, [session, isApproved, isAccountDeleted]);
-
-  // Get user location initially and watch it with High Accuracy
-  useEffect(() => {
-    if (!session || !isApproved || isAccountDeleted) return;
-    if (navigator.geolocation) {
-        const watchId = navigator.geolocation.watchPosition(
-            (pos) => {
-                setUserLocation({
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude
-                });
-            },
-            (err) => console.log("Location access denied or error", err),
-            { 
-              enableHighAccuracy: true,
-              maximumAge: 0,
-              timeout: 15000
-            }
-        );
-        return () => navigator.geolocation.clearWatch(watchId);
-    }
-  }, [session, isApproved, isAccountDeleted]);
-
-  const handleLogout = async () => {
-    // 1. Manually clear Supabase keys from LocalStorage immediately.
-    // This ensures that even if the network call fails, the user is effectively logged out locally.
-    // We try to preserve the map mode preference, but clear everything else to be safe.
-    const mapMode = localStorage.getItem('gemini_map_mode');
-    localStorage.clear();
-    if (mapMode) localStorage.setItem('gemini_map_mode', mapMode);
-
-    try {
-        // 2. Attempt server signout with a strict timeout (1000ms).
-        // If Supabase API hangs, we don't want the user stuck in a spinner loop.
-        const signOutPromise = auth.signOut();
-        const timeoutPromise = new Promise<{error?: string}>(resolve => setTimeout(() => resolve({ error: 'timeout' }), 1000));
-        
-        await Promise.race([signOutPromise, timeoutPromise]);
-        
-        setNotes([]);
-        setSelectedNote(null);
-        setIsAccountDeleted(false);
-    } catch (e) {
-        console.error("Logout error (ignored for forced exit):", e);
-    } finally {
-        // 3. Force hard reload to reset the application state completely.
-        window.location.href = '/'; 
-    }
-  };
-
+  // UI Actions
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
     setUserNoteInput("");
     setShowModal(true);
-    // Clear route on new interaction
     setCurrentRoute(null);
   };
 
   const handleSaveNote = async () => {
     if (!tempCoords) return;
     
-    // Save IMMEDIATELY without analysis
     const newNote: MapNote = {
-      id: crypto.randomUUID(), // Use UUID for better DB compatibility
+      id: crypto.randomUUID(),
       lat: tempCoords.lat,
       lng: tempCoords.lng,
       userNote: userNoteInput,
-      locationName: "Saved Location", // Default name
-      aiAnalysis: "", // Empty analysis indicates it needs processing later
+      locationName: "Saved Location",
+      aiAnalysis: "",
       sources: [],
       createdAt: Date.now(),
-      status: 'not_caught' // Default status
+      status: 'not_caught'
     };
     
     try {
-      // Save to DB
-      await db.addNote(newNote);
-      // Update UI state
-      setNotes(prev => [newNote, ...prev]);
+      await addNote(newNote);
       setSelectedNote(newNote);
       setShowModal(false);
       setTempCoords(null);
-      // Open sidebar to show the new note
       setSidebarOpen(true);
-      if (!isConnected) setIsConnected(true); // Re-establish confidence if write succeeds
     } catch (error) {
       console.error("Failed to save note", error);
       alert("Failed to save note to database.");
@@ -315,37 +101,19 @@ export default function App() {
     setIsAnalyzing(true);
     try {
       const result = await identifyLocation(note.lat, note.lng, note.userNote);
-      
       const updatedNote: MapNote = {
         ...note,
         locationName: result.locationName,
         aiAnalysis: result.details,
         sources: result.sources
       };
-
-      await db.addNote(updatedNote); // Re-save updated note
-      setNotes(prev => prev.map(n => n.id === note.id ? updatedNote : n));
+      await updateNote(updatedNote);
       setSelectedNote(updatedNote);
     } catch (error) {
       console.error("Analysis failed", error);
       alert("AI Analysis failed. Please try again.");
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  const handleUpdateStatus = async (id: string, status: 'caught' | 'not_caught') => {
-    const noteToUpdate = notes.find(n => n.id === id);
-    if (!noteToUpdate) return;
-
-    const updatedNote: MapNote = { ...noteToUpdate, status };
-
-    try {
-      await db.addNote(updatedNote);
-      setNotes(prev => prev.map(n => n.id === id ? updatedNote : n));
-      if (selectedNote?.id === id) setSelectedNote(updatedNote);
-    } catch (error) {
-      console.error("Failed to update status", error);
     }
   };
 
@@ -361,10 +129,7 @@ export default function App() {
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
       setCurrentRoute(null);
-      
-      if (window.innerWidth < 768) {
-        setSidebarOpen(false);
-      }
+      if (window.innerWidth < 768) setSidebarOpen(false);
     }
   };
 
@@ -372,59 +137,42 @@ export default function App() {
     setSelectedNote(note);
     setCurrentRoute(null);
     setFlyToTarget({ lat: note.lat, lng: note.lng, zoom: 16, timestamp: Date.now() });
-    
-    if (window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
+    if (window.innerWidth < 768) setSidebarOpen(false);
   };
 
-  const deleteNote = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await db.deleteNote(id);
-      setNotes(prev => prev.filter(n => n.id !== id));
+      await deleteNote(id);
       if (selectedNote?.id === id) setSelectedNote(null);
       if (currentRoute) setCurrentRoute(null);
     } catch (error) {
-      console.error("Failed to delete note", error);
       alert("Failed to delete note. Ensure you have admin permissions.");
-    }
-  };
-
-  const locateUser = () => {
-    if (userLocation) {
-        setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const { latitude, longitude } = pos.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
-        setFlyToTarget({ lat: latitude, lng: longitude, zoom: 17, timestamp: Date.now() });
-      }, (err) => {
-          alert("Could not get your location. Please check permissions.");
-      }, { enableHighAccuracy: true });
-    } else {
-        alert("Geolocation is not supported by this browser.");
     }
   };
 
   const handleNavigateToNote = async (note: MapNote) => {
       if (!userLocation) {
-          alert("We need your location to calculate a route. Please wait for GPS fix or check permissions.");
+          alert("We need your location. Please wait for GPS.");
           locateUser();
           return;
       }
-      
       setIsRouting(true);
       const route = await getRoute(userLocation.lat, userLocation.lng, note.lat, note.lng);
       setIsRouting(false);
-
-      if (route) {
-          setCurrentRoute(route);
-      } else {
-          alert("Could not find a driving route to this location.");
-      }
+      if (route) setCurrentRoute(route);
+      else alert("Could not find a driving route.");
   };
 
+  const locateUser = () => {
+    if (userLocation) {
+        setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
+    } else {
+        alert("Getting location...");
+    }
+  };
+
+  // Render Logic
   if (authLoading) {
     return (
         <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
@@ -436,13 +184,10 @@ export default function App() {
     );
   }
 
-  // Not logged in -> Show Auth Page
-  if (!session) {
-    return <AuthPage />;
-  }
+  if (!session) return <AuthPage />;
 
-  // Logged in BUT Account Deleted OR Not Approved -> Show Pending/Deleted Screen
-  if (isAccountDeleted || !isApproved) {
+  // Enforce access control
+  if (!hasAccess) {
       return (
         <PendingApproval 
           onLogout={handleLogout} 
@@ -452,13 +197,10 @@ export default function App() {
       );
   }
 
-  if (tableMissing) {
-    return <DatabaseSetupModal />;
-  }
+  if (tableMissing) return <DatabaseSetupModal />;
 
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden">
-      
       <Sidebar 
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
@@ -470,13 +212,13 @@ export default function App() {
         isSearching={isSearching}
         onSearch={handleSearch}
         onFlyToNote={flyToNote}
-        onDeleteNote={deleteNote}
+        onDeleteNote={handleDeleteNote}
         onNavigateToNote={handleNavigateToNote}
         routeData={currentRoute}
         isRouting={isRouting}
         onAnalyzeNote={handleAnalyzeNote}
         isAnalyzing={isAnalyzing}
-        onUpdateStatus={handleUpdateStatus}
+        onUpdateStatus={updateStatus}
         isConnected={isConnected}
         userRole={userRole}
         onLogout={handleLogout}
