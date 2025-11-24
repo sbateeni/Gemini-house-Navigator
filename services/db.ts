@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { MapNote, UserProfile, UserPermissions } from '../types';
+import { MapNote, UserProfile, UserPermissions, Assignment } from '../types';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -156,6 +156,74 @@ export const db = {
       if (error) throw error;
     } catch (error) {
       console.error("Error updating profile", error);
+      throw error;
+    }
+  },
+
+  // --- Assignments / Dispatch System ---
+
+  async createAssignment(assignment: Omit<Assignment, 'id' | 'createdAt' | 'status'>): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .insert({
+          target_user_id: assignment.targetUserId,
+          location_id: assignment.locationId,
+          location_name: assignment.locationName,
+          lat: assignment.lat,
+          lng: assignment.lng,
+          instructions: assignment.instructions,
+          created_by: assignment.createdBy,
+          created_at: Date.now(),
+          status: 'pending'
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error creating assignment", error);
+      throw error;
+    }
+  },
+
+  async getMyAssignments(userId: string): Promise<Assignment[]> {
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('target_user_id', userId)
+        .neq('status', 'completed') // Only show pending/accepted
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        targetUserId: row.target_user_id,
+        locationId: row.location_id,
+        locationName: row.location_name,
+        lat: row.lat,
+        lng: row.lng,
+        instructions: row.instructions,
+        status: row.status,
+        createdBy: row.created_by,
+        createdAt: row.created_at
+      }));
+    } catch (error) {
+      console.error("Error fetching my assignments", error);
+      return [];
+    }
+  },
+
+  async updateAssignmentStatus(id: string, status: 'accepted' | 'completed'): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .update({ status })
+        .eq('id', id);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error("Error updating assignment status", error);
       throw error;
     }
   }

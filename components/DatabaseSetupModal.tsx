@@ -58,36 +58,59 @@ create trigger on_auth_user_created
 -- 4. Secure the Notes Table
 alter table notes enable row level security;
 
--- Remove old policies
 drop policy if exists "Public Access" on notes;
 drop policy if exists "Auth read" on notes;
-drop policy if exists "Authenticated users can read notes" on notes;
 drop policy if exists "Auth insert" on notes;
 drop policy if exists "Auth update" on notes;
 drop policy if exists "Admin delete" on notes;
 
--- Add Authenticated Policies
--- Read: Only approved users
 create policy "Auth read" on notes for select using (
   auth.role() = 'authenticated' and 
   exists (select 1 from profiles where id = auth.uid() and is_approved = true)
 );
 
--- Insert: Only approved users
 create policy "Auth insert" on notes for insert with check (
   auth.role() = 'authenticated' and
   exists (select 1 from profiles where id = auth.uid() and is_approved = true)
 );
 
--- Update: Only approved users
 create policy "Auth update" on notes for update using (
   auth.role() = 'authenticated' and
   exists (select 1 from profiles where id = auth.uid() and is_approved = true)
 );
 
--- 5. Admin-Only Delete Policy
 create policy "Admin delete" on notes for delete using (
   exists (select 1 from profiles where id = auth.uid() and role = 'admin')
+);
+
+-- 5. Create Assignments Table (Operations Dispatch)
+create table if not exists assignments (
+  id uuid default gen_random_uuid() primary key,
+  target_user_id uuid not null references auth.users(id),
+  location_id text not null,
+  location_name text,
+  lat float8 not null,
+  lng float8 not null,
+  instructions text,
+  status text default 'pending', -- pending, accepted, completed
+  created_by uuid references auth.users(id),
+  created_at bigint
+);
+
+alter table assignments enable row level security;
+drop policy if exists "Read assignments" on assignments;
+create policy "Read assignments" on assignments for select using (
+  auth.uid() = target_user_id OR auth.uid() = created_by
+);
+
+drop policy if exists "Create assignments" on assignments;
+create policy "Create assignments" on assignments for insert with check (
+  auth.role() = 'authenticated'
+);
+
+drop policy if exists "Update assignments" on assignments;
+create policy "Update assignments" on assignments for update using (
+  auth.uid() = target_user_id OR auth.uid() = created_by
 );
 `;
 
@@ -117,10 +140,9 @@ create policy "Admin delete" on notes for delete using (
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">Security Update Required</h1>
+            <h1 className="text-xl font-bold text-white mb-1">Update Required: Ops System</h1>
             <p className="text-slate-400 text-sm">
-              Your app needs to update the database structure to support the new 
-              <span className="text-blue-400 font-bold mx-1">Secure Login, Permissions & Ban System</span>.
+              The app needs the new <span className="text-purple-400 font-bold mx-1">Assignments Table</span> for the Tactical Dispatch System.
             </p>
           </div>
         </div>

@@ -21,7 +21,11 @@ interface LeafletMapProps {
   otherUsers?: MapUser[]; 
   onUserClick?: (user: MapUser) => void; 
   secondaryRoute?: RouteData | null;
-  canSeeOthers?: boolean; // New prop for permission
+  canSeeOthers?: boolean;
+  // New props for tactical map
+  onNavigate?: (note: MapNote) => void;
+  onDispatch?: (note: MapNote) => void;
+  userRole?: string | null;
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -37,7 +41,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   otherUsers = [],
   onUserClick,
   secondaryRoute,
-  canSeeOthers = true
+  canSeeOthers = true,
+  onNavigate,
+  onDispatch,
+  userRole
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -62,10 +69,33 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       map.on('click', (e: any) => {
         onMapClick(e.latlng.lat, e.latlng.lng);
       });
+      
+      // Global popup event delegation because Leaflet popups are HTML strings
+      map.on('popupopen', (e: any) => {
+         const popupNode = e.popup._contentNode;
+         
+         const navBtn = popupNode.querySelector('.btn-navigate');
+         if (navBtn && onNavigate) {
+            navBtn.onclick = () => {
+                const noteId = navBtn.getAttribute('data-id');
+                const note = notes.find(n => n.id === noteId);
+                if (note) onNavigate(note);
+            };
+         }
+
+         const dispatchBtn = popupNode.querySelector('.btn-dispatch');
+         if (dispatchBtn && onDispatch) {
+            dispatchBtn.onclick = () => {
+                const noteId = dispatchBtn.getAttribute('data-id');
+                const note = notes.find(n => n.id === noteId);
+                if (note) onDispatch(note);
+            };
+         }
+      });
 
       mapInstanceRef.current = map;
     }
-  }, []); 
+  }, []); // Only run once, notes dependency handled in separate effect
 
   // Handle Satellite / Dark Mode
   useEffect(() => {
@@ -252,16 +282,14 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
             opacity: 0.8,
             lineCap: 'round',
             lineJoin: 'round',
-            dashArray: '12, 12', // Dashed line
+            dashArray: '12, 12',
         }).addTo(secondaryRouteLayerRef.current);
-
-        // Optional: animate dashes (simple CSS class via L.Path isn't standard, would need custom renderer or requestAnimationFrame loop, keeping it static dashed for stability)
         
         mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
     }
   }, [secondaryRoute]);
 
-  // Handle Notes Markers
+  // Handle Notes Markers & Interactive Popups
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -295,14 +323,27 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         iconAnchor: [16, 30]
       });
 
+      // Construct Tactical Popup HTML
+      const popupContent = `
+        <div class="font-sans min-w-[180px]">
+          <strong class="text-sm text-blue-400 block mb-1">${note.locationName}</strong>
+          <p class="text-xs mb-3 line-clamp-2 text-slate-300">${note.userNote}</p>
+          <div class="flex gap-2">
+             <button class="btn-navigate flex-1 bg-blue-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-blue-500 transition-colors" data-id="${note.id}">
+                NAVIGATE
+             </button>
+             ${userRole === 'admin' ? `
+               <button class="btn-dispatch flex-1 bg-purple-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-purple-500 transition-colors" data-id="${note.id}">
+                  DISPATCH
+               </button>
+             ` : ''}
+          </div>
+        </div>
+      `;
+
       const marker = window.L.marker([note.lat, note.lng], { icon })
         .addTo(map)
-        .bindPopup(`
-          <div class="font-sans min-w-[160px]">
-            <strong class="text-sm text-blue-400 block mb-1">${note.locationName}</strong>
-            <p class="text-xs mb-2 line-clamp-3">${note.userNote}</p>
-          </div>
-        `);
+        .bindPopup(popupContent);
 
       marker.on('popupopen', () => setSelectedNote(note));
       markersRef.current[note.id] = marker;
@@ -312,7 +353,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       }
     });
 
-  }, [notes, isSatellite, selectedNote]);
+  }, [notes, isSatellite, selectedNote, userRole]); // Re-run if user role changes to show/hide dispatch button
 
   // Handle Temp Marker
   useEffect(() => {

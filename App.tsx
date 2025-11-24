@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
-import { MapNote, MapUser } from './types';
+import { MapNote, MapUser, Assignment } from './types';
+import { db } from './services/db';
 
 // Components
 import { Sidebar } from './components/Sidebar';
@@ -15,6 +16,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
 import { UserCommandModal } from './components/UserCommandModal';
 import { LocationPickerModal } from './components/LocationPickerModal';
+import { DispatchModal } from './components/DispatchModal';
+import { NotificationBell } from './components/NotificationBell';
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -23,6 +26,7 @@ import { useGeolocation } from './hooks/useGeolocation';
 import { usePresence } from './hooks/usePresence';
 import { useNavigation } from './hooks/useNavigation';
 import { useNoteForm } from './hooks/useNoteForm';
+import { useAssignments } from './hooks/useAssignments';
 
 export default function App() {
   // --- 1. Authentication & User Data ---
@@ -35,6 +39,7 @@ export default function App() {
   // --- 2. Core Data Hooks ---
   const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted);
   const { userLocation } = useGeolocation(session, hasAccess);
+  const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
   // --- 3. Feature Hooks ---
   const { onlineUsers } = usePresence(session, hasAccess, userLocation); 
@@ -68,6 +73,7 @@ export default function App() {
   // Tactical Command States
   const [commandUser, setCommandUser] = useState<MapUser | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [dispatchTargetLocation, setDispatchTargetLocation] = useState<MapNote | null>(null);
 
   // --- 5. Form Logic Hook ---
   const { 
@@ -188,6 +194,38 @@ export default function App() {
     setCommandUser(null);
   };
 
+  // --- Dispatch System Handlers ---
+  const handleOpenDispatchModal = (note: MapNote) => {
+    setDispatchTargetLocation(note);
+  };
+
+  const handleSendDispatchOrder = async (targetUserId: string, instructions: string) => {
+    if (!dispatchTargetLocation || !session?.user) return;
+    
+    try {
+      await db.createAssignment({
+        targetUserId,
+        locationId: dispatchTargetLocation.id,
+        locationName: dispatchTargetLocation.locationName,
+        lat: dispatchTargetLocation.lat,
+        lng: dispatchTargetLocation.lng,
+        instructions,
+        createdBy: session.user.id
+      });
+      alert("Order Dispatched Successfully!");
+    } catch (e) {
+      console.error("Dispatch failed", e);
+      alert("Failed to send order.");
+    }
+  };
+
+  const handleAcceptAssignment = (assignment: Assignment) => {
+    acceptAssignment(assignment.id);
+    handleNavigateToPoint(assignment.lat, assignment.lng);
+    setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
+  };
+
+
   // --- 8. Render Guards ---
   if (authLoading) {
     return (
@@ -246,10 +284,13 @@ export default function App() {
         onLogout={handleLogout}
         onOpenDashboard={() => setShowDashboard(true)} 
         onOpenSettings={() => setShowSettings(true)}
-        canCreate={permissions.can_create} // Pass permission
+        canCreate={permissions.can_create} 
       />
 
       <div className="flex-1 relative w-full h-full">
+        {/* Notification HUD */}
+        <NotificationBell assignments={assignments} onAccept={handleAcceptAssignment} />
+
         <LeafletMap 
           isSatellite={isSatellite}
           notes={notes}
@@ -264,10 +305,17 @@ export default function App() {
           tempMarkerCoords={tempCoords}
           userLocation={userLocation}
           currentRoute={currentRoute}
-          secondaryRoute={secondaryRoute} // Render dashed line
+          secondaryRoute={secondaryRoute}
           otherUsers={onlineUsers} 
-          onUserClick={onUserClick} // Handle clicks on blue dots
-          canSeeOthers={permissions.can_see_others} // Pass permission
+          onUserClick={onUserClick}
+          canSeeOthers={permissions.can_see_others}
+          // Interactive Popup Handlers
+          onNavigate={(note) => {
+             if (permissions.can_navigate) handleNavigateToNote(note, locateUser);
+             else alert("Navigation permission denied.");
+          }}
+          onDispatch={handleOpenDispatchModal}
+          userRole={userRole}
         />
         
         <MapControls 
@@ -287,6 +335,15 @@ export default function App() {
           onSave={handleSaveNote}
           isAnalyzing={isAnalyzing}
           mode={isEditingNote ? 'edit' : 'create'}
+        />
+
+        {/* Dispatch Order Modal */}
+        <DispatchModal 
+            isOpen={!!dispatchTargetLocation}
+            onClose={() => setDispatchTargetLocation(null)}
+            targetLocation={dispatchTargetLocation}
+            onDispatch={handleSendDispatchOrder}
+            currentUserId={session.user.id}
         />
 
         {/* Admin Dashboard Modal */}
