@@ -194,15 +194,28 @@ export default function App() {
   }, [session, isApproved, isAccountDeleted]);
 
   const handleLogout = async () => {
+    // 1. Manually clear Supabase keys from LocalStorage immediately.
+    // This ensures that even if the network call fails, the user is effectively logged out locally.
+    // We try to preserve the map mode preference, but clear everything else to be safe.
+    const mapMode = localStorage.getItem('gemini_map_mode');
+    localStorage.clear();
+    if (mapMode) localStorage.setItem('gemini_map_mode', mapMode);
+
     try {
-        await auth.signOut();
+        // 2. Attempt server signout with a strict timeout (1000ms).
+        // If Supabase API hangs, we don't want the user stuck in a spinner loop.
+        const signOutPromise = auth.signOut();
+        const timeoutPromise = new Promise<{error?: string}>(resolve => setTimeout(() => resolve({ error: 'timeout' }), 1000));
+        
+        await Promise.race([signOutPromise, timeoutPromise]);
+        
         setNotes([]);
         setSelectedNote(null);
         setIsAccountDeleted(false);
     } catch (e) {
-        console.error("Logout failed:", e);
+        console.error("Logout error (ignored for forced exit):", e);
     } finally {
-        // Robust Logout: Always reload to ensure clean state and clear any stuck local storage
+        // 3. Force hard reload to reset the application state completely.
         window.location.href = '/'; 
     }
   };
