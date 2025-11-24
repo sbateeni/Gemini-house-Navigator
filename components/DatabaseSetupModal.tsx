@@ -6,7 +6,6 @@ import { supabase } from '../services/supabase';
 export const DatabaseSetupModal: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
-  // The SQL needed to setup the SECURE database structure
   const setupSQL = `
 -- 1. Create profiles table (for User/Admin roles)
 create table if not exists profiles (
@@ -112,6 +111,22 @@ drop policy if exists "Update assignments" on assignments;
 create policy "Update assignments" on assignments for update using (
   auth.uid() = target_user_id OR auth.uid() = created_by
 );
+
+-- 6. Create Logs Table (Tactical Events)
+create table if not exists logs (
+  id uuid default gen_random_uuid() primary key,
+  message text not null,
+  type text not null, -- alert, info, dispatch, status
+  user_id uuid references auth.users(id),
+  timestamp bigint
+);
+
+alter table logs enable row level security;
+drop policy if exists "Read logs" on logs;
+create policy "Read logs" on logs for select using (true); -- Everyone can read logs
+
+drop policy if exists "Create logs" on logs;
+create policy "Create logs" on logs for insert with check (auth.role() = 'authenticated');
 `;
 
   const copyToClipboard = () => {
@@ -133,8 +148,6 @@ create policy "Update assignments" on assignments for update using (
   return (
     <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* Header */}
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex items-start gap-4">
           <div className="p-3 bg-red-900/20 rounded-xl border border-red-900/50">
             <ShieldAlert className="text-red-500 w-8 h-8" />
@@ -142,20 +155,15 @@ create policy "Update assignments" on assignments for update using (
           <div>
             <h1 className="text-xl font-bold text-white mb-1">Update Required: Ops System</h1>
             <p className="text-slate-400 text-sm">
-              The app needs the new <span className="text-purple-400 font-bold mx-1">Assignments Table</span> for the Tactical Dispatch System.
+              The app needs the new <span className="text-purple-400 font-bold mx-1">Logs Table</span> for the Tactical Operations Center.
             </p>
           </div>
         </div>
 
-        {/* Code Block */}
         <div className="flex-1 overflow-hidden relative bg-slate-950 p-0 group">
-          <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-slate-950 to-transparent z-10"></div>
-          <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-slate-950 to-transparent z-10"></div>
-          
           <pre className="h-full overflow-auto p-6 text-xs md:text-sm font-mono text-green-400/90 leading-relaxed scrollbar-thin">
             {setupSQL}
           </pre>
-
           <button 
             onClick={copyToClipboard}
             className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-xs font-bold border border-slate-600 flex items-center gap-2 shadow-xl transition-all"
@@ -165,7 +173,6 @@ create policy "Update assignments" on assignments for update using (
           </button>
         </div>
 
-        {/* Footer Actions */}
         <div className="p-6 border-t border-slate-800 bg-slate-900 shrink-0">
           <div className="flex flex-col md:flex-row gap-4 items-center">
              <button 
@@ -182,9 +189,6 @@ create policy "Update assignments" on assignments for update using (
                I've run the code, Refresh
              </button>
           </div>
-          <p className="text-center text-xs text-slate-500 mt-4">
-            Paste the code into the SQL Editor and click "Run", then refresh this page.
-          </p>
         </div>
       </div>
     </div>

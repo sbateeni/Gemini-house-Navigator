@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings } from 'lucide-react';
+import { MapNote, RouteData, UnitStatus } from '../types';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings, CircleDot } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,7 +28,10 @@ interface SidebarProps {
   onEditNote: (note: MapNote, e: React.MouseEvent) => void;
   onOpenDashboard: () => void;
   onOpenSettings: () => void;
-  canCreate: boolean; // New prop for permission
+  canCreate: boolean;
+  // New Props for Status
+  myStatus: UnitStatus;
+  setMyStatus: (s: UnitStatus) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -56,7 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onEditNote,
   onOpenDashboard,
   onOpenSettings,
-  canCreate
+  canCreate,
+  myStatus,
+  setMyStatus
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -80,6 +85,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (status === 'caught') return 'border-green-500/50 bg-green-900/10';
     if (status === 'not_caught') return 'border-red-500/50 bg-red-900/10';
     return '';
+  };
+
+  const statusColors = {
+    patrol: 'bg-green-500',
+    busy: 'bg-yellow-500',
+    pursuit: 'bg-red-500',
+    offline: 'bg-slate-500'
   };
 
   return (
@@ -106,17 +118,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <h1 className="font-bold text-xl tracking-tight text-white leading-none mb-1">Map Journal</h1>
-              {/* Connection Status Indicator */}
+              {/* Unit Status Selector */}
               <div className="flex items-center gap-2">
-                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500'}`}></div>
-                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
-                    {isConnected ? 'Cloud Online' : 'Offline'}
-                 </span>
-                 {userRole === 'admin' && (
-                     <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded ml-2">
-                        <Shield size={10} /> Admin
-                     </span>
-                 )}
+                 <div className="relative group">
+                    <button className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 hover:bg-slate-700 transition-colors">
+                        <div className={`w-2 h-2 rounded-full ${statusColors[myStatus]} animate-pulse`}></div>
+                        {myStatus}
+                    </button>
+                    {/* Dropdown */}
+                    <div className="absolute top-full left-0 mt-1 w-32 bg-slate-900 border border-slate-700 rounded-lg shadow-xl overflow-hidden hidden group-hover:block z-50">
+                        {(['patrol', 'busy', 'pursuit'] as UnitStatus[]).map(s => (
+                            <button 
+                                key={s}
+                                onClick={() => setMyStatus(s)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold uppercase hover:bg-slate-800 text-slate-400 hover:text-white flex items-center gap-2"
+                            >
+                                <div className={`w-2 h-2 rounded-full ${statusColors[s]}`}></div>
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                 </div>
               </div>
             </div>
           </div>
@@ -297,93 +319,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
            <LogOut size={16} /> Sign Out
          </button>
       </div>
-
-      {/* Selected Note Detail View */}
-      {selectedNote && (
-        <div className="p-5 border-t border-slate-800 bg-slate-900 z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-          <div className="flex justify-between items-center mb-3">
-             <div className="flex items-center gap-2 text-blue-500">
-               <Globe size={14} />
-               <span className="text-xs uppercase tracking-wider font-bold">
-                 {selectedNote.aiAnalysis ? "Verified Location" : "Coordinates Saved"}
-               </span>
-             </div>
-             <button onClick={() => setSelectedNote(null)} className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full">
-               <X size={14} />
-             </button>
-          </div>
-          <h2 className="font-bold text-xl text-white mb-2">{selectedNote.locationName}</h2>
-          
-          {/* Action Buttons: Navigate & Analyze */}
-          <div className="mb-4 space-y-2">
-             {/* Navigation Status */}
-             {routeData && selectedNote ? (
-               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
-                 <div className="flex gap-4">
-                   <div className="flex items-center gap-1.5 text-green-400">
-                     <Clock size={16} />
-                     <span className="font-mono font-bold">{formatDuration(routeData.duration)}</span>
-                   </div>
-                   <div className="flex items-center gap-1.5 text-green-400">
-                     <Ruler size={16} />
-                     <span className="font-mono font-bold">{formatDistance(routeData.distance)}</span>
-                   </div>
-                 </div>
-                 <button 
-                   onClick={onStopNavigation}
-                   className="bg-red-900/30 hover:bg-red-900/50 text-red-400 p-1.5 rounded-lg transition-colors"
-                   title="Stop Navigation"
-                 >
-                   <XSquare size={18} />
-                 </button>
-               </div>
-             ) : (
-                <button 
-                  onClick={() => onNavigateToNote(selectedNote)}
-                  disabled={isRouting}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors border border-slate-700"
-                >
-                  {isRouting ? <Loader2 className="animate-spin" size={18} /> : <Navigation2 size={18} />}
-                  Navigate Here
-                </button>
-             )}
-
-             {/* Analyze Button (Only if not analyzed) */}
-             {!selectedNote.aiAnalysis && (
-               <button 
-                  onClick={() => onAnalyzeNote(selectedNote)}
-                  disabled={isAnalyzing}
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-lg shadow-blue-900/20"
-                >
-                  {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                  Identify with AI
-                </button>
-             )}
-          </div>
-
-          <div className="max-h-32 overflow-y-auto mb-4 pr-2 scrollbar-thin">
-            {selectedNote.aiAnalysis ? (
-              <p className="text-sm text-slate-300 leading-relaxed">
-                {selectedNote.aiAnalysis}
-              </p>
-            ) : (
-              <p className="text-sm text-slate-500 italic">
-                Location saved. Use the AI button to identify this place and get details.
-              </p>
-            )}
-          </div>
-          
-          {selectedNote.sources && selectedNote.sources.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
-              {selectedNote.sources.map((s, i) => (
-                <a key={i} href={s.uri} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-400 hover:text-blue-400 border border-slate-700 transition-colors">
-                  <ExternalLink size={12} /> {s.title}
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      
+      {/* Selected Note Detail View is handled by parent, but basic structure is here if needed */}
     </div>
   );
 };

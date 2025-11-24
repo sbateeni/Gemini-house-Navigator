@@ -1,12 +1,14 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabase';
-import { MapUser } from '../types';
+import { MapUser, UnitStatus } from '../types';
 
 export function usePresence(
     session: any, 
     hasAccess: boolean, 
-    userLocation: {lat: number, lng: number} | null
+    userLocation: {lat: number, lng: number} | null,
+    myStatus: UnitStatus = 'patrol',
+    isSOS: boolean = false
 ) {
   const [onlineUsers, setOnlineUsers] = useState<MapUser[]>([]);
   const channelRef = useRef<any>(null);
@@ -53,7 +55,9 @@ export function usePresence(
                         lat: p.lat,
                         lng: p.lng,
                         color: p.color,
-                        lastUpdated: p.online_at
+                        lastUpdated: p.online_at,
+                        status: p.status || 'patrol',
+                        isSOS: p.isSOS || false
                     });
                 }
             });
@@ -70,7 +74,9 @@ export function usePresence(
           color: userColor,
           online_at: Date.now(),
           lat: userLocation?.lat,
-          lng: userLocation?.lng
+          lng: userLocation?.lng,
+          status: myStatus,
+          isSOS: isSOS
         });
       }
     });
@@ -80,7 +86,7 @@ export function usePresence(
     };
   }, [session?.user?.id, hasAccess]);
 
-  // Update location in realtime when user moves
+  // Update location/status in realtime when user moves or changes state
   useEffect(() => {
       if (channelRef.current && userLocation) {
           // We intentionally don't await this to prevent blocking
@@ -90,10 +96,12 @@ export function usePresence(
               color: getUserColor(session?.user?.id || ''),
               online_at: Date.now(),
               lat: userLocation.lat,
-              lng: userLocation.lng
+              lng: userLocation.lng,
+              status: myStatus,
+              isSOS: isSOS
           });
       }
-  }, [userLocation]); // Triggers whenever GPS updates
+  }, [userLocation, myStatus, isSOS]);
 
   return { onlineUsers };
 }

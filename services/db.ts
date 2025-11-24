@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { MapNote, UserProfile, UserPermissions, Assignment } from '../types';
+import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -262,6 +262,42 @@ export const db = {
       if (error) throw error;
     } catch (error) {
       throw error;
+    }
+  },
+
+  // --- LOGGING SYSTEM ---
+  async createLogEntry(entry: Omit<LogEntry, 'id'>): Promise<void> {
+    try {
+      await supabase.from('logs').insert({
+        message: entry.message,
+        type: entry.type,
+        user_id: entry.userId,
+        timestamp: entry.timestamp
+      });
+    } catch (error) {
+      console.error("Log failed", error);
+    }
+  },
+
+  async getRecentLogs(limit = 20): Promise<LogEntry[]> {
+    try {
+      const { data, error } = await supabase
+        .from('logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+      
+      if (error) throw error;
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        message: row.message,
+        type: row.type,
+        userId: row.user_id,
+        timestamp: row.timestamp
+      }));
+    } catch (error) {
+      return [];
     }
   }
 };

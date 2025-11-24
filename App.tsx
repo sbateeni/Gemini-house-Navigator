@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
-import { MapNote, MapUser, Assignment } from './types';
+import { MapNote, MapUser, Assignment, UnitStatus } from './types';
 import { db } from './services/db';
 
 // Components
@@ -18,6 +18,8 @@ import { UserCommandModal } from './components/UserCommandModal';
 import { LocationPickerModal } from './components/LocationPickerModal';
 import { DispatchModal } from './components/DispatchModal';
 import { NotificationBell } from './components/NotificationBell';
+import { SOSButton } from './components/SOSButton';
+import { OperationsLog } from './components/OperationsLog';
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -31,18 +33,20 @@ import { useAssignments } from './hooks/useAssignments';
 export default function App() {
   // --- 1. Authentication & User Data ---
   const { session, authLoading, userRole, isApproved, permissions, isAccountDeleted, handleLogout, refreshAuth } = useAuth();
-  
-  // Banned users should basically be treated as deleted or blocked
   const isBanned = userRole === 'banned';
   const hasAccess = !isAccountDeleted && !isBanned && (isApproved || userRole === 'admin');
 
-  // --- 2. Core Data Hooks ---
+  // --- 2. Tactical State ---
+  const [myStatus, setMyStatus] = useState<UnitStatus>('patrol');
+  const [isSOS, setIsSOS] = useState(false);
+
+  // --- 3. Core Data Hooks ---
   const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted);
   const { userLocation } = useGeolocation(session, hasAccess);
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
-  // --- 3. Feature Hooks ---
-  const { onlineUsers } = usePresence(session, hasAccess, userLocation); 
+  // --- 4. Feature Hooks ---
+  const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
     currentRoute, 
     secondaryRoute, 
@@ -55,7 +59,7 @@ export default function App() {
     clearSecondaryRoute
   } = useNavigation(userLocation);
 
-  // --- 4. Local UI State ---
+  // --- 5. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isSatellite, setIsSatellite] = useState(() => localStorage.getItem('gemini_map_mode') === 'satellite');
@@ -75,13 +79,13 @@ export default function App() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dispatchTargetLocation, setDispatchTargetLocation] = useState<MapNote | null>(null);
 
-  // --- 5. Form Logic Hook ---
+  // --- 6. Form Logic Hook ---
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
       handleMapClick, handleEditNote, handleSaveNote, closeModal 
   } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen);
 
-  // --- 6. Effects ---
+  // --- 7. Effects ---
   useEffect(() => {
     const handleResize = () => setSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
@@ -92,7 +96,19 @@ export default function App() {
     localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
   }, [isSatellite]);
 
-  // --- 7. Handlers ---
+  // Log status changes
+  useEffect(() => {
+    if (session?.user && hasAccess) {
+       db.createLogEntry({
+          message: `Unit ${session.user.user_metadata?.username || 'User'} is now ${myStatus.toUpperCase()}`,
+          type: 'status',
+          userId: session.user.id,
+          timestamp: Date.now()
+       });
+    }
+  }, [myStatus]);
+
+  // --- 8. Handlers ---
   const locateUser = () => {
     if (userLocation) {
         setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
@@ -101,14 +117,27 @@ export default function App() {
     }
   };
 
+  const handleToggleSOS = () => {
+     const newState = !isSOS;
+     setIsSOS(newState);
+     if (session?.user) {
+         db.createLogEntry({
+             message: newState 
+                ? `🚨 SOS TRIGGERED BY ${session.user.user_metadata?.username?.toUpperCase()} 🚨` 
+                : `${session.user.user_metadata?.username} CANCELLED SOS`,
+             type: 'alert',
+             userId: session.user.id,
+             timestamp: Date.now()
+         });
+     }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    
     setIsSearching(true);
     const result = await searchPlace(searchQuery);
     setIsSearching(false);
-    
     if (result) {
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
@@ -176,32 +205,27 @@ export default function App() {
 
   const handleSelectDispatchLocation = async (note: MapNote) => {
     if (!commandUser) return;
-    
-    // Calculate route from CommandUser to Note
     const route = await calculateRoute(
       { lat: commandUser.lat, lng: commandUser.lng },
       { lat: note.lat, lng: note.lng }
     );
-    
     if (route) {
         setSecondaryRoute(route);
         setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
     } else {
         alert("Could not calculate dispatch route.");
     }
-
     setShowLocationPicker(false);
     setCommandUser(null);
   };
 
-  // --- Dispatch System Handlers ---
+  // Dispatch System Handlers
   const handleOpenDispatchModal = (note: MapNote) => {
     setDispatchTargetLocation(note);
   };
 
   const handleSendDispatchOrder = async (targetUserId: string, instructions: string) => {
     if (!dispatchTargetLocation || !session?.user) return;
-    
     try {
       await db.createAssignment({
         targetUserId,
@@ -211,6 +235,13 @@ export default function App() {
         lng: dispatchTargetLocation.lng,
         instructions,
         createdBy: session.user.id
+      });
+      // Log it
+      await db.createLogEntry({
+          message: `Dispatch order sent to user`,
+          type: 'dispatch',
+          userId: session.user.id,
+          timestamp: Date.now()
       });
       alert("Order Dispatched Successfully!");
     } catch (e) {
@@ -226,13 +257,13 @@ export default function App() {
   };
 
 
-  // --- 8. Render Guards ---
+  // --- 9. Render Guards ---
   if (authLoading) {
     return (
         <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-medium animate-pulse">Initializing Secure System...</p>
+                <p className="text-sm font-medium animate-pulse">Initializing Tactical System...</p>
             </div>
         </div>
     );
@@ -240,7 +271,6 @@ export default function App() {
 
   if (!session) return <AuthPage />;
 
-  // Block access if deleted or banned or not approved
   if (!hasAccess) {
       return (
         <PendingApproval 
@@ -285,11 +315,15 @@ export default function App() {
         onOpenDashboard={() => setShowDashboard(true)} 
         onOpenSettings={() => setShowSettings(true)}
         canCreate={permissions.can_create} 
+        myStatus={myStatus}
+        setMyStatus={setMyStatus}
       />
 
       <div className="flex-1 relative w-full h-full">
-        {/* Notification HUD */}
         <NotificationBell assignments={assignments} onAccept={handleAcceptAssignment} />
+        
+        {/* Panic Button */}
+        <SOSButton isActive={isSOS} onToggle={handleToggleSOS} />
 
         <LeafletMap 
           isSatellite={isSatellite}
@@ -309,7 +343,6 @@ export default function App() {
           otherUsers={onlineUsers} 
           onUserClick={onUserClick}
           canSeeOthers={permissions.can_see_others}
-          // Interactive Popup Handlers
           onNavigate={(note) => {
              if (permissions.can_navigate) handleNavigateToNote(note, locateUser);
              else alert("Navigation permission denied.");
@@ -326,6 +359,9 @@ export default function App() {
           onLocateUser={locateUser}
         />
 
+        {/* Live Operations Log */}
+        <OperationsLog />
+
         <CreateNoteModal 
           isOpen={showModal}
           onClose={closeModal}
@@ -337,7 +373,6 @@ export default function App() {
           mode={isEditingNote ? 'edit' : 'create'}
         />
 
-        {/* Dispatch Order Modal */}
         <DispatchModal 
             isOpen={!!dispatchTargetLocation}
             onClose={() => setDispatchTargetLocation(null)}
@@ -346,7 +381,6 @@ export default function App() {
             currentUserId={session.user.id}
         />
 
-        {/* Admin Dashboard Modal */}
         {userRole === 'admin' && (
           <AdminDashboard 
             isOpen={showDashboard} 
@@ -355,7 +389,6 @@ export default function App() {
           />
         )}
 
-        {/* Settings Modal (Admin Only) */}
         {userRole === 'admin' && (
           <SettingsModal 
             isOpen={showSettings}
@@ -367,7 +400,6 @@ export default function App() {
           />
         )}
 
-        {/* Tactical Command Modals (Admin Only) */}
         {userRole === 'admin' && (
             <>
                 <UserCommandModal 

@@ -55,9 +55,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkersRef = useRef<{ [key: string]: any }>({});
 
-  // --- FIX FOR STALE CLOSURES ---
-  // We use refs to keep track of the latest props, so the map event listeners
-  // (which are created once) can always access the freshest data.
   const notesRef = useRef(notes);
   const onNavigateRef = useRef(onNavigate);
   const onDispatchRef = useRef(onDispatch);
@@ -67,7 +64,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     onNavigateRef.current = onNavigate;
     onDispatchRef.current = onDispatch;
   }, [notes, onNavigate, onDispatch]);
-  // ------------------------------
 
   // Initialize Map
   useEffect(() => {
@@ -84,33 +80,24 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         onMapClick(e.latlng.lat, e.latlng.lng);
       });
       
-      // Dynamic Button Handling inside Popups
       map.on('popupopen', (e: any) => {
          const popupNode = e.popup._contentNode;
-         
-         // Attach click listener to NAVIGATE button
          const navBtn = popupNode.querySelector('.btn-navigate');
          if (navBtn) {
             navBtn.onclick = (evt: any) => {
-                evt.stopPropagation(); // Prevent map click
+                evt.stopPropagation();
                 const noteId = navBtn.getAttribute('data-id');
-                // Use REF to get the LATEST notes array
                 const note = notesRef.current.find(n => n.id === noteId);
                 if (note && onNavigateRef.current) {
                     onNavigateRef.current(note);
-                } else {
-                    console.warn("Could not find note data for navigation:", noteId);
                 }
             };
          }
-
-         // Attach click listener to DISPATCH button
          const dispatchBtn = popupNode.querySelector('.btn-dispatch');
          if (dispatchBtn) {
             dispatchBtn.onclick = (evt: any) => {
-                evt.stopPropagation(); // Prevent map click
+                evt.stopPropagation();
                 const noteId = dispatchBtn.getAttribute('data-id');
-                // Use REF to get the LATEST notes array
                 const note = notesRef.current.find(n => n.id === noteId);
                 if (note && onDispatchRef.current) {
                     onDispatchRef.current(note);
@@ -120,8 +107,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       });
 
       mapInstanceRef.current = map;
-
-      // Event Listener for Offline Download
+      
       window.addEventListener('download-offline-map', ((e: CustomEvent) => {
           if (e.detail && e.detail.callback) {
               const bounds = map.getBounds();
@@ -131,32 +117,26 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, []);
 
-  // Handle Satellite / Dark Mode with Offline Capability
+  // Handle Satellite / Dark Mode
   useEffect(() => {
     if (!layerGroupRef.current || !window.L) return;
 
     layerGroupRef.current.clearLayers();
 
-    // Define custom Offline TileLayer
     const OfflineTileLayer = window.L.TileLayer.extend({
         createTile: function(coords: any, done: any) {
             const tile = document.createElement('img');
-            
-            // 1. Try IndexedDB first (Fastest/Offline)
             offlineMaps.getTile(coords.x, coords.y, coords.z).then((blob) => {
                 if (blob) {
                     const url = URL.createObjectURL(blob);
                     tile.src = url;
                     done(null, tile);
                 } else {
-                    // 2. If not in DB, fallback to network
                     tile.src = this.getTileUrl(coords);
                 }
             }).catch(() => {
-                // Fallback on error
                 tile.src = this.getTileUrl(coords);
             });
-
             window.L.DomEvent.on(tile, 'load', window.L.Util.bind(this._tileOnLoad, this, done, tile));
             window.L.DomEvent.on(tile, 'error', window.L.Util.bind(this._tileOnError, this, done, tile));
             return tile;
@@ -187,7 +167,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [isSatellite]);
 
-  // Handle FlyTo Logic
+  // Handle FlyTo
   useEffect(() => {
     if (mapInstanceRef.current && flyToTarget) {
       mapInstanceRef.current.flyTo([flyToTarget.lat, flyToTarget.lng], flyToTarget.zoom || 14, {
@@ -252,22 +232,50 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     });
 
     visibleUsers.forEach(user => {
+        // TACTICAL VISUALS
+        const isSOS = user.isSOS;
+        let statusColor = user.color;
+        let ringColor = user.color;
+        
+        if (isSOS) {
+            statusColor = '#ef4444'; // Red
+            ringColor = '#ef4444';
+        } else if (user.status === 'patrol') {
+            ringColor = '#22c55e'; // Green ring
+        } else if (user.status === 'busy') {
+            ringColor = '#eab308'; // Yellow ring
+        } else if (user.status === 'pursuit') {
+            ringColor = '#f97316'; // Orange ring
+        }
+
+        const sosAnimation = isSOS ? `
+            @keyframes sos-pulse {
+                0% { transform: scale(1); opacity: 0.8; }
+                50% { transform: scale(3); opacity: 0; }
+                100% { transform: scale(1); opacity: 0; }
+            }
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 3px solid red; border-radius: 50%; animation: sos-pulse 1s infinite;"></div>
+        ` : '';
+
         const customHtml = `
-            <div style="position: relative; width: 0; height: 0;">
+            <div style="position: relative; width: 20px; height: 20px;">
+                <style>${sosAnimation}</style>
+                ${isSOS ? `<div style="position: absolute; top: -10px; left: -10px; width: 40px; height: 40px; background: rgba(239, 68, 68, 0.3); border-radius: 50%; animation: sos-pulse 1s infinite;"></div>` : ''}
+                
                 <div style="
                     position: absolute; 
-                    bottom: 12px; 
+                    bottom: 24px; 
                     left: 50%; 
                     transform: translateX(-50%); 
-                    background: rgba(15, 23, 42, 0.8); 
+                    background: ${isSOS ? '#b91c1c' : 'rgba(15, 23, 42, 0.9)'}; 
                     backdrop-filter: blur(4px);
-                    color: ${user.color}; 
+                    color: white; 
                     padding: 2px 8px; 
-                    border-radius: 6px; 
-                    font-size: 11px; 
+                    border-radius: 4px; 
+                    font-size: 10px; 
                     font-weight: 700; 
                     white-space: nowrap; 
-                    border: 1px solid ${user.color};
+                    border: 1px solid ${statusColor};
                     box-shadow: 0 2px 4px rgba(0,0,0,0.5);
                     cursor: pointer;
                 ">
@@ -275,14 +283,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
                 </div>
                 <div style="
                     position: absolute; 
-                    top: -6px; 
-                    left: -6px; 
-                    width: 12px; 
-                    height: 12px; 
-                    background: ${user.color}; 
+                    top: 0; 
+                    left: 0; 
+                    width: 16px; 
+                    height: 16px; 
+                    background: ${statusColor}; 
                     border: 2px solid white; 
+                    outline: 2px solid ${ringColor};
                     border-radius: 50%; 
-                    box-shadow: 0 0 10px ${user.color};
+                    box-shadow: 0 0 10px rgba(0,0,0,0.5);
                     cursor: pointer;
                 "></div>
             </div>
@@ -291,7 +300,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         const icon = window.L.divIcon({
             className: 'custom-div-icon',
             html: customHtml,
-            iconSize: [0, 0],
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
         });
 
         if (userMarkersRef.current[user.id]) {
@@ -309,46 +319,30 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
   }, [otherUsers, onUserClick, canSeeOthers]);
 
-  // Handle Main Route Drawing
+  // Render Routes (Existing logic remains same, just brief check)
   useEffect(() => {
     if (!mapInstanceRef.current || !routeLayerRef.current) return;
-    
     routeLayerRef.current.clearLayers();
-
     if (currentRoute && currentRoute.coordinates.length > 0) {
         const polyline = window.L.polyline(currentRoute.coordinates, {
-            color: '#3b82f6', 
-            weight: 6,
-            opacity: 0.8,
-            lineCap: 'round',
-            lineJoin: 'round',
+            color: '#3b82f6', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round',
         }).addTo(routeLayerRef.current);
-
         mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
     }
   }, [currentRoute]);
 
-  // Handle Secondary Route Drawing
   useEffect(() => {
     if (!mapInstanceRef.current || !secondaryRouteLayerRef.current) return;
-    
     secondaryRouteLayerRef.current.clearLayers();
-
     if (secondaryRoute && secondaryRoute.coordinates.length > 0) {
         const polyline = window.L.polyline(secondaryRoute.coordinates, {
-            color: '#a855f7', 
-            weight: 5,
-            opacity: 0.8,
-            lineCap: 'round',
-            lineJoin: 'round',
-            dashArray: '12, 12',
+            color: '#a855f7', weight: 5, opacity: 0.8, lineCap: 'round', lineJoin: 'round', dashArray: '12, 12',
         }).addTo(secondaryRouteLayerRef.current);
-        
         mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
     }
   }, [secondaryRoute]);
 
-  // Handle Notes Markers
+  // Notes Markers
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -405,23 +399,16 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
       marker.on('popupopen', () => setSelectedNote(note));
       markersRef.current[note.id] = marker;
-      
-      if (selectedNote?.id === note.id) {
-         marker.openPopup();
-      }
+      if (selectedNote?.id === note.id) { marker.openPopup(); }
     });
-
   }, [notes, isSatellite, selectedNote, userRole]);
 
-  // Handle Temp Marker
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    
     if (markersRef.current['temp_click']) {
         mapInstanceRef.current.removeLayer(markersRef.current['temp_click']);
         delete markersRef.current['temp_click'];
     }
-
     if (tempMarkerCoords) {
         const pulseIcon = window.L.divIcon({
             className: 'custom-div-icon',
@@ -432,7 +419,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           const marker = window.L.marker([tempMarkerCoords.lat, tempMarkerCoords.lng], { icon: pulseIcon }).addTo(mapInstanceRef.current);
           markersRef.current['temp_click'] = marker;
     }
-
   }, [tempMarkerCoords]);
 
   return <div ref={mapContainerRef} className="w-full h-full bg-slate-900 outline-none" />;

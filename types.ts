@@ -8,7 +8,7 @@ export interface MapNote {
   aiAnalysis: string;
   createdAt: number;
   sources?: GroundingSource[];
-  status?: 'caught' | 'not_caught'; // New field for status
+  status?: 'caught' | 'not_caught';
 }
 
 export interface GroundingSource {
@@ -20,13 +20,6 @@ export interface AnalysisResult {
   locationName: string;
   details: string;
   sources: GroundingSource[];
-}
-
-export interface FlightStatus {
-  heading: number;
-  speed: number;
-  altitude: number;
-  isFlying: boolean;
 }
 
 export interface RouteData {
@@ -50,13 +43,18 @@ export interface UserProfile {
   permissions: UserPermissions;
 }
 
+export type UnitStatus = 'patrol' | 'busy' | 'pursuit' | 'offline';
+
 export interface MapUser {
   id: string;
   username: string;
   lat: number;
   lng: number;
-  color: string; // To give each user a unique dot color
+  color: string;
   lastUpdated: number;
+  // New Tactical Fields
+  status: UnitStatus;
+  isSOS: boolean;
 }
 
 export interface Assignment {
@@ -70,4 +68,12 @@ export interface Assignment {
   status: 'pending' | 'accepted' | 'completed';
   createdBy: string;
   createdAt: number;
+}
+
+export interface LogEntry {
+  id: string;
+  message: string;
+  type: 'alert' | 'info' | 'dispatch' | 'status';
+  userId?: string;
+  timestamp: number;
 }
