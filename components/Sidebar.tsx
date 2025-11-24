@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,6 +21,8 @@ interface SidebarProps {
   isAnalyzing: boolean;
   onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
   isConnected: boolean;
+  userRole: 'admin' | 'user' | null;
+  onLogout: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -41,7 +43,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAnalyzeNote,
   isAnalyzing,
   onUpdateStatus,
-  isConnected
+  isConnected,
+  userRole,
+  onLogout
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -97,6 +101,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
                     {isConnected ? 'Cloud Online' : 'Offline'}
                  </span>
+                 {userRole === 'admin' && (
+                     <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded ml-2">
+                        <Shield size={10} /> Admin
+                     </span>
+                 )}
               </div>
             </div>
           </div>
@@ -181,13 +190,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   </div>
 
-                  {/* Delete Button */}
-                  <button 
-                    onClick={(e) => onDeleteNote(note.id, e)} 
-                    className="p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-900/50"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {/* Delete Button (Admin Only) */}
+                  {userRole === 'admin' && (
+                    <button 
+                        onClick={(e) => onDeleteNote(note.id, e)} 
+                        className="p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-900/50"
+                        title="Delete (Admin Only)"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -219,6 +231,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ))
         )}
+      </div>
+
+      {/* Logout Footer */}
+      <div className="p-3 border-t border-slate-800 bg-slate-900/50">
+         <button 
+           onClick={onLogout}
+           className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-colors text-sm"
+         >
+           <LogOut size={16} /> Sign Out
+         </button>
       </div>
 
       {/* Selected Note Detail View */}

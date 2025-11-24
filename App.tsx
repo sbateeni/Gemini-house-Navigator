@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { db } from './services/db';
+import { auth } from './services/auth';
+import { supabase } from './services/supabase';
 import { getRoute } from './services/routing';
-import { MapNote, RouteData } from './types';
+import { MapNote, RouteData, UserProfile } from './types';
 import { Sidebar } from './components/Sidebar';
 import { CreateNoteModal } from './components/CreateNoteModal';
 import { MapControls } from './components/MapControls';
 import { LeafletMap } from './components/LeafletMap';
+// Fix import to be explicit relative path
+import { DatabaseSetupModal } from './components/DatabaseSetupModal';
+import { AuthPage } from './components/AuthPage';
 
 export default function App() {
+  // Auth State
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+
   // Application State
   const [notes, setNotes] = useState<MapNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [isConnected, setIsConnected] = useState(false); // DB Connection Status
+  const [tableMissing, setTableMissing] = useState(false);
 
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -47,27 +58,58 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load notes from DB on mount
+  // Auth Initialization
   useEffect(() => {
+    auth.getSession().then(({ session }) => {
+      setSession(session);
+      if (session?.user) {
+        db.getUserProfile(session.user.id).then(profile => {
+            if (profile) setUserRole(profile.role);
+        });
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        db.getUserProfile(session.user.id).then(profile => {
+            if (profile) setUserRole(profile.role);
+        });
+      } else {
+        setUserRole(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load notes from DB on mount (only if logged in)
+  useEffect(() => {
+    if (!session) return;
+
     const initData = async () => {
       try {
         const savedNotes = await db.getAllNotes();
         setNotes(savedNotes);
         setIsConnected(true);
-      } catch (error) {
-        console.error("Failed to load notes from DB", error);
-        setIsConnected(false);
-        // Alert user if strictly offline or DB issue
-        alert("Cannot connect to the Cloud Database. Please check your internet connection.");
+      } catch (error: any) {
+        if (error.code === 'TABLE_MISSING') {
+            setTableMissing(true);
+        } else {
+            console.error("Failed to load notes from DB", error);
+            setIsConnected(false);
+        }
       } finally {
         setLoadingNotes(false);
       }
     };
     initData();
-  }, []);
+  }, [session]);
 
   // Get user location initially and watch it with High Accuracy
   useEffect(() => {
+    if (!session) return;
     if (navigator.geolocation) {
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
@@ -85,7 +127,13 @@ export default function App() {
         );
         return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, []);
+  }, [session]);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    setNotes([]);
+    setSelectedNote(null);
+  };
 
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
@@ -155,8 +203,6 @@ export default function App() {
     const noteToUpdate = notes.find(n => n.id === id);
     if (!noteToUpdate) return;
 
-    // Toggle logic: if clicking the same status, revert to undefined (optional, or just update)
-    // For now, simple update
     const updatedNote: MapNote = { ...noteToUpdate, status };
 
     try {
@@ -206,7 +252,7 @@ export default function App() {
       if (currentRoute) setCurrentRoute(null);
     } catch (error) {
       console.error("Failed to delete note", error);
-      alert("Failed to delete note.");
+      alert("Failed to delete note. Ensure you have admin permissions.");
     }
   };
 
@@ -244,6 +290,25 @@ export default function App() {
       }
   };
 
+  if (authLoading) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-slate-950 text-white">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm font-medium animate-pulse">Initializing Secure System...</p>
+            </div>
+        </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthPage />;
+  }
+
+  if (tableMissing) {
+    return <DatabaseSetupModal />;
+  }
+
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden">
       
@@ -266,6 +331,8 @@ export default function App() {
         isAnalyzing={isAnalyzing}
         onUpdateStatus={handleUpdateStatus}
         isConnected={isConnected}
+        userRole={userRole}
+        onLogout={handleLogout}
       />
 
       <div className="flex-1 relative w-full h-full">

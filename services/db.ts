@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { MapNote } from '../types';
+import { MapNote, UserProfile } from '../types';
 
 export const db = {
   // Get all notes from Supabase
@@ -28,9 +28,12 @@ export const db = {
       })) as MapNote[];
 
     } catch (error: any) {
-      // Use JSON.stringify to ensure the full error object is visible in the console
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        const missingError: any = new Error('Table Missing');
+        missingError.code = 'TABLE_MISSING';
+        throw missingError;
+      }
       console.error("Error fetching notes from Supabase:", JSON.stringify(error, null, 2));
-      // Throw error so App.tsx knows the connection failed
       throw error;
     }
   },
@@ -78,6 +81,24 @@ export const db = {
     } catch (error: any) {
       console.error("Error deleting note from Supabase:", JSON.stringify(error, null, 2));
       throw error;
+    }
+  },
+
+  // Get User Profile (Role)
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) return null; // Profile might not exist yet if just signed up
+      
+      return data as UserProfile;
+    } catch (error) {
+      console.error("Error fetching profile", error);
+      return null;
     }
   }
 };

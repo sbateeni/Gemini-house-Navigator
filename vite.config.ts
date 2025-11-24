@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 // Manually filter env vars to avoid exposing system variables
 const envKeys = [
@@ -18,6 +19,14 @@ envKeys.forEach(key => {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'), // Standard convention, though here we map to root if needed, but relative is safer.
+      // Since structure is flat root, we map '@' to '.'
+      '@components': path.resolve(__dirname, './components'),
+      '@services': path.resolve(__dirname, './services')
+    },
+  },
   define: {
     'process.env': processEnv
   }

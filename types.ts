@@ -33,3 +33,9 @@ export interface RouteData {
   distance: number; // in meters
   duration: number; // in seconds
 }
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+}
