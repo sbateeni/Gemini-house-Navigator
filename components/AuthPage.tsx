@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { auth } from '../services/auth';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isReset, setIsReset] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  const [showResend, setShowResend] = useState(false); // New state to control resend button visibility
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,15 +17,25 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
+    setShowResend(false);
 
     try {
+      // Force a logout before attempting new auth actions to clear stale states
+      await auth.signOut();
+
       if (isReset) {
         const { error } = await auth.resetPassword(email);
         if (error) throw error;
         setMessage({ type: 'success', text: 'Password reset link sent to your email!' });
       } else if (isLogin) {
         const { error } = await auth.signIn(email, password);
-        if (error) throw error;
+        if (error) {
+          // Detect email confirmation error specifically
+          if (error.message.includes("Email not confirmed")) {
+            setShowResend(true);
+          }
+          throw error;
+        }
         // App.tsx handles state change via onAuthStateChange
       } else {
         const { data, error } = await auth.signUp(email, password, username);
@@ -37,6 +48,20 @@ export const AuthPage: React.FC = () => {
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'An error occurred' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setLoading(true);
+    try {
+      const { error } = await auth.resendConfirmation(email);
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Confirmation email sent! Please check your inbox (and spam folder).' });
+      setShowResend(false);
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to resend email.' });
     } finally {
       setLoading(false);
     }
@@ -64,9 +89,22 @@ export const AuthPage: React.FC = () => {
         </div>
 
         {message && (
-          <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 text-sm ${message.type === 'error' ? 'bg-red-900/20 text-red-400 border border-red-900/50' : 'bg-green-900/20 text-green-400 border border-green-900/50'}`}>
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
-            <p>{message.text}</p>
+          <div className={`mb-6 p-4 rounded-xl flex flex-col items-start gap-2 text-sm ${message.type === 'error' ? 'bg-red-900/20 text-red-400 border border-red-900/50' : 'bg-green-900/20 text-green-400 border border-green-900/50'}`}>
+            <div className="flex items-start gap-3">
+               <AlertCircle size={18} className="shrink-0 mt-0.5" />
+               <p>{message.text}</p>
+            </div>
+            
+            {/* Resend Button if applicable */}
+            {showResend && message.type === 'error' && (
+              <button 
+                type="button"
+                onClick={handleResendConfirmation}
+                className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-white px-3 py-2 rounded-lg border border-red-700/50 flex items-center gap-2 transition-colors w-full justify-center font-bold"
+              >
+                <Send size={12} /> Resend Confirmation Email
+              </button>
+            )}
           </div>
         )}
 
@@ -126,14 +164,14 @@ export const AuthPage: React.FC = () => {
               <p>
                 {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
                 <button
-                  onClick={() => { setIsLogin(!isLogin); setMessage(null); }}
+                  onClick={() => { setIsLogin(!isLogin); setMessage(null); setShowResend(false); }}
                   className="text-blue-400 hover:text-blue-300 font-semibold"
                 >
                   {isLogin ? 'Sign Up' : 'Sign In'}
                 </button>
               </p>
               <button
-                onClick={() => { setIsReset(true); setMessage(null); }}
+                onClick={() => { setIsReset(true); setMessage(null); setShowResend(false); }}
                 className="text-slate-500 hover:text-slate-300 text-xs"
               >
                 Forgot Password?
@@ -141,7 +179,7 @@ export const AuthPage: React.FC = () => {
             </>
           ) : (
             <button
-              onClick={() => { setIsReset(false); setMessage(null); }}
+              onClick={() => { setIsReset(false); setMessage(null); setShowResend(false); }}
               className="text-blue-400 hover:text-blue-300 font-semibold"
             >
               Back to Login

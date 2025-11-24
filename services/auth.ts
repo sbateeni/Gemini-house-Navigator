@@ -9,6 +9,7 @@ export const auth = {
         data: {
           username: username,
         },
+        emailRedirectTo: window.location.origin, // Ensure redirection comes back to the app
       },
     });
     return { data, error };
@@ -30,6 +31,17 @@ export const auth = {
   async resetPassword(email: string) {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin, // Redirect back to app after click
+    });
+    return { data, error };
+  },
+
+  async resendConfirmation(email: string) {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: window.location.origin
+      }
     });
     return { data, error };
   },
