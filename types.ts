@@ -1,3 +1,4 @@
+
 export interface MapNote {
   id: string;
   lat: number;
@@ -40,4 +41,13 @@ export interface UserProfile {
   role: 'admin' | 'user';
   isApproved: boolean; // New field for approval status
   email?: string; // Added email for admin dashboard
+}
+
+export interface MapUser {
+  id: string;
+  username: string;
+  lat: number;
+  lng: number;
+  color: string; // To give each user a unique dot color
+  lastUpdated: number;
 }

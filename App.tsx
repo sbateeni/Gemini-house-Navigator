@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { MapNote } from './types';
@@ -31,7 +32,7 @@ export default function App() {
   const { userLocation } = useGeolocation(session, hasAccess);
   
   // --- 3. Feature Hooks ---
-  usePresence(session, hasAccess);
+  const { onlineUsers } = usePresence(session, hasAccess, userLocation); // Pass location to broadcast
   const { currentRoute, isRouting, handleNavigateToNote, handleStopNavigation } = useNavigation(userLocation);
 
   // --- 4. Local UI State ---
@@ -198,6 +199,7 @@ export default function App() {
           tempMarkerCoords={tempCoords}
           userLocation={userLocation}
           currentRoute={currentRoute}
+          otherUsers={onlineUsers} // Pass live users to map
         />
         
         <MapControls 

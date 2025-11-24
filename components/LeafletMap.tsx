@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef } from 'react';
-import { MapNote, RouteData } from '../types';
+import { MapNote, RouteData, MapUser } from '../types';
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ interface LeafletMapProps {
   tempMarkerCoords: { lat: number; lng: number } | null;
   userLocation: { lat: number; lng: number } | null;
   currentRoute: RouteData | null;
+  otherUsers?: MapUser[]; // List of other live users
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -28,7 +30,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   flyToTarget,
   tempMarkerCoords,
   userLocation,
-  currentRoute
+  currentRoute,
+  otherUsers = []
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -36,6 +39,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const routeLayerRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
+  const userMarkersRef = useRef<{ [key: string]: any }>({}); // Store other user markers
 
   // Initialize Map
   useEffect(() => {
@@ -106,7 +110,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [flyToTarget]);
 
-  // Handle User Location Marker
+  // Handle Current User Location Marker (The "Me" dot)
   useEffect(() => {
     if (!mapInstanceRef.current || !userLocation) return;
     
@@ -118,6 +122,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         className: 'custom-div-icon',
         html: `
         <div style="position: relative; width: 24px; height: 24px;">
+            <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">YOU</div>
             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #3b82f6; border: 2px solid white; border-radius: 50%; z-index: 2;"></div>
             <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: rgba(59, 130, 246, 0.4); border-radius: 50%; animation: pulse 2s infinite;"></div>
         </div>
@@ -138,6 +143,78 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }).addTo(mapInstanceRef.current);
 
   }, [userLocation]);
+
+  // Handle Other Users Markers (Live Tracking)
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    // Get list of current active IDs
+    const activeIds = new Set(otherUsers.map(u => u.id));
+
+    // Remove users who went offline
+    Object.keys(userMarkersRef.current).forEach(userId => {
+        if (!activeIds.has(userId)) {
+            map.removeLayer(userMarkersRef.current[userId]);
+            delete userMarkersRef.current[userId];
+        }
+    });
+
+    // Add or Update markers for online users
+    otherUsers.forEach(user => {
+        const customHtml = `
+            <div style="position: relative; width: 0; height: 0;">
+                <div style="
+                    position: absolute; 
+                    bottom: 12px; 
+                    left: 50%; 
+                    transform: translateX(-50%); 
+                    background: rgba(15, 23, 42, 0.8); 
+                    backdrop-filter: blur(4px);
+                    color: ${user.color}; 
+                    padding: 2px 8px; 
+                    border-radius: 6px; 
+                    font-size: 11px; 
+                    font-weight: 700; 
+                    white-space: nowrap; 
+                    border: 1px solid ${user.color};
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                ">
+                    ${user.username}
+                </div>
+                <div style="
+                    position: absolute; 
+                    top: -6px; 
+                    left: -6px; 
+                    width: 12px; 
+                    height: 12px; 
+                    background: ${user.color}; 
+                    border: 2px solid white; 
+                    border-radius: 50%; 
+                    box-shadow: 0 0 10px ${user.color};
+                "></div>
+            </div>
+        `;
+
+        const icon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: customHtml,
+            iconSize: [0, 0], // CSS handles size
+        });
+
+        if (userMarkersRef.current[user.id]) {
+            // Update existing marker position
+            userMarkersRef.current[user.id].setLatLng([user.lat, user.lng]);
+            userMarkersRef.current[user.id].setIcon(icon); // Update icon in case name/color changed
+        } else {
+            // Create new marker
+            const marker = window.L.marker([user.lat, user.lng], { icon, zIndexOffset: 900 });
+            marker.addTo(map);
+            userMarkersRef.current[user.id] = marker;
+        }
+    });
+
+  }, [otherUsers]);
 
   // Handle Route Drawing
   useEffect(() => {
