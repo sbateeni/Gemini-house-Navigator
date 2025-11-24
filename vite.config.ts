@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Pass Vercel environment variables to the client-side code
+    // Safely expose API_KEY if available in build environment
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   }
 });

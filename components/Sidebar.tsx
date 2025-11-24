@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,6 +17,8 @@ interface SidebarProps {
   onNavigateToNote: (note: MapNote) => void;
   routeData: RouteData | null;
   isRouting: boolean;
+  onAnalyzeNote: (note: MapNote) => void;
+  isAnalyzing: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,7 +35,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteNote,
   onNavigateToNote,
   routeData,
-  isRouting
+  isRouting,
+  onAnalyzeNote,
+  isAnalyzing
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -133,7 +137,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`p-4 rounded-2xl border cursor-pointer transition-all active:scale-[0.98] group relative ${selectedNote?.id === note.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg ring-1 ring-blue-500/20' : 'bg-slate-800/40 border-slate-700 hover:bg-slate-800'}`}
             >
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-semibold text-base text-blue-100 truncate pr-6">{note.locationName}</h3>
+                <h3 className="font-semibold text-base text-blue-100 truncate pr-6">
+                  {note.locationName}
+                </h3>
                 <button 
                   onClick={(e) => onDeleteNote(note.id, e)} 
                   className="absolute right-3 top-4 p-1.5 rounded-full hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors"
@@ -146,6 +152,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                  <span className="text-[10px] font-medium bg-slate-800 px-2 py-1 rounded-full text-slate-500">
                     {new Date(note.createdAt).toLocaleDateString()}
                  </span>
+                 {!note.aiAnalysis && (
+                   <span className="flex items-center gap-1 text-[10px] text-yellow-500/80">
+                     <Sparkles size={10} /> Needs Analysis
+                   </span>
+                 )}
               </div>
             </div>
           ))
@@ -158,7 +169,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex justify-between items-center mb-3">
              <div className="flex items-center gap-2 text-blue-500">
                <Globe size={14} />
-               <span className="text-xs uppercase tracking-wider font-bold">AI Analysis</span>
+               <span className="text-xs uppercase tracking-wider font-bold">
+                 {selectedNote.aiAnalysis ? "Verified Location" : "Coordinates Saved"}
+               </span>
              </div>
              <button onClick={() => setSelectedNote(null)} className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full">
                <X size={14} />
@@ -166,10 +179,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <h2 className="font-bold text-xl text-white mb-2">{selectedNote.locationName}</h2>
           
-          {/* Navigation Controls */}
-          <div className="mb-4">
+          {/* Action Buttons: Navigate & Analyze */}
+          <div className="mb-4 space-y-2">
+             {/* Navigation Status */}
              {routeData && selectedNote ? (
-               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between mb-2">
+               <div className="bg-green-900/20 border border-green-900/50 rounded-lg p-3 flex items-center justify-between">
                  <div className="flex gap-4">
                    <div className="flex items-center gap-1.5 text-green-400">
                      <Clock size={16} />
@@ -185,18 +199,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button 
                   onClick={() => onNavigateToNote(selectedNote)}
                   disabled={isRouting}
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors"
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors border border-slate-700"
                 >
                   {isRouting ? <Loader2 className="animate-spin" size={18} /> : <Navigation2 size={18} />}
                   Navigate Here
                 </button>
              )}
+
+             {/* Analyze Button (Only if not analyzed) */}
+             {!selectedNote.aiAnalysis && (
+               <button 
+                  onClick={() => onAnalyzeNote(selectedNote)}
+                  disabled={isAnalyzing}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-lg shadow-blue-900/20"
+                >
+                  {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                  Identify with AI
+                </button>
+             )}
           </div>
 
           <div className="max-h-32 overflow-y-auto mb-4 pr-2 scrollbar-thin">
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {selectedNote.aiAnalysis}
-            </p>
+            {selectedNote.aiAnalysis ? (
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {selectedNote.aiAnalysis}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500 italic">
+                Location saved. Use the AI button to identify this place and get details.
+              </p>
+            )}
           </div>
           
           {selectedNote.sources && selectedNote.sources.length > 0 && (

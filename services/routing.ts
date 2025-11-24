@@ -10,10 +10,11 @@ export const getRoute = async (
   endLng: number
 ): Promise<RouteData | null> => {
   try {
-    // OSRM expects: longitude,latitude;longitude,latitude
-    // geometries=geojson ensures we get the full shape of the road, not just straight lines
-    // overview=full provides the complete path resolution
-    const url = `${OSRM_API_URL}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson&steps=true`;
+    // OSRM Request Breakdown:
+    // - overview=full: Returns the most detailed path geometry available.
+    // - geometries=geojson: Returns coordinates as precise line segments, enabling the map to draw curves and turns accurately.
+    // - steps=true: useful for turn-by-turn instructions (unused here but good for debug)
+    const url = `${OSRM_API_URL}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
     
     const response = await fetch(url);
     const data = await response.json();

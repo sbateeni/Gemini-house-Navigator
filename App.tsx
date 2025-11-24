@@ -73,9 +73,9 @@ export default function App() {
             },
             (err) => console.log("Location access denied or error", err),
             { 
-              enableHighAccuracy: true, // Critical for navigation
-              maximumAge: 0,            // Do not use cached position
-              timeout: 10000            // Wait up to 10s for good fix
+              enableHighAccuracy: true,
+              maximumAge: 0,
+              timeout: 15000
             }
         );
         return () => navigator.geolocation.clearWatch(watchId);
@@ -93,18 +93,15 @@ export default function App() {
   const handleSaveNote = async () => {
     if (!tempCoords) return;
     
-    setIsAnalyzing(true);
-    
-    const result = await identifyLocation(tempCoords.lat, tempCoords.lng, userNoteInput);
-    
+    // Save IMMEDIATELY without analysis
     const newNote: MapNote = {
       id: Date.now().toString(),
       lat: tempCoords.lat,
       lng: tempCoords.lng,
       userNote: userNoteInput,
-      locationName: result.locationName,
-      aiAnalysis: result.details,
-      sources: result.sources,
+      locationName: "Saved Location", // Default name
+      aiAnalysis: "", // Empty analysis indicates it needs processing later
+      sources: [],
       createdAt: Date.now()
     };
     
@@ -116,9 +113,32 @@ export default function App() {
       setSelectedNote(newNote);
       setShowModal(false);
       setTempCoords(null);
+      // Open sidebar to show the new note
+      setSidebarOpen(true);
     } catch (error) {
       console.error("Failed to save note", error);
       alert("Failed to save note to database.");
+    }
+  };
+
+  const handleAnalyzeNote = async (note: MapNote) => {
+    setIsAnalyzing(true);
+    try {
+      const result = await identifyLocation(note.lat, note.lng, note.userNote);
+      
+      const updatedNote: MapNote = {
+        ...note,
+        locationName: result.locationName,
+        aiAnalysis: result.details,
+        sources: result.sources
+      };
+
+      await db.addNote(updatedNote); // Re-save updated note
+      setNotes(prev => prev.map(n => n.id === note.id ? updatedNote : n));
+      setSelectedNote(updatedNote);
+    } catch (error) {
+      console.error("Analysis failed", error);
+      alert("AI Analysis failed. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -133,7 +153,6 @@ export default function App() {
     setIsSearching(false);
     
     if (result) {
-      // Trigger flyTo via state prop
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
       setCurrentRoute(null);
@@ -146,7 +165,7 @@ export default function App() {
 
   const flyToNote = (note: MapNote) => {
     setSelectedNote(note);
-    setCurrentRoute(null); // Reset route when just clicking
+    setCurrentRoute(null);
     setFlyToTarget({ lat: note.lat, lng: note.lng, zoom: 16, timestamp: Date.now() });
     
     if (window.innerWidth < 768) {
@@ -195,7 +214,6 @@ export default function App() {
 
       if (route) {
           setCurrentRoute(route);
-          // Sidebar remains open to show distance/time
       } else {
           alert("Could not find a driving route to this location.");
       }
@@ -219,6 +237,8 @@ export default function App() {
         onNavigateToNote={handleNavigateToNote}
         routeData={currentRoute}
         isRouting={isRouting}
+        onAnalyzeNote={handleAnalyzeNote}
+        isAnalyzing={isAnalyzing}
       />
 
       <div className="flex-1 relative w-full h-full">

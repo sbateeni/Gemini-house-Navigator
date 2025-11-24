@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Loader2, Plus } from 'lucide-react';
+import { MapPin, X, Plus } from 'lucide-react';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface CreateNoteModalProps {
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
   onSave: () => void;
-  isAnalyzing: boolean;
+  isAnalyzing: boolean; // Kept in interface to avoid breaking parent usage, but unused for loading now
 }
 
 export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
@@ -52,20 +52,11 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
         
         <button 
           onClick={onSave}
-          disabled={isAnalyzing || !userNoteInput.trim()}
+          disabled={!userNoteInput.trim()}
           className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl text-base font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 mb-2"
         >
-          {isAnalyzing ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              Analysing...
-            </>
-          ) : (
-            <>
-              <Plus size={20} />
-              Save Entry
-            </>
-          )}
+          <Plus size={20} />
+          Save Entry
         </button>
       </div>
     </div>
