@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
-import { MapNote } from './types';
+import { MapNote, MapUser } from './types';
 
 // Components
 import { Sidebar } from './components/Sidebar';
@@ -13,6 +13,8 @@ import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SettingsModal } from './components/SettingsModal';
+import { UserCommandModal } from './components/UserCommandModal';
+import { LocationPickerModal } from './components/LocationPickerModal';
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -32,8 +34,18 @@ export default function App() {
   const { userLocation } = useGeolocation(session, hasAccess);
   
   // --- 3. Feature Hooks ---
-  const { onlineUsers } = usePresence(session, hasAccess, userLocation); // Pass location to broadcast
-  const { currentRoute, isRouting, handleNavigateToNote, handleStopNavigation } = useNavigation(userLocation);
+  const { onlineUsers } = usePresence(session, hasAccess, userLocation); 
+  const { 
+    currentRoute, 
+    secondaryRoute, 
+    setSecondaryRoute, 
+    calculateRoute, 
+    isRouting, 
+    handleNavigateToNote, 
+    handleNavigateToPoint,
+    handleStopNavigation,
+    clearSecondaryRoute
+  } = useNavigation(userLocation);
 
   // --- 4. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
@@ -49,6 +61,10 @@ export default function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Tactical Command States
+  const [commandUser, setCommandUser] = useState<MapUser | null>(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   // --- 5. Form Logic Hook ---
   const { 
@@ -132,6 +148,50 @@ export default function App() {
     }
   };
 
+  // Tactical Command Handlers
+  const onUserClick = (user: MapUser) => {
+    if (userRole === 'admin') {
+      setCommandUser(user);
+    }
+  };
+
+  const handleIntercept = () => {
+    if (!commandUser) return;
+    handleNavigateToPoint(commandUser.lat, commandUser.lng);
+    setCommandUser(null);
+  };
+
+  const handleDispatch = () => {
+    setShowLocationPicker(true);
+    // Keep commandUser for context, but maybe close the first modal or overlay it
+    // We can keep commandUser set, but set showLocationPicker true.
+    // Ideally close Command Modal first visually? 
+    // Let's rely on conditional rendering or z-index.
+    // The LocationPicker uses commandUser to know who we are dispatching.
+  };
+
+  const handleSelectDispatchLocation = async (note: MapNote) => {
+    if (!commandUser) return;
+    
+    // Calculate route from CommandUser to Note
+    const route = await calculateRoute(
+      { lat: commandUser.lat, lng: commandUser.lng },
+      { lat: note.lat, lng: note.lng }
+    );
+    
+    if (route) {
+        setSecondaryRoute(route);
+        // Also fly map to see the route
+        // Find midpoint or fit bounds? Leaflet map handles route fitting, but let's fly to user
+        setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
+    } else {
+        alert("Could not calculate dispatch route.");
+    }
+
+    setShowLocationPicker(false);
+    setCommandUser(null);
+  };
+
   // --- 8. Render Guards ---
   if (authLoading) {
     return (
@@ -175,7 +235,7 @@ export default function App() {
         onDeleteNote={handleDeleteNote}
         onEditNote={handleEditNote} 
         onNavigateToNote={(note) => handleNavigateToNote(note, locateUser)}
-        onStopNavigation={handleStopNavigation}
+        onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
         routeData={currentRoute}
         isRouting={isRouting}
         onAnalyzeNote={handleAnalyzeNote}
@@ -199,7 +259,9 @@ export default function App() {
           tempMarkerCoords={tempCoords}
           userLocation={userLocation}
           currentRoute={currentRoute}
-          otherUsers={onlineUsers} // Pass live users to map
+          secondaryRoute={secondaryRoute} // Render dashed line
+          otherUsers={onlineUsers} 
+          onUserClick={onUserClick} // Handle clicks on blue dots
         />
         
         <MapControls 
@@ -240,6 +302,27 @@ export default function App() {
             isSatellite={isSatellite}
             setIsSatellite={setIsSatellite}
           />
+        )}
+
+        {/* Tactical Command Modals (Admin Only) */}
+        {userRole === 'admin' && (
+            <>
+                <UserCommandModal 
+                    isOpen={!!commandUser && !showLocationPicker}
+                    onClose={() => setCommandUser(null)}
+                    user={commandUser}
+                    onIntercept={handleIntercept}
+                    onDispatch={handleDispatch}
+                />
+                
+                <LocationPickerModal
+                    isOpen={showLocationPicker}
+                    onClose={() => { setShowLocationPicker(false); setCommandUser(null); }}
+                    notes={notes}
+                    onSelectLocation={handleSelectDispatchLocation}
+                    targetUserName={commandUser?.username}
+                />
+            </>
         )}
       </div>
     </div>

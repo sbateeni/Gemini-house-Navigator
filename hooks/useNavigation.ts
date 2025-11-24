@@ -1,13 +1,15 @@
+
 import { useState, useEffect } from 'react';
 import { getRoute } from '../services/routing';
 import { RouteData, MapNote } from '../types';
 
 export function useNavigation(userLocation: {lat: number, lng: number} | null) {
   const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
+  const [secondaryRoute, setSecondaryRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
   const [navigationTarget, setNavigationTarget] = useState<{lat: number, lng: number} | null>(null);
 
-  // Dynamic Rerouting Effect
+  // Dynamic Rerouting for Main Route (Me -> Target)
   useEffect(() => {
     if (!userLocation || !navigationTarget) return;
 
@@ -36,16 +38,41 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
       }
   };
 
+  const handleNavigateToPoint = async (lat: number, lng: number) => {
+      if (!userLocation) {
+          alert("Waiting for GPS...");
+          return;
+      }
+      setIsRouting(true);
+      setNavigationTarget({ lat, lng });
+      const route = await getRoute(userLocation.lat, userLocation.lng, lat, lng);
+      setIsRouting(false);
+      if (route) setCurrentRoute(route);
+  };
+
+  const calculateRoute = async (start: {lat: number, lng: number}, end: {lat: number, lng: number}) => {
+      return await getRoute(start.lat, start.lng, end.lat, end.lng);
+  };
+
   const handleStopNavigation = () => {
     setNavigationTarget(null);
     setCurrentRoute(null);
   };
 
+  const clearSecondaryRoute = () => {
+      setSecondaryRoute(null);
+  };
+
   return {
     currentRoute,
+    secondaryRoute,
+    setSecondaryRoute,
     isRouting,
     navigationTarget,
     handleNavigateToNote,
-    handleStopNavigation
+    handleNavigateToPoint,
+    calculateRoute,
+    handleStopNavigation,
+    clearSecondaryRoute
   };
 }
