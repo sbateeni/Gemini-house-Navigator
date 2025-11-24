@@ -25,8 +25,10 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'), // Standard convention, though here we map to root if needed, but relative is safer.
-      // Since structure is flat root, we map '@' to '.'
+      '@': path.resolve(__dirname, './src'), 
+      // Map components and services to root if structure is flat, 
+      // or to proper folders if structure is nested. 
+      // Current structure has components/ and services/ in root.
       '@components': path.resolve(__dirname, './components'),
       '@services': path.resolve(__dirname, './services')
     },

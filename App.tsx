@@ -31,7 +31,9 @@ export default function App() {
   
   // Sidebar & Map View State
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
-  const [isSatellite, setIsSatellite] = useState(false);
+  const [isSatellite, setIsSatellite] = useState(() => {
+    return localStorage.getItem('gemini_map_mode') === 'satellite';
+  });
   
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,37 +61,69 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auth Initialization
+  // Save map mode preference
   useEffect(() => {
-    auth.getSession().then(({ session }) => {
-      setSession(session);
-      if (session?.user) {
-        db.getUserProfile(session.user.id).then(profile => {
-            if (profile) {
-                setUserRole(profile.role);
-                setIsApproved(profile.isApproved);
-            }
-        });
-      }
-      setAuthLoading(false);
-    });
+    localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
+  }, [isSatellite]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  // Auth Initialization with Safety Timeout
+  useEffect(() => {
+    let mounted = true;
+
+    // Safety timeout: If Supabase doesn't respond in 3 seconds, force load to stop spinner
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+         console.warn("Auth check timed out, forcing UI load");
+         setAuthLoading(false);
+      }
+    }, 3000);
+
+    const checkUser = async () => {
+      try {
+        const { session } = await auth.getSession();
+        if (!mounted) return;
+        
+        setSession(session);
+        if (session?.user) {
+          const profile = await db.getUserProfile(session.user.id);
+          if (profile) {
+              setUserRole(profile.role);
+              setIsApproved(profile.isApproved);
+          }
+        }
+      } catch (e) {
+        console.error("Auth check failed", e);
+      } finally {
+        if (mounted) {
+          clearTimeout(safetyTimeout);
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
       setSession(session);
       if (session?.user) {
-        db.getUserProfile(session.user.id).then(profile => {
-            if (profile) {
-                setUserRole(profile.role);
-                setIsApproved(profile.isApproved);
-            }
-        });
+        const profile = await db.getUserProfile(session.user.id);
+        if (profile) {
+            setUserRole(profile.role);
+            setIsApproved(profile.isApproved);
+        }
       } else {
         setUserRole(null);
         setIsApproved(false);
       }
+      setAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Load notes from DB on mount (only if logged in AND approved)
@@ -141,6 +175,7 @@ export default function App() {
     await auth.signOut();
     setNotes([]);
     setSelectedNote(null);
+    window.location.reload();
   };
 
   const handleMapClick = (lat: number, lng: number) => {
@@ -156,14 +191,15 @@ export default function App() {
     
     // Save IMMEDIATELY without analysis
     const newNote: MapNote = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(), // Use UUID for better DB compatibility
       lat: tempCoords.lat,
       lng: tempCoords.lng,
       userNote: userNoteInput,
       locationName: "Saved Location", // Default name
       aiAnalysis: "", // Empty analysis indicates it needs processing later
       sources: [],
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      status: 'not_caught' // Default status
     };
     
     try {
