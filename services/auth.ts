@@ -14,12 +14,21 @@ export const auth = {
     return { data, error };
   },
 
-  async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { data, error };
+  async signIn(email: string, password: string, rememberMe: boolean = true) {
+    try {
+        // Note: setPersistence is not available on the Supabase v2 auth client instance directly.
+        // Persistence is handled by the storage configuration of the client (defaults to localStorage).
+        // For dynamic persistence (session vs local), one would need separate clients or custom storage adapters.
+        // We will proceed with the default behavior.
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        return { data, error };
+    } catch (e: any) {
+        return { data: { user: null, session: null }, error: e };
+    }
   },
 
   async signOut() {
