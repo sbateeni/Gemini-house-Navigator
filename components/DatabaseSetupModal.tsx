@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Database, Terminal, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
 import { supabase } from '../services/supabase';
@@ -13,7 +14,8 @@ create table if not exists profiles (
   username text,
   role text default 'user',
   is_approved boolean default false,
-  email text, -- Added for Admin Dashboard
+  email text,
+  permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb,
   primary key (id)
 );
 
@@ -35,8 +37,15 @@ create policy "Admin update" on profiles for update using (
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, username, role, is_approved, email)
-  values (new.id, new.raw_user_meta_data->>'username', 'user', false, new.email);
+  insert into public.profiles (id, username, role, is_approved, email, permissions)
+  values (
+    new.id, 
+    new.raw_user_meta_data->>'username', 
+    'user', 
+    false, 
+    new.email,
+    '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb
+  );
   return new;
 end;
 $$ language plpgsql security definer;
@@ -111,7 +120,7 @@ create policy "Admin delete" on notes for delete using (
             <h1 className="text-xl font-bold text-white mb-1">Security Update Required</h1>
             <p className="text-slate-400 text-sm">
               Your app needs to update the database structure to support the new 
-              <span className="text-blue-400 font-bold mx-1">Secure Login & Approval System</span>.
+              <span className="text-blue-400 font-bold mx-1">Secure Login, Permissions & Ban System</span>.
             </p>
           </div>
         </div>

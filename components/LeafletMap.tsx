@@ -19,8 +19,9 @@ interface LeafletMapProps {
   userLocation: { lat: number; lng: number } | null;
   currentRoute: RouteData | null;
   otherUsers?: MapUser[]; 
-  onUserClick?: (user: MapUser) => void; // New prop
-  secondaryRoute?: RouteData | null; // New prop
+  onUserClick?: (user: MapUser) => void; 
+  secondaryRoute?: RouteData | null;
+  canSeeOthers?: boolean; // New prop for permission
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -35,7 +36,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   currentRoute,
   otherUsers = [],
   onUserClick,
-  secondaryRoute
+  secondaryRoute,
+  canSeeOthers = true
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -149,7 +151,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    const activeIds = new Set(otherUsers.map(u => u.id));
+    const visibleUsers = canSeeOthers ? otherUsers : [];
+    const activeIds = new Set(visibleUsers.map(u => u.id));
 
     Object.keys(userMarkersRef.current).forEach(userId => {
         if (!activeIds.has(userId)) {
@@ -158,7 +161,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         }
     });
 
-    otherUsers.forEach(user => {
+    visibleUsers.forEach(user => {
         const customHtml = `
             <div style="position: relative; width: 0; height: 0;">
                 <div style="
@@ -215,7 +218,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         }
     });
 
-  }, [otherUsers, onUserClick]);
+  }, [otherUsers, onUserClick, canSeeOthers]);
 
   // Handle Main Route Drawing
   useEffect(() => {

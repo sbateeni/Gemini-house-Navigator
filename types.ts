@@ -35,12 +35,19 @@ export interface RouteData {
   duration: number; // in seconds
 }
 
+export interface UserPermissions {
+  can_create: boolean;
+  can_see_others: boolean;
+  can_navigate: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
-  role: 'admin' | 'user';
-  isApproved: boolean; // New field for approval status
-  email?: string; // Added email for admin dashboard
+  role: 'admin' | 'user' | 'banned';
+  isApproved: boolean;
+  email?: string;
+  permissions: UserPermissions;
 }
 
 export interface MapUser {

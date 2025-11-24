@@ -1,5 +1,12 @@
+
 import { supabase } from './supabase';
-import { MapNote, UserProfile } from '../types';
+import { MapNote, UserProfile, UserPermissions } from '../types';
+
+const DEFAULT_PERMISSIONS: UserPermissions = {
+  can_create: true,
+  can_see_others: true,
+  can_navigate: true
+};
 
 export const db = {
   // Get all notes from Supabase
@@ -99,8 +106,9 @@ export const db = {
         id: data.id,
         username: data.username,
         role: data.role,
-        isApproved: data.is_approved === true, // Default to false if null/undefined
-        email: data.email
+        isApproved: data.is_approved === true,
+        email: data.email,
+        permissions: data.permissions || DEFAULT_PERMISSIONS
       };
     } catch (error) {
       console.error("Error fetching profile", error);
@@ -114,7 +122,7 @@ export const db = {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .order('role', { ascending: true }); // Admins first usually implies sorting logic, or handle in UI
+        .order('role', { ascending: true }); 
 
       if (error) throw error;
 
@@ -123,7 +131,8 @@ export const db = {
         username: row.username,
         role: row.role,
         isApproved: row.is_approved === true,
-        email: row.email
+        email: row.email,
+        permissions: row.permissions || DEFAULT_PERMISSIONS
       }));
     } catch (error) {
       console.error("Error fetching all profiles", error);
@@ -131,12 +140,13 @@ export const db = {
     }
   },
 
-  // Admin: Update Profile Role/Approval
+  // Admin: Update Profile Role/Approval/Permissions
   async updateProfile(id: string, updates: Partial<UserProfile>): Promise<void> {
     try {
       const dbUpdates: any = {};
       if (updates.role) dbUpdates.role = updates.role;
       if (updates.isApproved !== undefined) dbUpdates.is_approved = updates.isApproved;
+      if (updates.permissions) dbUpdates.permissions = updates.permissions;
 
       const { error } = await supabase
         .from('profiles')

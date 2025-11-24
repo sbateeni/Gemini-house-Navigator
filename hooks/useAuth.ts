@@ -1,14 +1,23 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
+import { UserPermissions } from '../types';
+
+const DEFAULT_PERMISSIONS: UserPermissions = {
+  can_create: true,
+  can_see_others: true,
+  can_navigate: true
+};
 
 export function useAuth() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  const [userRole, setUserRole] = useState<'admin' | 'user' | 'banned' | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
   const [isAccountDeleted, setIsAccountDeleted] = useState(false);
+  const [permissions, setPermissions] = useState<UserPermissions>(DEFAULT_PERMISSIONS);
 
   // Define logic as a reusable function for manual checks
   const refreshAuth = useCallback(async () => {
@@ -29,10 +38,16 @@ export function useAuth() {
              const profile = await db.getUserProfile(session.user.id);
              if (profile) {
                  setUserRole(profile.role);
+                 setPermissions(profile.permissions);
+                 
                  // ADMIN OVERRIDE: If role is admin, force approval to true regardless of DB flag
-                 // This prevents Admins from ever being locked out by a race condition.
                  const effectiveApproval = profile.role === 'admin' ? true : profile.isApproved;
                  setIsApproved(effectiveApproval);
+                 
+                 // If banned, treat as not approved (or handle in UI)
+                 if (profile.role === 'banned') {
+                   setIsApproved(false);
+                 }
              }
           }
         } else {
@@ -64,6 +79,7 @@ export function useAuth() {
           setUserRole(null);
           setIsApproved(false);
           setIsAccountDeleted(false);
+          setPermissions(DEFAULT_PERMISSIONS);
           setAuthLoading(false);
       } else if (session?.user) {
         // Re-run full check on sign-in events
@@ -79,7 +95,7 @@ export function useAuth() {
     };
   }, [refreshAuth, authLoading]);
 
-  // Realtime Subscription for Profile Approval
+  // Realtime Subscription for Profile Approval and Permissions
   useEffect(() => {
     if (!session?.user?.id) return;
 
@@ -97,8 +113,21 @@ export function useAuth() {
           const newProfile = payload.new;
           if (newProfile) {
              const isAdmin = userRole === 'admin'; 
+             
+             // Update Approval
              if (isAdmin || newProfile.is_approved === true) {
                setIsApproved(true);
+             }
+             if (newProfile.role === 'banned') {
+               setIsApproved(false);
+               setUserRole('banned');
+             } else {
+               setUserRole(newProfile.role);
+             }
+
+             // Update Permissions
+             if (newProfile.permissions) {
+               setPermissions(newProfile.permissions);
              }
           }
         }
@@ -131,8 +160,9 @@ export function useAuth() {
     authLoading,
     userRole,
     isApproved,
+    permissions,
     isAccountDeleted,
     handleLogout,
-    refreshAuth // Exported for use in UI
+    refreshAuth 
   };
 }

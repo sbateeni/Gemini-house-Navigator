@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { MapNote, RouteData } from '../types';
 import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings } from 'lucide-react';
@@ -22,11 +23,12 @@ interface SidebarProps {
   isAnalyzing: boolean;
   onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
   isConnected: boolean;
-  userRole: 'admin' | 'user' | null;
+  userRole: 'admin' | 'user' | 'banned' | null;
   onLogout: () => void;
   onEditNote: (note: MapNote, e: React.MouseEvent) => void;
   onOpenDashboard: () => void;
-  onOpenSettings: () => void; // New prop
+  onOpenSettings: () => void;
+  canCreate: boolean; // New prop for permission
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -53,7 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onEditNote,
   onOpenDashboard,
-  onOpenSettings
+  onOpenSettings,
+  canCreate
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -160,7 +163,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <MapIcon className="w-8 h-8 opacity-40" />
             </div>
             <h3 className="text-white font-medium mb-1">Start your journey</h3>
-            <p className="text-sm">Tap anywhere on the map to drop a pin. Notes are synced globally.</p>
+            <p className="text-sm">
+                {canCreate 
+                    ? "Tap anywhere on the map to drop a pin. Notes are synced globally."
+                    : "Explore the map and view global notes."}
+            </p>
           </div>
         ) : (
           notes.map(note => (

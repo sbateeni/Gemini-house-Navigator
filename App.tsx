@@ -26,8 +26,11 @@ import { useNoteForm } from './hooks/useNoteForm';
 
 export default function App() {
   // --- 1. Authentication & User Data ---
-  const { session, authLoading, userRole, isApproved, isAccountDeleted, handleLogout, refreshAuth } = useAuth();
-  const hasAccess = !isAccountDeleted && (isApproved || userRole === 'admin');
+  const { session, authLoading, userRole, isApproved, permissions, isAccountDeleted, handleLogout, refreshAuth } = useAuth();
+  
+  // Banned users should basically be treated as deleted or blocked
+  const isBanned = userRole === 'banned';
+  const hasAccess = !isAccountDeleted && !isBanned && (isApproved || userRole === 'admin');
 
   // --- 2. Core Data Hooks ---
   const { notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected } = useNotes(session, hasAccess, isAccountDeleted);
@@ -163,11 +166,6 @@ export default function App() {
 
   const handleDispatch = () => {
     setShowLocationPicker(true);
-    // Keep commandUser for context, but maybe close the first modal or overlay it
-    // We can keep commandUser set, but set showLocationPicker true.
-    // Ideally close Command Modal first visually? 
-    // Let's rely on conditional rendering or z-index.
-    // The LocationPicker uses commandUser to know who we are dispatching.
   };
 
   const handleSelectDispatchLocation = async (note: MapNote) => {
@@ -181,8 +179,6 @@ export default function App() {
     
     if (route) {
         setSecondaryRoute(route);
-        // Also fly map to see the route
-        // Find midpoint or fit bounds? Leaflet map handles route fitting, but let's fly to user
         setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
     } else {
         alert("Could not calculate dispatch route.");
@@ -206,11 +202,12 @@ export default function App() {
 
   if (!session) return <AuthPage />;
 
+  // Block access if deleted or banned or not approved
   if (!hasAccess) {
       return (
         <PendingApproval 
           onLogout={handleLogout} 
-          isDeleted={isAccountDeleted} 
+          isDeleted={isAccountDeleted || isBanned} 
           email={session.user.email} 
           onCheckStatus={refreshAuth}
         />
@@ -234,7 +231,10 @@ export default function App() {
         onFlyToNote={flyToNote}
         onDeleteNote={handleDeleteNote}
         onEditNote={handleEditNote} 
-        onNavigateToNote={(note) => handleNavigateToNote(note, locateUser)}
+        onNavigateToNote={(note) => {
+            if (permissions.can_navigate) handleNavigateToNote(note, locateUser);
+            else alert("Navigation permission required.");
+        }}
         onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
         routeData={currentRoute}
         isRouting={isRouting}
@@ -246,6 +246,7 @@ export default function App() {
         onLogout={handleLogout}
         onOpenDashboard={() => setShowDashboard(true)} 
         onOpenSettings={() => setShowSettings(true)}
+        canCreate={permissions.can_create} // Pass permission
       />
 
       <div className="flex-1 relative w-full h-full">
@@ -254,7 +255,11 @@ export default function App() {
           notes={notes}
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
-          onMapClick={(lat, lng) => handleMapClick(lat, lng, handleStopNavigation)}
+          onMapClick={(lat, lng) => {
+              if (permissions.can_create) {
+                 handleMapClick(lat, lng, handleStopNavigation);
+              }
+          }}
           flyToTarget={flyToTarget}
           tempMarkerCoords={tempCoords}
           userLocation={userLocation}
@@ -262,6 +267,7 @@ export default function App() {
           secondaryRoute={secondaryRoute} // Render dashed line
           otherUsers={onlineUsers} 
           onUserClick={onUserClick} // Handle clicks on blue dots
+          canSeeOthers={permissions.can_see_others} // Pass permission
         />
         
         <MapControls 
