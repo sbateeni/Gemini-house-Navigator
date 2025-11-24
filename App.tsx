@@ -317,6 +317,7 @@ export default function App() {
         canCreate={permissions.can_create} 
         myStatus={myStatus}
         setMyStatus={setMyStatus}
+        onlineUsers={onlineUsers}
       />
 
       <div className="flex-1 relative w-full h-full">

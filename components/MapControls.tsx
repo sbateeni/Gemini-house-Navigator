@@ -17,7 +17,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
   onLocateUser
 }) => {
   return (
-    <div className="absolute top-4 right-4 z-[400] flex flex-col gap-3">
+    <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
        {/* Sidebar Toggle (Mobile) */}
        {!sidebarOpen && (
          <button 
@@ -31,7 +31,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
        <button 
          onClick={onLocateUser}
          className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-xl border border-blue-500 flex items-center justify-center hover:bg-blue-500 active:scale-95 transition-all"
-         title="My Location"
+         title="موقعي الحالي"
        >
          <Navigation size={24} />
        </button>
@@ -39,7 +39,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
        <button 
          onClick={() => setIsSatellite(!isSatellite)}
          className={`w-12 h-12 rounded-full shadow-xl border flex items-center justify-center transition-all active:scale-95 ${isSatellite ? 'bg-slate-900 text-white border-slate-700' : 'bg-slate-900 text-slate-400 border-slate-700'}`}
-         title="Toggle Satellite"
+         title="تغيير نمط الخريطة"
        >
          {isSatellite ? <Globe size={24} /> : <Layers size={24} />}
        </button>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { X, Send, User, MapPin } from 'lucide-react';
 import { MapNote, UserProfile } from '../types';
@@ -27,7 +26,6 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       db.getAllProfiles().then(profiles => {
-        // Filter out self and banned users
         setUsers(profiles.filter(p => p.id !== currentUserId && p.role !== 'banned'));
       });
       setInstructions("");
@@ -46,7 +44,7 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
   if (!isOpen || !targetLocation) return null;
 
   return (
-    <div className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
         
         <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-2xl">
@@ -54,7 +52,7 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
             <div className="bg-purple-900/30 p-1.5 rounded-lg">
                 <Send className="text-purple-400 w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-white">Dispatch Unit</h2>
+            <h2 className="text-lg font-bold text-white">إصدار تكليف/مهمة</h2>
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
             <X size={20} />
@@ -67,36 +65,36 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
                 <MapPin size={20} />
              </div>
              <div>
-                <div className="text-xs text-slate-500 uppercase font-bold">Target Location</div>
+                <div className="text-xs text-slate-500 uppercase font-bold">الموقع المستهدف</div>
                 <div className="text-white font-medium line-clamp-1">{targetLocation.locationName}</div>
              </div>
           </div>
 
           <div>
-             <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Select Unit</label>
+             <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">اختر الوحدة/العنصر</label>
              <div className="relative">
                 <select 
                    value={selectedUser}
                    onChange={(e) => setSelectedUser(e.target.value)}
                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white appearance-none focus:border-purple-500 focus:outline-none transition-colors"
                 >
-                   <option value="">-- Choose User --</option>
+                   <option value="">-- اختر المستخدم --</option>
                    {users.map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.username} ({u.isApproved ? 'Active' : 'Pending'})
+                        {u.username} ({u.isApproved ? 'نشط' : 'قيد الانتظار'})
                       </option>
                    ))}
                 </select>
-                <User className="absolute right-3 top-3.5 text-slate-500 pointer-events-none" size={18} />
+                <User className="absolute left-3 top-3.5 text-slate-500 pointer-events-none" size={18} />
              </div>
           </div>
 
           <div>
-             <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">Tactical Instructions (Optional)</label>
+             <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">التعليمات (اختياري)</label>
              <textarea 
                value={instructions}
                onChange={(e) => setInstructions(e.target.value)}
-               placeholder="e.g. Proceed with caution. Support incoming."
+               placeholder="مثال: توجه فوراً للدعم. الهدف متحرك."
                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:border-purple-500 focus:outline-none transition-colors h-24 resize-none"
              />
           </div>
@@ -106,8 +104,8 @@ export const DispatchModal: React.FC<DispatchModalProps> = ({
              disabled={!selectedUser || sending}
              className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
-             {sending ? "Sending..." : "Send Order"}
-             {!sending && <Send size={18} />}
+             {sending ? "جاري الإرسال..." : "إرسال الأمر"}
+             {!sending && <Send size={18} className="rotate-180" />}
           </button>
         </div>
       </div>

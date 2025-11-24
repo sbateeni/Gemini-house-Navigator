@@ -7,7 +7,7 @@ export const AuthPage: React.FC = () => {
   const [isReset, setIsReset] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
-  const [showResend, setShowResend] = useState(false); // New state to control resend button visibility
+  const [showResend, setShowResend] = useState(false); 
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,34 +20,31 @@ export const AuthPage: React.FC = () => {
     setShowResend(false);
 
     try {
-      // Force a logout before attempting new auth actions to clear stale states
       await auth.signOut();
 
       if (isReset) {
         const { error } = await auth.resetPassword(email);
         if (error) throw error;
-        setMessage({ type: 'success', text: 'Password reset link sent to your email!' });
+        setMessage({ type: 'success', text: 'تم إرسال رابط استعادة كلمة المرور إلى بريدك!' });
       } else if (isLogin) {
         const { error } = await auth.signIn(email, password);
         if (error) {
-          // Detect email confirmation error specifically
           if (error.message.includes("Email not confirmed")) {
             setShowResend(true);
           }
           throw error;
         }
-        // App.tsx handles state change via onAuthStateChange
       } else {
         const { data, error } = await auth.signUp(email, password, username);
         if (error) throw error;
         if (data.user && data.user.identities && data.user.identities.length === 0) {
-            setMessage({ type: 'error', text: 'This email is already registered.' });
+            setMessage({ type: 'error', text: 'هذا البريد مسجل بالفعل.' });
         } else {
-            setMessage({ type: 'success', text: 'Registration successful! Please check your email to confirm your account.' });
+            setMessage({ type: 'success', text: 'تم التسجيل بنجاح! الرجاء التحقق من بريدك الإلكتروني.' });
         }
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'An error occurred' });
+      setMessage({ type: 'error', text: err.message || 'حدث خطأ ما' });
     } finally {
       setLoading(false);
     }
@@ -58,17 +55,17 @@ export const AuthPage: React.FC = () => {
     try {
       const { error } = await auth.resendConfirmation(email);
       if (error) throw error;
-      setMessage({ type: 'success', text: 'Confirmation email sent! Please check your inbox (and spam folder).' });
+      setMessage({ type: 'success', text: 'تم إرسال الرابط! تفقد بريدك الوارد (أو الرسائل المزعجة).' });
       setShowResend(false);
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to resend email.' });
+      setMessage({ type: 'error', text: err.message || 'فشل إرسال البريد.' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[100px]"></div>
@@ -81,10 +78,10 @@ export const AuthPage: React.FC = () => {
             <ShieldCheck className="text-white w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            {isReset ? 'Reset Password' : (isLogin ? 'Welcome Back' : 'Create Account')}
+            {isReset ? 'استعادة كلمة المرور' : (isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد')}
           </h1>
           <p className="text-slate-400 text-sm">
-            {isReset ? 'Enter your email to receive a recovery link' : (isLogin ? 'Access your secure map journal' : 'Join the secure network')}
+            {isReset ? 'أدخل بريدك لاستلام رابط الاستعادة' : (isLogin ? 'نظام العمليات الجغرافية الآمن' : 'الانضمام للشبكة المؤمنة')}
           </p>
         </div>
 
@@ -95,14 +92,13 @@ export const AuthPage: React.FC = () => {
                <p>{message.text}</p>
             </div>
             
-            {/* Resend Button if applicable */}
             {showResend && message.type === 'error' && (
               <button 
                 type="button"
                 onClick={handleResendConfirmation}
                 className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-white px-3 py-2 rounded-lg border border-red-700/50 flex items-center gap-2 transition-colors w-full justify-center font-bold"
               >
-                <Send size={12} /> Resend Confirmation Email
+                <Send size={12} className="rotate-180" /> إعادة إرسال التفعيل
               </button>
             )}
           </div>
@@ -111,40 +107,40 @@ export const AuthPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && !isReset && (
             <div className="relative group">
-              <User className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+              <User className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
               <input
                 type="text"
-                placeholder="Username"
+                placeholder="اسم المستخدم"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required={!isLogin}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               />
             </div>
           )}
 
           <div className="relative group">
-            <Mail className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+            <Mail className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
             <input
               type="email"
-              placeholder="Email Address"
+              placeholder="البريد الإلكتروني"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
           </div>
 
           {!isReset && (
             <div className="relative group">
-              <Lock className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
+              <Lock className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="كلمة المرور"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               />
             </div>
           )}
@@ -154,7 +150,7 @@ export const AuthPage: React.FC = () => {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (isReset ? 'Send Link' : (isLogin ? 'Sign In' : 'Sign Up'))}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (isReset ? 'إرسال الرابط' : (isLogin ? 'دخول' : 'تسجيل'))}
           </button>
         </form>
 
@@ -162,19 +158,19 @@ export const AuthPage: React.FC = () => {
           {!isReset ? (
             <>
               <p>
-                {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}
+                {isLogin ? "ليس لديك حساب؟" : "لديك حساب بالفعل؟"}{' '}
                 <button
                   onClick={() => { setIsLogin(!isLogin); setMessage(null); setShowResend(false); }}
                   className="text-blue-400 hover:text-blue-300 font-semibold"
                 >
-                  {isLogin ? 'Sign Up' : 'Sign In'}
+                  {isLogin ? 'إنشاء حساب' : 'تسجيل الدخول'}
                 </button>
               </p>
               <button
                 onClick={() => { setIsReset(true); setMessage(null); setShowResend(false); }}
                 className="text-slate-500 hover:text-slate-300 text-xs"
               >
-                Forgot Password?
+                نسيت كلمة المرور؟
               </button>
             </>
           ) : (
@@ -182,7 +178,7 @@ export const AuthPage: React.FC = () => {
               onClick={() => { setIsReset(false); setMessage(null); setShowResend(false); }}
               className="text-blue-400 hover:text-blue-300 font-semibold"
             >
-              Back to Login
+              العودة للدخول
             </button>
           )}
         </div>
