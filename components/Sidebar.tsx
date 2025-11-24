@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, Hand } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div>
               <h1 className="font-bold text-xl tracking-tight text-white">Map Journal</h1>
-              <p className="text-xs text-slate-400">Gemini + Maps</p>
+              <p className="text-xs text-slate-400">Gemini + Maps + Cloud</p>
             </div>
           </div>
           {/* Mobile Close Button */}
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <MapIcon className="w-8 h-8 opacity-40" />
             </div>
             <h3 className="text-white font-medium mb-1">Start your journey</h3>
-            <p className="text-sm">Tap anywhere on the map to drop a pin and write a note.</p>
+            <p className="text-sm">Tap anywhere on the map to drop a pin. Notes are synced globally.</p>
           </div>
         ) : (
           notes.map(note => (
@@ -160,14 +160,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                         onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'caught'); }}
                         className={`p-1.5 rounded-md transition-colors ${note.status === 'caught' ? 'bg-green-600 text-white shadow-sm' : 'text-slate-500 hover:text-green-400 hover:bg-slate-800'}`}
-                        title="تم القبض"
+                        title="Caught"
                     >
                         <CheckCircle2 size={16} />
                     </button>
                     <button
                         onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'not_caught'); }}
                         className={`p-1.5 rounded-md transition-colors ${note.status === 'not_caught' ? 'bg-red-600 text-white shadow-sm' : 'text-slate-500 hover:text-red-400 hover:bg-slate-800'}`}
-                        title="لم يتم القبض"
+                        title="Not Caught"
                     >
                         <XCircle size={16} />
                     </button>
@@ -192,12 +192,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </span>
                     {note.status === 'caught' && (
                         <span className="text-[10px] font-bold bg-green-900/30 text-green-400 px-2 py-1 rounded-full border border-green-900/50">
-                            تم القبض
+                            Caught
                         </span>
                     )}
                     {note.status === 'not_caught' && (
                         <span className="text-[10px] font-bold bg-red-900/30 text-red-400 px-2 py-1 rounded-full border border-red-900/50">
-                            لم يتم القبض
+                            Not Caught
                         </span>
                     )}
                  </div>
