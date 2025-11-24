@@ -1,5 +1,5 @@
-import React from 'react';
-import { Shield, Clock, LogOut, UserX, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Shield, Clock, LogOut, UserX, RefreshCw, Loader2 } from 'lucide-react';
 
 interface PendingApprovalProps {
   onLogout: () => void;
@@ -7,6 +7,14 @@ interface PendingApprovalProps {
 }
 
 export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDeleted = false }) => {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogoutClick = () => {
+    setIsLoggingOut(true);
+    // Call parent logout handler which eventually reloads the page
+    onLogout();
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Effects */}
@@ -61,10 +69,12 @@ export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDe
           )}
           
           <button 
-            onClick={onLogout}
+            onClick={handleLogoutClick}
+            disabled={isLoggingOut}
             className={`w-full font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 ${isDeleted ? 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/20' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`}
           >
-            <LogOut size={18} /> {isDeleted ? 'Sign Out & Restart' : 'Sign Out'}
+            {isLoggingOut ? <Loader2 className="animate-spin" size={18} /> : <LogOut size={18} />}
+            {isDeleted ? 'Sign Out & Restart' : 'Sign Out'}
           </button>
         </div>
       </div>
