@@ -48,6 +48,7 @@ export default function App() {
   const [showModal, setShowModal] = useState(false);
   const [tempCoords, setTempCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userNoteInput, setUserNoteInput] = useState("");
+  const [isEditingNote, setIsEditingNote] = useState(false);
 
   // Map Animation State
   const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
@@ -65,12 +66,10 @@ export default function App() {
   }, [isSatellite]);
 
   // Dynamic Rerouting Effect
-  // Whenever userLocation updates (GPS moves), recalculate route to the target
   useEffect(() => {
     if (!userLocation || !navigationTarget) return;
 
     const updateRoute = async () => {
-        // We don't set isRouting(true) here to avoid UI flickering on every GPS update
         const route = await getRoute(userLocation.lat, userLocation.lng, navigationTarget.lat, navigationTarget.lng);
         if (route) setCurrentRoute(route);
     };
@@ -82,34 +81,57 @@ export default function App() {
   const handleMapClick = (lat: number, lng: number) => {
     setTempCoords({ lat, lng });
     setUserNoteInput("");
+    setIsEditingNote(false); // Creating new
     setShowModal(true);
-    handleStopNavigation(); // Clear nav when clicking elsewhere
+    handleStopNavigation();
+  };
+
+  const handleEditNote = (note: MapNote, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTempCoords({ lat: note.lat, lng: note.lng });
+    setUserNoteInput(note.userNote);
+    setSelectedNote(note); // Use selected note to track ID
+    setIsEditingNote(true); // Editing existing
+    setShowModal(true);
   };
 
   const handleSaveNote = async () => {
     if (!tempCoords) return;
-    
-    const newNote: MapNote = {
-      id: crypto.randomUUID(),
-      lat: tempCoords.lat,
-      lng: tempCoords.lng,
-      userNote: userNoteInput,
-      locationName: "Saved Location",
-      aiAnalysis: "",
-      sources: [],
-      createdAt: Date.now(),
-      status: 'not_caught'
-    };
-    
+
     try {
-      await addNote(newNote);
-      setSelectedNote(newNote);
+      if (isEditingNote && selectedNote) {
+        // UPDATE EXISTING
+        const updatedNote: MapNote = {
+          ...selectedNote,
+          userNote: userNoteInput,
+          // We keep locationName and AI analysis as is, or clear them if you want re-analysis
+          // For now, let's just update the user's text.
+        };
+        await updateNote(updatedNote);
+        setSelectedNote(updatedNote);
+      } else {
+        // CREATE NEW
+        const newNote: MapNote = {
+          id: crypto.randomUUID(),
+          lat: tempCoords.lat,
+          lng: tempCoords.lng,
+          userNote: userNoteInput,
+          locationName: "Saved Location",
+          aiAnalysis: "",
+          sources: [],
+          createdAt: Date.now(),
+          status: 'not_caught'
+        };
+        await addNote(newNote);
+        setSelectedNote(newNote);
+      }
+      
       setShowModal(false);
       setTempCoords(null);
       setSidebarOpen(true);
     } catch (error) {
       console.error("Failed to save note", error);
-      alert("Failed to save note to database.");
+      alert("Failed to save/update note.");
       setIsConnected(false);
     }
   };
@@ -159,12 +181,14 @@ export default function App() {
 
   const handleDeleteNote = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      await deleteNote(id);
-      if (selectedNote?.id === id) setSelectedNote(null);
-      if (currentRoute) handleStopNavigation();
-    } catch (error) {
-      alert("Failed to delete note. Ensure you have admin permissions.");
+    if (confirm("Are you sure you want to delete this note?")) {
+      try {
+        await deleteNote(id);
+        if (selectedNote?.id === id) setSelectedNote(null);
+        if (currentRoute) handleStopNavigation();
+      } catch (error) {
+        alert("Failed to delete note. Ensure you have admin permissions.");
+      }
     }
   };
 
@@ -174,19 +198,14 @@ export default function App() {
           locateUser();
           return;
       }
-      
-      // Start navigation loop
       setIsRouting(true);
       setNavigationTarget({ lat: note.lat, lng: note.lng });
-      
-      // Initial fetch
       const route = await getRoute(userLocation.lat, userLocation.lng, note.lat, note.lng);
       setIsRouting(false);
-      
       if (route) setCurrentRoute(route);
       else {
         alert("Could not find a driving route.");
-        setNavigationTarget(null); // Cancel if failed
+        setNavigationTarget(null);
       }
   };
 
@@ -217,7 +236,6 @@ export default function App() {
 
   if (!session) return <AuthPage />;
 
-  // Enforce access control
   if (!hasAccess) {
       return (
         <PendingApproval 
@@ -245,6 +263,7 @@ export default function App() {
         onSearch={handleSearch}
         onFlyToNote={flyToNote}
         onDeleteNote={handleDeleteNote}
+        onEditNote={handleEditNote} 
         onNavigateToNote={handleNavigateToNote}
         onStopNavigation={handleStopNavigation}
         routeData={currentRoute}
@@ -286,6 +305,7 @@ export default function App() {
           setUserNoteInput={setUserNoteInput}
           onSave={handleSaveNote}
           isAnalyzing={isAnalyzing}
+          mode={isEditingNote ? 'edit' : 'create'}
         />
       </div>
     </div>

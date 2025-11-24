@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapNote, RouteData } from '../types';
-import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare } from 'lucide-react';
+import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3 } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,6 +24,7 @@ interface SidebarProps {
   isConnected: boolean;
   userRole: 'admin' | 'user' | null;
   onLogout: () => void;
+  onEditNote: (note: MapNote, e: React.MouseEvent) => void; // New Prop
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -47,7 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdateStatus,
   isConnected,
   userRole,
-  onLogout
+  onLogout,
+  onEditNote
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -192,15 +194,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                   </div>
 
-                  {/* Delete Button (Admin Only) */}
+                  {/* Admin Actions: Edit & Delete */}
                   {userRole === 'admin' && (
-                    <button 
-                        onClick={(e) => onDeleteNote(note.id, e)} 
-                        className="p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-900/50"
-                        title="Delete (Admin Only)"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button 
+                          onClick={(e) => onEditNote(note, e)} 
+                          className="p-2 rounded-lg hover:bg-yellow-900/30 text-slate-500 hover:text-yellow-400 transition-colors border border-transparent hover:border-yellow-900/50"
+                          title="Edit Note (Admin Only)"
+                      >
+                          <Edit3 size={16} />
+                      </button>
+                      <button 
+                          onClick={(e) => onDeleteNote(note.id, e)} 
+                          className="p-2 rounded-lg hover:bg-red-900/30 text-slate-500 hover:text-red-400 transition-colors border border-transparent hover:border-red-900/50"
+                          title="Delete (Admin Only)"
+                      >
+                          <Trash2 size={16} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

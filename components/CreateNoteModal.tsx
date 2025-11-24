@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Plus } from 'lucide-react';
+import { MapPin, X, Plus, Edit3 } from 'lucide-react';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -8,7 +8,8 @@ interface CreateNoteModalProps {
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
   onSave: () => void;
-  isAnalyzing: boolean; // Kept in interface to avoid breaking parent usage, but unused for loading now
+  isAnalyzing: boolean;
+  mode?: 'create' | 'edit'; // New prop to distinguish modes
 }
 
 export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
@@ -18,7 +19,8 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   userNoteInput,
   setUserNoteInput,
   onSave,
-  isAnalyzing
+  isAnalyzing,
+  mode = 'create'
 }) => {
   if (!isOpen) return null;
 
@@ -27,11 +29,11 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
       <div className="bg-slate-900 border-t md:border border-slate-700 p-6 rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-md transform transition-all animate-in slide-in-from-bottom-10 md:zoom-in-95">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-500">
-              <MapPin size={20} />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${mode === 'edit' ? 'bg-yellow-600/20 text-yellow-500' : 'bg-blue-600/20 text-blue-500'}`}>
+              {mode === 'edit' ? <Edit3 size={20} /> : <MapPin size={20} />}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">New Entry</h2>
+              <h2 className="text-xl font-bold text-white">{mode === 'edit' ? 'Edit Entry' : 'New Entry'}</h2>
               <p className="text-xs text-slate-400 font-mono">
                 {tempCoords?.lat.toFixed(4)}, {tempCoords?.lng.toFixed(4)}
               </p>
@@ -53,10 +55,13 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
         <button 
           onClick={onSave}
           disabled={!userNoteInput.trim()}
-          className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl text-base font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 mb-2"
+          className={`w-full text-white py-4 rounded-xl text-base font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 mb-2 disabled:opacity-50 disabled:cursor-not-allowed
+            ${mode === 'edit' 
+              ? 'bg-yellow-600 hover:bg-yellow-500 shadow-yellow-900/20' 
+              : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'}`}
         >
-          <Plus size={20} />
-          Save Entry
+          {mode === 'edit' ? <Edit3 size={20} /> : <Plus size={20} />}
+          {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
         </button>
       </div>
     </div>
