@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, RouteData, UnitStatus, UserProfile } from '../types';
 import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings, CircleDot, Users, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
@@ -65,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onlineUsers
 }) => {
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Fetch all profiles if admin (to show offline users too)
   useEffect(() => {
@@ -72,6 +73,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
       db.getAllProfiles().then(setAllProfiles);
     }
   }, [userRole, isOpen]);
+
+  // --- AUTO CLOSE LOGIC ---
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let inactivityTimer: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      // Set timeout to 10 seconds (10000ms)
+      inactivityTimer = setTimeout(() => {
+        setIsOpen(false);
+      }, 10000);
+    };
+
+    // Start initial timer
+    resetTimer();
+
+    // Listen for activity inside the sidebar to reset the timer
+    const sidebarElement = sidebarRef.current;
+    const events = ['mousemove', 'mousedown', 'keypress', 'touchstart', 'scroll', 'click'];
+
+    if (sidebarElement) {
+      events.forEach(event => {
+        sidebarElement.addEventListener(event, resetTimer);
+      });
+    }
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      if (sidebarElement) {
+        events.forEach(event => {
+          sidebarElement.removeEventListener(event, resetTimer);
+        });
+      }
+    };
+  }, [isOpen, setIsOpen]);
 
   const getStatusStyle = (status?: string) => {
     if (status === 'caught') return 'border-green-500/50 bg-green-900/10';
@@ -105,6 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div 
+      ref={sidebarRef}
       className={`
         fixed inset-y-0 right-0 z-[1000] 
         w-full md:w-80 

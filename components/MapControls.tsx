@@ -18,15 +18,16 @@ export const MapControls: React.FC<MapControlsProps> = ({
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
-       {/* Sidebar Toggle (Mobile) */}
-       {!sidebarOpen && (
-         <button 
-           onClick={() => setSidebarOpen(true)}
-           className="w-12 h-12 bg-slate-900/90 backdrop-blur text-white rounded-full shadow-xl border border-slate-700 flex items-center justify-center hover:bg-slate-800 active:scale-95 transition-all"
-         >
-           <Menu size={24} />
-         </button>
-       )}
+       {/* Sidebar Toggle (Always Visible) */}
+       <button 
+         onClick={() => setSidebarOpen(!sidebarOpen)}
+         className={`w-12 h-12 backdrop-blur text-white rounded-full shadow-xl border border-slate-700 flex items-center justify-center active:scale-95 transition-all
+           ${sidebarOpen ? 'bg-blue-600 border-blue-500' : 'bg-slate-900/90 hover:bg-slate-800'}
+         `}
+         title={sidebarOpen ? "إغلاق القائمة" : "فتح القائمة"}
+       >
+         <Menu size={24} />
+       </button>
 
        <button 
          onClick={onLocateUser}
