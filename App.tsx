@@ -12,6 +12,7 @@ export default function App() {
   // Application State
   const [notes, setNotes] = useState<MapNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
+  const [isConnected, setIsConnected] = useState(false); // DB Connection Status
 
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -46,14 +47,18 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load notes from IndexedDB on mount
+  // Load notes from DB on mount
   useEffect(() => {
     const initData = async () => {
       try {
         const savedNotes = await db.getAllNotes();
         setNotes(savedNotes);
+        setIsConnected(true);
       } catch (error) {
         console.error("Failed to load notes from DB", error);
+        setIsConnected(false);
+        // Alert user if strictly offline or DB issue
+        alert("Cannot connect to the Cloud Database. Please check your internet connection.");
       } finally {
         setLoadingNotes(false);
       }
@@ -106,7 +111,7 @@ export default function App() {
     };
     
     try {
-      // Save to IndexedDB
+      // Save to DB
       await db.addNote(newNote);
       // Update UI state
       setNotes(prev => [newNote, ...prev]);
@@ -115,9 +120,11 @@ export default function App() {
       setTempCoords(null);
       // Open sidebar to show the new note
       setSidebarOpen(true);
+      if (!isConnected) setIsConnected(true); // Re-establish confidence if write succeeds
     } catch (error) {
       console.error("Failed to save note", error);
       alert("Failed to save note to database.");
+      setIsConnected(false);
     }
   };
 
@@ -199,6 +206,7 @@ export default function App() {
       if (currentRoute) setCurrentRoute(null);
     } catch (error) {
       console.error("Failed to delete note", error);
+      alert("Failed to delete note.");
     }
   };
 
@@ -257,6 +265,7 @@ export default function App() {
         onAnalyzeNote={handleAnalyzeNote}
         isAnalyzing={isAnalyzing}
         onUpdateStatus={handleUpdateStatus}
+        isConnected={isConnected}
       />
 
       <div className="flex-1 relative w-full h-full">

@@ -20,6 +20,7 @@ interface SidebarProps {
   onAnalyzeNote: (note: MapNote) => void;
   isAnalyzing: boolean;
   onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
+  isConnected: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -39,7 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isRouting,
   onAnalyzeNote,
   isAnalyzing,
-  onUpdateStatus
+  onUpdateStatus,
+  isConnected
 }) => {
   
   const formatDuration = (seconds: number) => {
@@ -88,8 +90,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <BookOpen className="text-white w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-xl tracking-tight text-white">Map Journal</h1>
-              <p className="text-xs text-slate-400">Gemini + Maps + Cloud</p>
+              <h1 className="font-bold text-xl tracking-tight text-white leading-none mb-1">Map Journal</h1>
+              {/* Connection Status Indicator */}
+              <div className="flex items-center gap-2">
+                 <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500'}`}></div>
+                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isConnected ? 'text-green-500' : 'text-red-500'}`}>
+                    {isConnected ? 'Cloud Online' : 'Offline'}
+                 </span>
+              </div>
             </div>
           </div>
           {/* Mobile Close Button */}

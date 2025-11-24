@@ -30,8 +30,8 @@ export const db = {
     } catch (error: any) {
       // Use JSON.stringify to ensure the full error object is visible in the console
       console.error("Error fetching notes from Supabase:", JSON.stringify(error, null, 2));
-      // Return empty array so app doesn't crash, but check console for "relation does not exist"
-      return [];
+      // Throw error so App.tsx knows the connection failed
+      throw error;
     }
   },
 
