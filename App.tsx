@@ -148,6 +148,37 @@ export default function App() {
     };
   }, []);
 
+  // Realtime Subscription for Profile Approval
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    // Listen for updates to the current user's profile
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${session.user.id}`
+        },
+        (payload: any) => {
+          // payload.new contains the updated row (snake_case columns)
+          const newProfile = payload.new;
+          if (newProfile && newProfile.is_approved === true) {
+            setIsApproved(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
+
+
   // Load notes from DB on mount (only if logged in AND approved)
   useEffect(() => {
     if (!session || !isApproved || isAccountDeleted) return;
@@ -169,6 +200,24 @@ export default function App() {
       }
     };
     initData();
+
+    // Notes Realtime Subscription
+    const notesChannel = supabase
+      .channel('notes-changes')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'notes' },
+        (payload) => {
+           // Refresh full list to keep it simple and consistent
+           initData(); 
+        }
+      )
+      .subscribe();
+
+    return () => {
+       supabase.removeChannel(notesChannel);
+    };
+
   }, [session, isApproved, isAccountDeleted]);
 
   // Get user location initially and watch it with High Accuracy
@@ -394,7 +443,13 @@ export default function App() {
 
   // Logged in BUT Account Deleted OR Not Approved -> Show Pending/Deleted Screen
   if (isAccountDeleted || !isApproved) {
-      return <PendingApproval onLogout={handleLogout} isDeleted={isAccountDeleted} />;
+      return (
+        <PendingApproval 
+          onLogout={handleLogout} 
+          isDeleted={isAccountDeleted} 
+          email={session.user.email} 
+        />
+      );
   }
 
   if (tableMissing) {

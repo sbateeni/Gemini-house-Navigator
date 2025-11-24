@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Shield, Clock, LogOut, UserX, RefreshCw, Loader2 } from 'lucide-react';
+import { Shield, Clock, LogOut, UserX, RefreshCw, Loader2, User } from 'lucide-react';
 
 interface PendingApprovalProps {
   onLogout: () => void;
   isDeleted?: boolean;
+  email?: string;
 }
 
-export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDeleted = false }) => {
+export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDeleted = false, email }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogoutClick = () => {
@@ -41,6 +42,13 @@ export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDe
         <h1 className="text-2xl font-bold text-white mb-3">
           {isDeleted ? 'Account Not Found' : 'Account Pending'}
         </h1>
+        
+        {email && (
+            <div className="inline-flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full mb-6 border border-slate-700/50">
+                <User size={14} className="text-slate-400" />
+                <span className="text-sm text-slate-300 font-mono">{email}</span>
+            </div>
+        )}
         
         <p className="text-slate-400 mb-8 leading-relaxed">
           {isDeleted ? (
