@@ -19,6 +19,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+  const [isAccountDeleted, setIsAccountDeleted] = useState(false);
 
   // Application State
   const [notes, setNotes] = useState<MapNote[]>([]);
@@ -66,7 +67,7 @@ export default function App() {
     localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
   }, [isSatellite]);
 
-  // Auth Initialization with Safety Timeout
+  // Auth Initialization with Safety Timeout and Server Validation
   useEffect(() => {
     let mounted = true;
 
@@ -80,16 +81,32 @@ export default function App() {
 
     const checkUser = async () => {
       try {
+        // 1. Check local session first
         const { session } = await auth.getSession();
-        if (!mounted) return;
         
-        setSession(session);
+        if (!mounted) return;
+
         if (session?.user) {
-          const profile = await db.getUserProfile(session.user.id);
-          if (profile) {
-              setUserRole(profile.role);
-              setIsApproved(profile.isApproved);
+          // 2. Validate with server (detect deleted account)
+          const { user: serverUser, error: userError } = await auth.getUser();
+          
+          if (userError || !serverUser) {
+             console.warn("Local session exists but user not found on server (Deleted?)");
+             setIsAccountDeleted(true);
+             // We keep session to allow PendingApproval screen to show "Deleted" state
+             // instead of falling back to AuthPage immediately
+             setSession(session);
+          } else {
+             // User exists, fetch profile
+             setSession(session);
+             const profile = await db.getUserProfile(session.user.id);
+             if (profile) {
+                 setUserRole(profile.role);
+                 setIsApproved(profile.isApproved);
+             }
           }
+        } else {
+          setSession(null);
         }
       } catch (e) {
         console.error("Auth check failed", e);
@@ -103,18 +120,23 @@ export default function App() {
 
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Listen for auth changes (sign in, sign out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      setSession(session);
-      if (session?.user) {
+      
+      if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUserRole(null);
+          setIsApproved(false);
+          setIsAccountDeleted(false);
+      } else if (session?.user) {
+        setSession(session);
+        // On strict auth state change, re-fetch profile
         const profile = await db.getUserProfile(session.user.id);
         if (profile) {
             setUserRole(profile.role);
             setIsApproved(profile.isApproved);
         }
-      } else {
-        setUserRole(null);
-        setIsApproved(false);
       }
       setAuthLoading(false);
     });
@@ -128,7 +150,7 @@ export default function App() {
 
   // Load notes from DB on mount (only if logged in AND approved)
   useEffect(() => {
-    if (!session || !isApproved) return;
+    if (!session || !isApproved || isAccountDeleted) return;
 
     const initData = async () => {
       try {
@@ -147,11 +169,11 @@ export default function App() {
       }
     };
     initData();
-  }, [session, isApproved]);
+  }, [session, isApproved, isAccountDeleted]);
 
   // Get user location initially and watch it with High Accuracy
   useEffect(() => {
-    if (!session || !isApproved) return;
+    if (!session || !isApproved || isAccountDeleted) return;
     if (navigator.geolocation) {
         const watchId = navigator.geolocation.watchPosition(
             (pos) => {
@@ -169,18 +191,19 @@ export default function App() {
         );
         return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [session, isApproved]);
+  }, [session, isApproved, isAccountDeleted]);
 
   const handleLogout = async () => {
     try {
         await auth.signOut();
         setNotes([]);
         setSelectedNote(null);
+        setIsAccountDeleted(false);
     } catch (e) {
         console.error("Logout failed:", e);
     } finally {
-        // Always reload to ensure clean state
-        window.location.reload();
+        // Robust Logout: Always reload to ensure clean state and clear any stuck local storage
+        window.location.href = '/'; 
     }
   };
 
@@ -351,13 +374,14 @@ export default function App() {
     );
   }
 
+  // Not logged in -> Show Auth Page
   if (!session) {
     return <AuthPage />;
   }
 
-  // New check: If user is logged in but NOT approved, show pending screen
-  if (!isApproved) {
-      return <PendingApproval onLogout={handleLogout} />;
+  // Logged in BUT Account Deleted OR Not Approved -> Show Pending/Deleted Screen
+  if (isAccountDeleted || !isApproved) {
+      return <PendingApproval onLogout={handleLogout} isDeleted={isAccountDeleted} />;
   }
 
   if (tableMissing) {

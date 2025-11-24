@@ -37,5 +37,11 @@ export const auth = {
   async getSession() {
     const { data, error } = await supabase.auth.getSession();
     return { session: data.session, error };
+  },
+
+  async getUser() {
+    // Validates the user with the server, bypassing local cache
+    const { data, error } = await supabase.auth.getUser();
+    return { user: data.user, error };
   }
 };
