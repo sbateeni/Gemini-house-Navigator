@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
+import { offlineMaps } from '../services/offlineMaps';
 
 declare global {
   interface Window {
@@ -22,7 +23,6 @@ interface LeafletMapProps {
   onUserClick?: (user: MapUser) => void; 
   secondaryRoute?: RouteData | null;
   canSeeOthers?: boolean;
-  // New props for tactical map
   onNavigate?: (note: MapNote) => void;
   onDispatch?: (note: MapNote) => void;
   userRole?: string | null;
@@ -70,10 +70,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         onMapClick(e.latlng.lat, e.latlng.lng);
       });
       
-      // Global popup event delegation because Leaflet popups are HTML strings
       map.on('popupopen', (e: any) => {
          const popupNode = e.popup._contentNode;
-         
          const navBtn = popupNode.querySelector('.btn-navigate');
          if (navBtn && onNavigate) {
             navBtn.onclick = () => {
@@ -82,7 +80,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
                 if (note) onNavigate(note);
             };
          }
-
          const dispatchBtn = popupNode.querySelector('.btn-dispatch');
          if (dispatchBtn && onDispatch) {
             dispatchBtn.onclick = () => {
@@ -94,20 +91,65 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       });
 
       mapInstanceRef.current = map;
-    }
-  }, []); // Only run once, notes dependency handled in separate effect
 
-  // Handle Satellite / Dark Mode
+      // Event Listener for Offline Download
+      window.addEventListener('download-offline-map', ((e: CustomEvent) => {
+          if (e.detail && e.detail.callback) {
+              const bounds = map.getBounds();
+              e.detail.callback(bounds);
+          }
+      }) as EventListener);
+    }
+  }, []);
+
+  // Handle Satellite / Dark Mode with Offline Capability
   useEffect(() => {
     if (!layerGroupRef.current || !window.L) return;
 
     layerGroupRef.current.clearLayers();
 
+    // Define custom Offline TileLayer
+    const OfflineTileLayer = window.L.TileLayer.extend({
+        createTile: function(coords: any, done: any) {
+            const tile = document.createElement('img');
+            
+            // 1. Try IndexedDB first (Fastest/Offline)
+            offlineMaps.getTile(coords.x, coords.y, coords.z).then((blob) => {
+                if (blob) {
+                    const url = URL.createObjectURL(blob);
+                    tile.src = url;
+                    done(null, tile);
+                } else {
+                    // 2. If not in DB, fallback to network
+                    tile.src = this.getTileUrl(coords);
+                    
+                    // If online and we want to cache passively (optional, disabled for now to save space)
+                    /* 
+                    if (navigator.onLine) {
+                         fetch(tile.src).then(res => res.blob()).then(blob => {
+                             offlineMaps.saveTile(coords.x, coords.y, coords.z, blob);
+                         });
+                    }
+                    */
+                }
+            }).catch(() => {
+                // Fallback on error
+                tile.src = this.getTileUrl(coords);
+            });
+
+            window.L.DomEvent.on(tile, 'load', window.L.Util.bind(this._tileOnLoad, this, done, tile));
+            window.L.DomEvent.on(tile, 'error', window.L.Util.bind(this._tileOnError, this, done, tile));
+            return tile;
+        }
+    });
+
     if (isSatellite) {
-      const imagery = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      // Use standard URL for "online" path, but our custom class intercepts it
+      const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri',
         maxZoom: 19
       });
+      // We keep labels online-only for now as they are complex to cache separately without significant storage
       const labels = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 19
       });
@@ -118,7 +160,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       layerGroupRef.current.addLayer(transport);
       layerGroupRef.current.addLayer(labels);
     } else {
-      const darkLayer = window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+       // Also attempt offline support for standard map if desired, but user asked for Satellite specifically usually
+       const darkLayer = new OfflineTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap, &copy; CARTO',
         subdomains: 'abcd',
         maxZoom: 20
@@ -240,7 +283,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         } else {
             const marker = window.L.marker([user.lat, user.lng], { icon, zIndexOffset: 900 });
             marker.addTo(map);
-            // Add Click Handler
             marker.on('click', () => {
                 if(onUserClick) onUserClick(user);
             });
@@ -277,7 +319,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
     if (secondaryRoute && secondaryRoute.coordinates.length > 0) {
         const polyline = window.L.polyline(secondaryRoute.coordinates, {
-            color: '#a855f7', // Purple
+            color: '#a855f7', 
             weight: 5,
             opacity: 0.8,
             lineCap: 'round',
@@ -289,7 +331,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [secondaryRoute]);
 
-  // Handle Notes Markers & Interactive Popups
+  // Handle Notes Markers
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -323,7 +365,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         iconAnchor: [16, 30]
       });
 
-      // Construct Tactical Popup HTML
       const popupContent = `
         <div class="font-sans min-w-[180px]">
           <strong class="text-sm text-blue-400 block mb-1">${note.locationName}</strong>
@@ -353,7 +394,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       }
     });
 
-  }, [notes, isSatellite, selectedNote, userRole]); // Re-run if user role changes to show/hide dispatch button
+  }, [notes, isSatellite, selectedNote, userRole]);
 
   // Handle Temp Marker
   useEffect(() => {

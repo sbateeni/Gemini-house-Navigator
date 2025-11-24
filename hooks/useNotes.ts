@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
@@ -9,10 +10,8 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
   const [isConnected, setIsConnected] = useState(false);
   const [tableMissing, setTableMissing] = useState(false);
 
-  useEffect(() => {
-    if (!session || !isApproved || isAccountDeleted) return;
-
-    const initData = async () => {
+  // Sync function
+  const refreshNotes = async () => {
       try {
         const savedNotes = await db.getAllNotes();
         setNotes(savedNotes);
@@ -21,44 +20,73 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
         if (error.code === 'TABLE_MISSING') {
             setTableMissing(true);
         } else {
-            console.error("Failed to load notes", error);
+            console.warn("Running in Offline Mode (Cache)");
             setIsConnected(false);
         }
       } finally {
         setLoadingNotes(false);
       }
-    };
-    initData();
+  };
 
+  useEffect(() => {
+    if (!session || !isApproved || isAccountDeleted) return;
+
+    // Initial load
+    refreshNotes();
+
+    // Setup Online Listener for Auto-Sync
+    const handleOnline = async () => {
+        console.log("Network restored. Syncing...");
+        await db.syncPendingNotes();
+        await refreshNotes();
+        setIsConnected(true);
+    };
+
+    const handleOffline = () => {
+        setIsConnected(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Setup Supabase Realtime (Only works when online)
     const notesChannel = supabase
       .channel('notes-changes')
       .on(
         'postgres_changes', 
         { event: '*', schema: 'public', table: 'notes' },
-        () => { initData(); }
+        () => { refreshNotes(); }
       )
       .subscribe();
 
     return () => {
        supabase.removeChannel(notesChannel);
+       window.removeEventListener('online', handleOnline);
+       window.removeEventListener('offline', handleOffline);
     };
 
   }, [session, isApproved, isAccountDeleted]);
 
   const addNote = async (note: MapNote) => {
-    await db.addNote(note);
+    // Optimistic UI update
     setNotes(prev => [note, ...prev]);
-    if (!isConnected) setIsConnected(true);
+    
+    try {
+      await db.addNote(note);
+      if (navigator.onLine && !isConnected) setIsConnected(true);
+    } catch (e) {
+      console.warn("Saved to offline queue");
+    }
   };
 
   const updateNote = async (updatedNote: MapNote) => {
-    await db.addNote(updatedNote);
     setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+    await db.addNote(updatedNote); // Reuse upsert
   };
 
   const deleteNote = async (id: string) => {
-    await db.deleteNote(id);
     setNotes(prev => prev.filter(n => n.id !== id));
+    await db.deleteNote(id);
   };
 
   const updateStatus = async (id: string, status: 'caught' | 'not_caught') => {
@@ -77,7 +105,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
     updateNote,
     deleteNote,
     updateStatus,
-    setNotes, // Exposed for manual updates if needed
+    setNotes,
     setIsConnected
   };
 }
