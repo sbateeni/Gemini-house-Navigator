@@ -172,10 +172,16 @@ export default function App() {
   }, [session, isApproved]);
 
   const handleLogout = async () => {
-    await auth.signOut();
-    setNotes([]);
-    setSelectedNote(null);
-    window.location.reload();
+    try {
+        await auth.signOut();
+        setNotes([]);
+        setSelectedNote(null);
+    } catch (e) {
+        console.error("Logout failed:", e);
+    } finally {
+        // Always reload to ensure clean state
+        window.location.reload();
+    }
   };
 
   const handleMapClick = (lat: number, lng: number) => {
@@ -351,7 +357,7 @@ export default function App() {
 
   // New check: If user is logged in but NOT approved, show pending screen
   if (!isApproved) {
-      return <PendingApproval />;
+      return <PendingApproval onLogout={handleLogout} />;
   }
 
   if (tableMissing) {

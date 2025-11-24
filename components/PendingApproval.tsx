@@ -1,13 +1,11 @@
 import React from 'react';
 import { Shield, Clock, LogOut } from 'lucide-react';
-import { auth } from '../services/auth';
 
-export const PendingApproval: React.FC = () => {
-  const handleLogout = async () => {
-    await auth.signOut();
-    window.location.reload();
-  };
+interface PendingApprovalProps {
+  onLogout: () => void;
+}
 
+export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Effects */}
@@ -41,8 +39,8 @@ export const PendingApproval: React.FC = () => {
           </button>
           
           <button 
-            onClick={handleLogout}
-            className="w-full text-slate-500 hover:text-white text-sm flex items-center justify-center gap-2 py-2"
+            onClick={onLogout}
+            className="w-full text-slate-500 hover:text-white text-sm flex items-center justify-center gap-2 py-2 cursor-pointer"
           >
             <LogOut size={16} /> Sign Out
           </button>
