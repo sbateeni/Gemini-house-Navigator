@@ -38,6 +38,7 @@ export default function App() {
   
   // Navigation State
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [initialCenterSet, setInitialCenterSet] = useState(false); // Track if we've centered on user yet
   const [currentRoute, setCurrentRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
 
@@ -129,10 +130,26 @@ export default function App() {
     }
   }, [session]);
 
+  // Auto-center on user location when found for the first time
+  useEffect(() => {
+    if (userLocation && !initialCenterSet) {
+        setFlyToTarget({ 
+            lat: userLocation.lat, 
+            lng: userLocation.lng, 
+            zoom: 16, 
+            timestamp: Date.now(),
+            showPulse: true 
+        });
+        setInitialCenterSet(true);
+    }
+  }, [userLocation, initialCenterSet]);
+
   const handleLogout = async () => {
     await auth.signOut();
     setNotes([]);
     setSelectedNote(null);
+    setInitialCenterSet(false); // Reset auto-center flag
+    setUserLocation(null);
   };
 
   const handleMapClick = (lat: number, lng: number) => {
