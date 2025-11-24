@@ -5,15 +5,28 @@ interface PendingApprovalProps {
   onLogout: () => void;
   isDeleted?: boolean;
   email?: string;
+  onCheckStatus: () => Promise<void>; // New prop for manual check
 }
 
-export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDeleted = false, email }) => {
+export const PendingApproval: React.FC<PendingApprovalProps> = ({ 
+  onLogout, 
+  isDeleted = false, 
+  email,
+  onCheckStatus 
+}) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   const handleLogoutClick = () => {
     setIsLoggingOut(true);
-    // Call parent logout handler which eventually reloads the page
     onLogout();
+  };
+
+  const handleCheckStatus = async () => {
+    setIsChecking(true);
+    await onCheckStatus();
+    // Use a small timeout to ensure the user sees the spinner/interaction even if the check is instant
+    setTimeout(() => setIsChecking(false), 500);
   };
 
   return (
@@ -69,10 +82,12 @@ export const PendingApproval: React.FC<PendingApprovalProps> = ({ onLogout, isDe
         <div className="space-y-4">
           {!isDeleted && (
             <button 
-              onClick={() => window.location.reload()}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 rounded-xl transition-colors border border-slate-700 flex items-center justify-center gap-2"
+              onClick={handleCheckStatus}
+              disabled={isChecking}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 rounded-xl transition-colors border border-slate-700 flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <RefreshCw size={18} /> Check Status Again
+              {isChecking ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
+              {isChecking ? 'Verifying...' : 'Check Status Again'}
             </button>
           )}
           

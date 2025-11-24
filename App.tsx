@@ -19,7 +19,7 @@ import { useGeolocation } from './hooks/useGeolocation';
 
 export default function App() {
   // Custom Hooks
-  const { session, authLoading, userRole, isApproved, isAccountDeleted, handleLogout } = useAuth();
+  const { session, authLoading, userRole, isApproved, isAccountDeleted, handleLogout, refreshAuth } = useAuth();
   
   // Calculate access rights: 
   // 1. Account must exist (not deleted).
@@ -193,6 +193,7 @@ export default function App() {
           onLogout={handleLogout} 
           isDeleted={isAccountDeleted} 
           email={session.user.email} 
+          onCheckStatus={refreshAuth}
         />
       );
   }

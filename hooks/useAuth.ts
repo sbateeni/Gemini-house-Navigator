@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
@@ -10,23 +10,11 @@ export function useAuth() {
   const [isApproved, setIsApproved] = useState<boolean>(false);
   const [isAccountDeleted, setIsAccountDeleted] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    // Safety timeout: If DB is too slow, don't block UI forever, but try to resolve state.
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && authLoading) {
-         console.warn("Auth check timed out, forcing UI load");
-         setAuthLoading(false);
-      }
-    }, 4000); // Increased slightly to allow profile fetch
-
-    const checkUser = async () => {
+  // Define logic as a reusable function for manual checks
+  const refreshAuth = useCallback(async () => {
       try {
         const { session } = await auth.getSession();
         
-        if (!mounted) return;
-
         if (session?.user) {
           // 1. Validate with server (Check if deleted)
           const { user: serverUser, error: userError } = await auth.getUser();
@@ -37,7 +25,7 @@ export function useAuth() {
              setSession(session);
           } else {
              setSession(session);
-             // 2. Fetch Profile & Role BEFORE stopping loading
+             // 2. Fetch Profile & Role
              const profile = await db.getUserProfile(session.user.id);
              if (profile) {
                  setUserRole(profile.role);
@@ -53,20 +41,24 @@ export function useAuth() {
       } catch (e) {
         console.error("Auth check failed", e);
       } finally {
-        if (mounted) {
-          clearTimeout(safetyTimeout);
-          // Only stop loading AFTER profile is fetched
-          setAuthLoading(false);
-        }
+        setAuthLoading(false);
       }
-    };
+  }, []);
 
-    checkUser();
+  useEffect(() => {
+    // Safety timeout: If DB is too slow, don't block UI forever, but try to resolve state.
+    const safetyTimeout = setTimeout(() => {
+      if (authLoading) {
+         console.warn("Auth check timed out, forcing UI load");
+         setAuthLoading(false);
+      }
+    }, 4000);
+
+    // Initial check
+    refreshAuth();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
       if (event === 'SIGNED_OUT') {
           setSession(null);
           setUserRole(null);
@@ -74,26 +66,18 @@ export function useAuth() {
           setIsAccountDeleted(false);
           setAuthLoading(false);
       } else if (session?.user) {
-        setSession(session);
-        // Ensure profile is fetched on login event too
-        const profile = await db.getUserProfile(session.user.id);
-        if (profile) {
-            setUserRole(profile.role);
-            const effectiveApproval = profile.role === 'admin' ? true : profile.isApproved;
-            setIsApproved(effectiveApproval);
-        }
-        setAuthLoading(false);
+        // Re-run full check on sign-in events
+        refreshAuth();
       } else {
         setAuthLoading(false);
       }
     });
 
     return () => {
-      mounted = false;
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [refreshAuth, authLoading]);
 
   // Realtime Subscription for Profile Approval
   useEffect(() => {
@@ -112,7 +96,6 @@ export function useAuth() {
         (payload: any) => {
           const newProfile = payload.new;
           if (newProfile) {
-             // If admin, keep true. If user, check db.
              const isAdmin = userRole === 'admin'; 
              if (isAdmin || newProfile.is_approved === true) {
                setIsApproved(true);
@@ -134,7 +117,6 @@ export function useAuth() {
 
     try {
         const signOutPromise = auth.signOut();
-        // Short timeout for network requests
         const timeoutPromise = new Promise<{error?: string}>(resolve => setTimeout(() => resolve({ error: 'timeout' }), 1000));
         await Promise.race([signOutPromise, timeoutPromise]);
     } catch (e) {
@@ -150,6 +132,7 @@ export function useAuth() {
     userRole,
     isApproved,
     isAccountDeleted,
-    handleLogout
+    handleLogout,
+    refreshAuth // Exported for use in UI
   };
 }
