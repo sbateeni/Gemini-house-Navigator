@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, RouteData, UnitStatus, UserProfile, UserRole } from '../types';
 import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings, CircleDot, Users, Wifi, WifiOff } from 'lucide-react';
@@ -67,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userRole === 'super_admin' || userRole === 'governorate_admin' || userRole === 'center_admin';
+  const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
 
   // Fetch all profiles if admin (to show offline users too)
   useEffect(() => {

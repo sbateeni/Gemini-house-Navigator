@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabase';
 import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
 
@@ -34,7 +33,6 @@ export const db = {
     }
 
     localStorage.removeItem(CACHE_KEY_PENDING_NOTES);
-    // Refresh cache implicitly handled by UI reload
   },
 
   // --- CORE FUNCTIONS ---
@@ -52,15 +50,16 @@ export const db = {
       // Apply Hierarchical Filters
       if (currentUserProfile) {
         const role = currentUserProfile.role;
-        // Super Admin sees ALL
-        if (role === 'super_admin') {
-           // No filter
+        // Super Admin (and legacy admin) sees ALL
+        if (role === 'super_admin' || role === 'admin') {
+           // No filter - see everything
         } 
         // Governorate Admin sees ONLY their governorate
         else if (role === 'governorate_admin' && currentUserProfile.governorate) {
            query = query.eq('governorate', currentUserProfile.governorate);
         }
-        // Center Admin/User sees ONLY their center
+        // Center Admin/User sees ONLY their center notes (or Governorates if policy allows, but usually stricter)
+        // Here we restrict center admins and users to their center for strict compartmentalization
         else if ((role === 'center_admin' || role === 'user') && currentUserProfile.center) {
            query = query.eq('center', currentUserProfile.center);
         }
@@ -192,11 +191,17 @@ export const db = {
       // Apply Filters
       if (currentUserProfile) {
         const role = currentUserProfile.role;
-        if (role === 'governorate_admin' && currentUserProfile.governorate) {
-           // See users in my gov OR unassigned users
+        
+        // Super Admin (and legacy admin) sees all
+        if (role === 'super_admin' || role === 'admin') {
+           // No filter
+        }
+        // Governorate Admin sees users in their gov OR unassigned users (to assign them)
+        else if (role === 'governorate_admin' && currentUserProfile.governorate) {
            query = query.or(`governorate.eq.${currentUserProfile.governorate},governorate.is.null`);
-        } else if (role === 'center_admin' && currentUserProfile.center) {
-           // See users in my center
+        } 
+        // Center Admin sees users in their center
+        else if (role === 'center_admin' && currentUserProfile.center) {
            query = query.eq('center', currentUserProfile.center);
         }
       }
@@ -252,27 +257,31 @@ export const db = {
   },
 
   async getMyAssignments(userId: string): Promise<Assignment[]> {
-    const { data, error } = await supabase
-      .from('assignments')
-      .select('*')
-      .eq('target_user_id', userId)
-      .neq('status', 'completed')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      targetUserId: row.target_user_id,
-      locationId: row.location_id,
-      locationName: row.location_name,
-      lat: row.lat,
-      lng: row.lng,
-      instructions: row.instructions,
-      status: row.status,
-      createdBy: row.created_by,
-      createdAt: row.created_at
-    }));
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('target_user_id', userId)
+        .neq('status', 'completed')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        targetUserId: row.target_user_id,
+        locationId: row.location_id,
+        locationName: row.location_name,
+        lat: row.lat,
+        lng: row.lng,
+        instructions: row.instructions,
+        status: row.status,
+        createdBy: row.created_by,
+        createdAt: row.created_at
+      }));
+    } catch (e) {
+      return [];
+    }
   },
 
   async updateAssignmentStatus(id: string, status: 'accepted' | 'completed'): Promise<void> {
@@ -280,36 +289,39 @@ export const db = {
     if (error) throw error;
   },
 
-  async createLogEntry(entry: Omit<LogEntry, 'id'>): Promise<void> {
+  // Logging
+  async createLogEntry(log: Omit<LogEntry, 'id'>): Promise<void> {
     try {
       await supabase.from('logs').insert({
-        message: entry.message,
-        type: entry.type,
-        user_id: entry.userId,
-        timestamp: entry.timestamp,
-        governorate: entry.governorate
+        message: log.message,
+        type: log.type,
+        user_id: log.userId,
+        timestamp: log.timestamp,
+        governorate: log.governorate
       });
-    } catch (error) {
-      console.error("Log failed", error);
+    } catch (e) {
+      // logs are best effort
     }
   },
 
-  async getRecentLogs(limit = 20): Promise<LogEntry[]> {
-    const { data, error } = await supabase
-      .from('logs')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(limit);
-    
-    if (error) throw error;
-
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      message: row.message,
-      type: row.type,
-      userId: row.user_id,
-      timestamp: row.timestamp,
-      governorate: row.governorate
-    }));
+  async getRecentLogs(): Promise<LogEntry[]> {
+    try {
+      const { data } = await supabase
+        .from('logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(50);
+      
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        message: row.message,
+        type: row.type,
+        userId: row.user_id,
+        timestamp: row.timestamp,
+        governorate: row.governorate
+      }));
+    } catch {
+      return [];
+    }
   }
 };

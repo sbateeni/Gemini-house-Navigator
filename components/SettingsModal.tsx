@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle, Trash2, Database, AlertTriangle } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
@@ -23,7 +24,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const isAdmin = userRole === 'super_admin' || userRole === 'governorate_admin' || userRole === 'center_admin';
+  const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
 
   if (!isOpen) return null;
 

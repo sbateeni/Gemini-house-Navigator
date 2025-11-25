@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { X, Shield, User, CheckCircle2, XCircle, Loader2, Wifi, WifiOff, Ban, Settings, ToggleLeft, ToggleRight, Building2, MapPin } from 'lucide-react';
 import { db } from '../services/db';
@@ -205,8 +206,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                          </div>
                        </td>
                        <td className="p-4">
-                         <div className={`px-3 py-1 rounded-lg text-xs font-bold border w-fit ${user.role.includes('admin') ? 'bg-purple-900/20 text-purple-400 border-purple-900/50' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                           {user.role === 'super_admin' ? 'قائد عام' : user.role === 'governorate_admin' ? 'مدير محافظة' : user.role === 'center_admin' ? 'مدير مركز' : 'عنصر'}
+                         <div className={`px-3 py-1 rounded-lg text-xs font-bold border w-fit ${user.role && user.role.includes('admin') ? 'bg-purple-900/20 text-purple-400 border-purple-900/50' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                           {user.role === 'super_admin' ? 'قائد عام' : user.role === 'governorate_admin' ? 'مدير محافظة' : user.role === 'center_admin' ? 'مدير مركز' : user.role === 'admin' ? 'Admin' : 'عنصر'}
                          </div>
                        </td>
                        <td className="p-4 text-slate-400">
@@ -282,7 +283,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                                 value={selectedUserForPerms.role}
                                 onChange={(e) => handleRoleChange(selectedUserForPerms, e.target.value as UserRole)}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-sm"
-                                disabled={currentUserProfile?.role !== 'super_admin'} 
+                                disabled={currentUserProfile?.role !== 'super_admin' && currentUserProfile?.role !== 'admin'} 
                             >
                                 <option value="user">عنصر</option>
                                 <option value="center_admin">مدير مركز</option>
@@ -291,7 +292,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                             </select>
                         </div>
                         
-                        {(currentUserProfile?.role === 'super_admin') && (
+                        {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">المحافظة</label>
                             <input 
