@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { CreateNoteModal } from './CreateNoteModal';
 import { AdminDashboard } from './AdminDashboard';
@@ -5,6 +6,7 @@ import { SettingsModal } from './SettingsModal';
 import { UserCommandModal } from './UserCommandModal';
 import { LocationPickerModal } from './LocationPickerModal';
 import { DispatchModal } from './DispatchModal';
+import { FullLogsModal } from './FullLogsModal';
 import { MapNote, UserProfile, UserRole, MapUser } from '../types';
 
 interface ModalContainerProps {
@@ -49,6 +51,10 @@ interface ModalContainerProps {
   dispatchTargetLocation: MapNote | null;
   closeDispatchModal: () => void;
   onSendDispatch: (userId: string, instructions: string) => Promise<void>;
+
+  // Logs Props
+  showFullLogs: boolean;
+  closeFullLogs: () => void;
 }
 
 export const ModalContainer: React.FC<ModalContainerProps> = ({
@@ -81,7 +87,9 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   commandUserName,
   dispatchTargetLocation,
   closeDispatchModal,
-  onSendDispatch
+  onSendDispatch,
+  showFullLogs,
+  closeFullLogs
 }) => {
   return (
     <>
@@ -134,6 +142,11 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         targetLocation={dispatchTargetLocation}
         onDispatch={onSendDispatch}
         currentUserId={currentUserId}
+      />
+
+      <FullLogsModal 
+        isOpen={showFullLogs}
+        onClose={closeFullLogs}
       />
     </>
   );

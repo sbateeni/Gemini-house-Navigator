@@ -1,10 +1,15 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { db } from '../services/db';
 import { LogEntry } from '../types';
-import { Activity, AlertTriangle, Radio } from 'lucide-react';
+import { Activity, AlertTriangle, Radio, Maximize2 } from 'lucide-react';
 
-export const OperationsLog: React.FC = () => {
+interface OperationsLogProps {
+  onExpand?: () => void;
+}
+
+export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +40,12 @@ export const OperationsLog: React.FC = () => {
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('ar-EG', { hour12: false });
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[1000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden" dir="rtl">
+    <div 
+      className="fixed bottom-0 left-0 right-0 z-[1000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden cursor-pointer hover:bg-slate-900 transition-colors group" 
+      dir="rtl"
+      onClick={onExpand}
+      title="اضغط لتوسيع السجل"
+    >
       <div className="bg-slate-900/50 px-2 py-1 rounded border border-slate-700 ml-4 flex items-center gap-2 shrink-0">
          <Activity size={14} className="text-green-500 animate-pulse" />
          <span className="text-green-500 font-bold tracking-wider">سجل العمليات</span>
@@ -53,6 +63,10 @@ export const OperationsLog: React.FC = () => {
             </div>
          ))}
          {logs.length === 0 && <span className="text-slate-600 italic">النظام جاهز. بانتظار الأحداث...</span>}
+      </div>
+
+      <div className="mr-4 text-slate-600 group-hover:text-white transition-colors">
+          <Maximize2 size={16} />
       </div>
     </div>
   );

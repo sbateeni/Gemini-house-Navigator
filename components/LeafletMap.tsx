@@ -1,7 +1,8 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
 import { offlineMaps } from '../services/offlineMaps';
+import { createNoteIconHtml, createNotePopupHtml, createUserIconHtml, createSelfIconHtml, createTempMarkerIconHtml } from '../utils/mapHelpers';
 
 declare global {
   interface Window {
@@ -28,7 +29,6 @@ interface LeafletMapProps {
   userRole?: string | null;
 }
 
-// Palestine Coordinates (General Center)
 const DEFAULT_CENTER: [number, number] = [31.9522, 35.2332]; // Near Jerusalem/Ramallah
 const DEFAULT_ZOOM = 9;
 
@@ -64,20 +64,18 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const onNavigateRef = useRef(onNavigate);
   const onDispatchRef = useRef(onDispatch);
 
-  // Update refs to ensure event listeners have latest data
   useEffect(() => {
     notesRef.current = notes;
     onNavigateRef.current = onNavigate;
     onDispatchRef.current = onDispatch;
   }, [notes, onNavigate, onDispatch]);
 
-  // Initialize Map
   useEffect(() => {
     if (mapContainerRef.current && !mapInstanceRef.current && window.L) {
       const map = window.L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false
-      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM); // Set default view to Palestine
+      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM); 
       
       layerGroupRef.current = window.L.layerGroup().addTo(map);
       routeLayerRef.current = window.L.layerGroup().addTo(map);
@@ -87,7 +85,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         onMapClick(e.latlng.lat, e.latlng.lng);
       });
       
-      // Popup Event Delegation
       map.on('popupopen', (e: any) => {
          const popupNode = e.popup._contentNode;
          if (!popupNode) return;
@@ -96,9 +93,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
          if (navBtn) {
             navBtn.onclick = (evt: any) => {
                 evt.stopPropagation();
-                // Get ID from attribute
                 const noteId = navBtn.getAttribute('data-id');
-                // Find note in REF (fresh data)
                 const note = notesRef.current.find((n: MapNote) => n.id === noteId);
                 if (note && onNavigateRef.current) {
                     onNavigateRef.current(note);
@@ -132,7 +127,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, []);
 
-  // Auto-Fly to User Location on First Fix
   useEffect(() => {
     if (userLocation && mapInstanceRef.current && !hasInitialFlownToUserRef.current) {
       mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, {
@@ -143,7 +137,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [userLocation]);
 
-  // Update Offline/Online Layers
   useEffect(() => {
     if (!layerGroupRef.current || !window.L) return;
 
@@ -191,12 +184,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [isSatellite]);
 
-  // Handle Note Markers Re-rendering
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    // Clear existing markers
     Object.keys(markersRef.current).forEach(key => {
       if (key !== 'temp' && key !== 'temp_click') {
         map.removeLayer(markersRef.current[key]);
@@ -205,43 +196,16 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     });
 
     notes.forEach(note => {
+      const html = createNoteIconHtml(isSatellite);
       const icon = window.L.divIcon({
         className: 'custom-div-icon',
-        html: `<div style="
-          width: 32px; 
-          height: 32px; 
-          background-color: ${isSatellite ? '#ef4444' : '#3b82f6'}; 
-          border: 3px solid white; 
-          border-radius: 50%; 
-          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-        ">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-        </div>`,
+        html: html,
         iconSize: [32, 32],
         iconAnchor: [16, 30]
       });
 
-      // Arabic Popup Content
-      const popupContent = `
-        <div class="font-sans min-w-[180px] text-right" dir="rtl">
-          <strong class="text-sm text-blue-400 block mb-1">${note.locationName}</strong>
-          <p class="text-xs mb-3 line-clamp-2 text-slate-300">${note.userNote}</p>
-          <div class="flex gap-2">
-             <button class="btn-navigate flex-1 bg-blue-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-blue-500 transition-colors" data-id="${note.id}">
-                ذهاب
-             </button>
-             ${userRole === 'admin' || userRole === 'super_admin' || userRole === 'governorate_admin' || userRole === 'center_admin' ? `
-               <button class="btn-dispatch flex-1 bg-purple-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-purple-500 transition-colors" data-id="${note.id}">
-                  توجيه
-               </button>
-             ` : ''}
-          </div>
-        </div>
-      `;
+      const canCommand = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+      const popupContent = createNotePopupHtml(note, canCommand);
 
       const marker = window.L.marker([note.lat, note.lng], { icon })
         .addTo(map)
@@ -253,7 +217,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     });
   }, [notes, isSatellite, selectedNote, userRole]);
 
-  // Handle FlyTo Animation
   useEffect(() => {
     if (!mapInstanceRef.current || !flyToTarget) return;
     mapInstanceRef.current.flyTo([flyToTarget.lat, flyToTarget.lng], flyToTarget.zoom || 16, {
@@ -262,12 +225,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     });
   }, [flyToTarget]);
 
-  // Handle Temporary Marker (Create Mode)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
     
-    // Remove old temp marker
     if (markersRef.current['temp']) {
       map.removeLayer(markersRef.current['temp']);
       delete markersRef.current['temp'];
@@ -276,7 +237,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     if (tempMarkerCoords) {
       const icon = window.L.divIcon({
         className: 'custom-div-icon',
-        html: `<div class="w-4 h-4 bg-white border-2 border-slate-900 rounded-full animate-bounce shadow-xl"></div>`,
+        html: createTempMarkerIconHtml(),
         iconSize: [16, 16]
       });
       const marker = window.L.marker([tempMarkerCoords.lat, tempMarkerCoords.lng], { icon }).addTo(map);
@@ -284,7 +245,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     }
   }, [tempMarkerCoords]);
 
-  // Handle Current Route Drawing
   useEffect(() => {
     if (!routeLayerRef.current || !window.L) return;
     routeLayerRef.current.clearLayers();
@@ -297,30 +257,26 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(routeLayerRef.current);
-      
       mapInstanceRef.current.fitBounds(line.getBounds(), { padding: [50, 50] });
     }
   }, [currentRoute]);
 
-  // Handle Secondary Route (Tactical) Drawing
   useEffect(() => {
      if (!secondaryRouteLayerRef.current || !window.L) return;
      secondaryRouteLayerRef.current.clearLayers();
 
      if (secondaryRoute) {
          const line = window.L.polyline(secondaryRoute.coordinates, {
-             color: '#a855f7', // Purple
+             color: '#a855f7',
              weight: 4,
              dashArray: '10, 10',
              opacity: 0.8,
              lineCap: 'round'
          }).addTo(secondaryRouteLayerRef.current);
-         
          mapInstanceRef.current.fitBounds(line.getBounds(), { padding: [50, 50] });
      }
   }, [secondaryRoute]);
 
-  // Handle Other Users Rendering
   useEffect(() => {
       if (!mapInstanceRef.current) return;
       const map = mapInstanceRef.current;
@@ -337,26 +293,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       otherUsers.forEach(user => {
           if (!canSeeOthers) return;
 
-          const iconHtml = `
-            <div style="position: relative; width: 34px; height: 34px; transition: all 0.5s ease;">
-                <div style="
-                    background-color: ${user.color || '#3b82f6'};
-                    width: 100%; height: 100%;
-                    border-radius: 50%;
-                    border: 2px solid white;
-                    display: flex; align-items: center; justify-content: center;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-                ">
-                    <span style="font-size: 12px; font-weight: bold; color: white;">${user.username.charAt(0).toUpperCase()}</span>
-                </div>
-                ${user.isSOS ? `<div style="position: absolute; inset: -10px; border-radius: 50%; border: 3px solid #ef4444; animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>` : ''}
-                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(15, 23, 42, 0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; backdrop-filter: blur(4px);">${user.username}</div>
-            </div>
-          `;
-
+          const html = createUserIconHtml(user);
           const icon = window.L.divIcon({
               className: 'custom-div-icon',
-              html: iconHtml,
+              html: html,
               iconSize: [34, 34],
               iconAnchor: [17, 17]
           });
@@ -384,20 +324,13 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
   }, [otherUsers, canSeeOthers, onUserClick]);
   
-  // Handle Current User Marker (Self)
   useEffect(() => {
     if (!mapInstanceRef.current || !userLocation) return;
     if (userMarkerRef.current) mapInstanceRef.current.removeLayer(userMarkerRef.current);
 
     const userIcon = window.L.divIcon({
         className: 'custom-div-icon',
-        html: `
-        <div style="position: relative; width: 24px; height: 24px;">
-            <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">أنا</div>
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #3b82f6; border: 2px solid white; border-radius: 50%; z-index: 2;"></div>
-            <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: rgba(59, 130, 246, 0.4); border-radius: 50%; animation: pulse 2s infinite;"></div>
-        </div>
-        `,
+        html: createSelfIconHtml(),
         iconSize: [24, 24],
         iconAnchor: [12, 12]
     });
