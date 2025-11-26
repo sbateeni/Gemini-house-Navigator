@@ -86,4 +86,5 @@ export interface LogEntry {
   userId?: string;
   timestamp: number;
   governorate?: string;
+  center?: string;
 }

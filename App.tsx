@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { identifyLocation, searchPlace } from './services/gemini';
 import { MapNote, MapUser, Assignment, UnitStatus } from './types';
@@ -102,10 +103,11 @@ export default function App() {
           type: 'status',
           userId: session.user.id,
           timestamp: Date.now(),
-          governorate: userProfile?.governorate // Log context
+          governorate: userProfile?.governorate, // Log context
+          center: userProfile?.center
        });
     }
-  }, [myStatus, session?.user?.id, userProfile?.governorate]);
+  }, [myStatus, session?.user?.id, userProfile?.governorate, userProfile?.center]);
 
   // --- 8. Handlers ---
   const locateUser = () => {
@@ -148,7 +150,8 @@ export default function App() {
              type: 'alert',
              userId: session.user.id,
              timestamp: Date.now(),
-             governorate: userProfile?.governorate
+             governorate: userProfile?.governorate,
+             center: userProfile?.center
          });
      }
   };
@@ -263,7 +266,8 @@ export default function App() {
           type: 'dispatch',
           userId: session.user.id,
           timestamp: Date.now(),
-          governorate: userProfile?.governorate
+          governorate: userProfile?.governorate,
+          center: userProfile?.center
       });
       alert("تم الإرسال بنجاح!");
     } catch (e) {

@@ -124,7 +124,8 @@ create table if not exists logs (
   type text not null, 
   user_id uuid references auth.users(id),
   timestamp bigint,
-  governorate text
+  governorate text,
+  center text
 );
 
 alter table logs enable row level security;
@@ -159,9 +160,9 @@ create policy "Create logs" on logs for insert with check (auth.role() = 'authen
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">تحديث النظام مطلوب: الهيكلية</h1>
+            <h1 className="text-xl font-bold text-white mb-1">تحديث النظام مطلوب: جدول السجلات</h1>
             <p className="text-slate-400 text-sm">
-              التطبيق يحتاج لتحديث قاعدة البيانات لدعم <span className="text-purple-400 font-bold mx-1">الهيكلية الهرمية</span> (المحافظات والمراكز).
+              التطبيق يحتاج لإنشاء جدول <span className="text-purple-400 font-bold mx-1">logs</span> لدعم شريط الأحداث ونظام SOS.
             </p>
           </div>
         </div>

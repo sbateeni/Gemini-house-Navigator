@@ -142,10 +142,21 @@ export const db = {
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
-      if (error) throw error;
+      if (error) {
+        // Check for missing column error specifically
+        if (error.code === '42703') { 
+            throw new Error("DATABASE_SCHEMA_MISMATCH");
+        }
+        throw error;
+      }
       
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
+      if (error.message === "DATABASE_SCHEMA_MISMATCH") {
+          alert("خطأ: قاعدة البيانات تحتاج لتحديث. الأعمدة (governorate, center) مفقودة.");
+          throw error;
+      }
+
       if (!navigator.onLine || error.message?.includes('fetch')) {
          const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
          if (!pending.find((n: MapNote) => n.id === note.id)) {
@@ -301,25 +312,35 @@ export const db = {
   // Logging
   async createLogEntry(log: Omit<LogEntry, 'id'>): Promise<void> {
     try {
-      await supabase.from('logs').insert({
+      const row: any = {
         message: log.message,
         type: log.type,
         user_id: log.userId,
         timestamp: log.timestamp,
         governorate: log.governorate
-      });
+      };
+      if (log.center) row.center = log.center;
+
+      await supabase.from('logs').insert(row);
     } catch (e) {
       // logs are best effort
+      console.error("Log failed", e);
     }
   },
 
   async getRecentLogs(): Promise<LogEntry[]> {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('logs')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(50);
+
+      if (error) {
+          // If table missing, return empty to prevent crash
+          if (error.code === 'PGRST205' || error.code === '42P01') return [];
+          throw error;
+      }
       
       return (data || []).map((row: any) => ({
         id: row.id,
@@ -327,7 +348,8 @@ export const db = {
         type: row.type,
         userId: row.user_id,
         timestamp: row.timestamp,
-        governorate: row.governorate
+        governorate: row.governorate,
+        center: row.center
       }));
     } catch {
       return [];
