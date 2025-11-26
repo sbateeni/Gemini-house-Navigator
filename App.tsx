@@ -14,6 +14,7 @@ import { PendingApproval } from './components/PendingApproval';
 import { NotificationBell } from './components/NotificationBell';
 import { SOSButton } from './components/SOSButton';
 import { OperationsLog } from './components/OperationsLog';
+import { PlaneView } from './components/PlaneView'; // Imported PlaneView
 
 // Hooks
 import { useAuth } from './hooks/useAuth';
@@ -320,6 +321,7 @@ export default function App() {
       />
 
       <div className="flex-1 relative w-full h-full">
+        <PlaneView /> {/* Added PlaneView for HUD/Cockpit visuals */}
         <NotificationBell assignments={assignments} onAccept={handleAcceptAssignment} />
         
         {/* Panic Button */}
@@ -389,7 +391,6 @@ export default function App() {
             closeCommandUser={() => setCommandUser(null)}
             onIntercept={handleIntercept}
             onDispatch={handleDispatch}
-            showLocationPicker={showLocationPicker} // Pass show logic
             
             showLocationPickerModal={showLocationPicker}
             closeLocationPicker={() => { setShowLocationPicker(false); setCommandUser(null); }}

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapNote, RouteData, UnitStatus, UserProfile, UserRole } from '../types';
+import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser } from '../types';
 import { BookOpen, Search, Loader2, X, Map as MapIcon, Trash2, Globe, ExternalLink, Navigation2, Clock, Ruler, Sparkles, CheckCircle2, XCircle, LogOut, Shield, XSquare, Edit3, LayoutDashboard, Settings, CircleDot, Users, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
 
@@ -32,7 +32,7 @@ interface SidebarProps {
   canCreate: boolean;
   myStatus: UnitStatus;
   setMyStatus: (s: UnitStatus) => void;
-  onlineUsers: any[]; // From usePresence
+  onlineUsers: MapUser[]; 
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({

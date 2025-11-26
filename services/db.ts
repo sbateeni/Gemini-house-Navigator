@@ -24,15 +24,24 @@ export const db = {
 
     console.log(`Syncing ${pendingNotes.length} offline notes...`);
     
+    const failedNotes: MapNote[] = [];
+
     for (const note of pendingNotes) {
       try {
         await this.addNote(note, true);
       } catch (e) {
         console.error("Failed to sync note", note.id, e);
+        failedNotes.push(note);
       }
     }
 
-    localStorage.removeItem(CACHE_KEY_PENDING_NOTES);
+    if (failedNotes.length > 0) {
+        console.warn(`${failedNotes.length} notes failed to sync and remain in queue.`);
+        localStorage.setItem(CACHE_KEY_PENDING_NOTES, JSON.stringify(failedNotes));
+    } else {
+        console.log("All pending notes synced successfully.");
+        localStorage.removeItem(CACHE_KEY_PENDING_NOTES);
+    }
   },
 
   // --- CORE FUNCTIONS ---
