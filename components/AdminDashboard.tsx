@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Shield, User, CheckCircle2, XCircle, Loader2, Wifi, WifiOff, Ban, Settings, ToggleLeft, ToggleRight, Building2, MapPin } from 'lucide-react';
+import { X, Shield, User, CheckCircle2, XCircle, Loader2, Wifi, WifiOff, Ban, Settings, ToggleLeft, ToggleRight, Building2, MapPin, ChevronDown } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole } from '../types';
 import { supabase } from '../services/supabase';
@@ -11,6 +11,12 @@ interface AdminDashboardProps {
   currentUserId: string;
   currentUserProfile: UserProfile | null;
 }
+
+const PALESTINE_GOVERNORATES = [
+  'القدس', 'رام الله والبيرة', 'نابلس', 'الخليل', 'جنين',
+  'طولكرم', 'قلقيلية', 'بيت لحم', 'سلفيت', 'أريحا والأغوار', 'طوباس',
+  'شمال غزة', 'غزة', 'دير البلح', 'خان يونس', 'رفح'
+];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, currentUserId, currentUserProfile }) => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -78,10 +84,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
      if (!selectedUserForPerms) return;
      
      const updates: Partial<UserProfile> = {};
-     if (editGov) updates.governorate = editGov;
-     if (editCenter) updates.center = editCenter;
+     
+     // Only update Gov/Center if the role requires it
+     if (selectedUserForPerms.role !== 'super_admin') {
+         updates.governorate = editGov;
+         if (selectedUserForPerms.role !== 'governorate_admin') {
+             updates.center = editCenter;
+         } else {
+             updates.center = null; // Gov Admin doesn't belong to a center
+         }
+     } else {
+         updates.governorate = null;
+         updates.center = null;
+     }
 
-     // Optimistic
+     // Optimistic UI Update
      setProfiles(prev => prev.map(p => p.id === selectedUserForPerms.id ? { ...p, ...updates } : p));
      setSelectedUserForPerms(prev => prev ? { ...prev, ...updates } : null);
 
@@ -94,20 +111,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
   };
 
   const handleRoleChange = async (user: UserProfile, newRole: UserRole) => {
-    if (confirm(`Change role of ${user.username} to ${newRole}?`)) {
-        setProfiles(prev => prev.map(p => p.id === user.id ? { ...p, role: newRole } : p));
-        try {
-            await db.updateProfile(user.id, { role: newRole });
-        } catch (error) {
-            console.error("Failed to update role", error);
-            fetchUsers();
-        }
-    }
+      // Update local state immediately for UI responsiveness
+      const updatedUser = { ...user, role: newRole };
+      setProfiles(prev => prev.map(p => p.id === user.id ? updatedUser : p));
+      setSelectedUserForPerms(updatedUser); // Update modal user to reflect new role
+      
+      try {
+          await db.updateProfile(user.id, { role: newRole });
+      } catch (error) {
+          console.error("Failed to update role", error);
+          fetchUsers();
+      }
   };
 
   const handleBanUser = async (user: UserProfile) => {
     if (user.id === currentUserId) return;
-    if (confirm(`Are you sure you want to BAN ${user.username}?`)) {
+    if (confirm(`هل أنت متأكد من حظر المستخدم ${user.username}؟`)) {
         const isBanned = user.role === 'banned';
         const newRole = isBanned ? 'user' : 'banned';
         setProfiles(prev => prev.map(p => p.id === user.id ? { ...p, role: newRole, isApproved: isBanned } : p));
@@ -134,9 +153,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
 
   const openUserModal = (user: UserProfile) => {
       setSelectedUserForPerms(user);
-      setEditGov(user.governorate || "");
+      // Pre-fill fields. If I am Gov Admin, I can only assign to my Gov.
+      if (currentUserProfile?.role === 'governorate_admin') {
+          setEditGov(currentUserProfile.governorate || "");
+      } else if (currentUserProfile?.role === 'center_admin') {
+          setEditGov(currentUserProfile.governorate || "");
+          setEditCenter(currentUserProfile.center || "");
+      } else {
+          setEditGov(user.governorate || "");
+      }
       setEditCenter(user.center || "");
   };
+
+  // Helper to extract existing centers for a chosen governorate dynamically
+  const getCentersForGov = (gov: string) => {
+      const centers = new Set<string>();
+      profiles.forEach(p => {
+          if (p.governorate === gov && p.center) {
+              centers.add(p.center);
+          }
+      });
+      return Array.from(centers);
+  };
+
+  const availableCenters = editGov ? getCentersForGov(editGov) : [];
 
   if (!isOpen) return null;
 
@@ -211,16 +251,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                          </div>
                        </td>
                        <td className="p-4 text-slate-400">
-                          <div className="flex flex-col gap-1">
-                             <div className="flex items-center gap-1">
-                                <MapPin size={12} className="text-blue-500" />
-                                <span>{user.governorate || 'غير محدد'}</span>
-                             </div>
-                             <div className="flex items-center gap-1">
-                                <Building2 size={12} className="text-yellow-500" />
-                                <span>{user.center || 'غير محدد'}</span>
-                             </div>
-                          </div>
+                          {user.role === 'super_admin' ? (
+                              <span className="text-purple-400 font-bold text-xs bg-purple-900/20 px-2 py-1 rounded">كل الصلاحيات</span>
+                          ) : (
+                              <div className="flex flex-col gap-1">
+                                 <div className="flex items-center gap-1">
+                                    <MapPin size={12} className="text-blue-500" />
+                                    <span>{user.governorate || '---'}</span>
+                                 </div>
+                                 <div className="flex items-center gap-1">
+                                    <Building2 size={12} className="text-yellow-500" />
+                                    <span>{user.center || '---'}</span>
+                                 </div>
+                              </div>
+                          )}
                        </td>
                        <td className="p-4 text-left">
                          <div className="flex items-center justify-end gap-2">
@@ -277,76 +321,110 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                     <h4 className="text-xs uppercase text-slate-500 font-bold">الهيكلية والرتبة</h4>
                     
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
+                        <div className="col-span-2">
                             <label className="text-xs text-slate-400 block mb-1">الرتبة</label>
                             <select 
                                 value={selectedUserForPerms.role}
                                 onChange={(e) => handleRoleChange(selectedUserForPerms, e.target.value as UserRole)}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-sm"
-                                disabled={currentUserProfile?.role !== 'super_admin' && currentUserProfile?.role !== 'admin'} 
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm focus:border-purple-500 focus:outline-none"
+                                disabled={currentUserProfile?.role !== 'super_admin' && currentUserProfile?.role !== 'admin' && currentUserProfile?.role !== 'governorate_admin'} 
                             >
                                 <option value="user">عنصر</option>
                                 <option value="center_admin">مدير مركز</option>
-                                <option value="governorate_admin">مدير محافظة</option>
-                                <option value="super_admin">قيادة عامة</option>
+                                {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
+                                    <>
+                                        <option value="governorate_admin">مدير محافظة</option>
+                                        <option value="super_admin">قيادة عامة</option>
+                                    </>
+                                )}
                             </select>
                         </div>
                         
-                        {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
-                        <div>
-                            <label className="text-xs text-slate-400 block mb-1">المحافظة</label>
-                            <input 
-                                type="text" 
-                                value={editGov}
-                                onChange={(e) => setEditGov(e.target.value)}
-                                placeholder="مثال: رام الله"
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-sm"
-                            />
-                        </div>
+                        {/* Conditional Hierarchy Inputs */}
+                        {selectedUserForPerms.role !== 'super_admin' ? (
+                            <>
+                                <div>
+                                    <label className="text-xs text-slate-400 block mb-1">المحافظة</label>
+                                    <div className="relative">
+                                        <select 
+                                            value={editGov}
+                                            onChange={(e) => {
+                                                setEditGov(e.target.value);
+                                                setEditCenter(""); // Reset center when gov changes
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm appearance-none focus:border-purple-500 focus:outline-none disabled:opacity-50"
+                                            disabled={currentUserProfile?.role === 'governorate_admin' || currentUserProfile?.role === 'center_admin'}
+                                        >
+                                            <option value="">-- اختر المحافظة --</option>
+                                            {PALESTINE_GOVERNORATES.map(gov => (
+                                                <option key={gov} value={gov}>{gov}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute left-3 top-3.5 text-slate-500 pointer-events-none" size={16} />
+                                    </div>
+                                </div>
+                                
+                                {selectedUserForPerms.role !== 'governorate_admin' && (
+                                    <div>
+                                         <label className="text-xs text-slate-400 block mb-1">المركز / القسم</label>
+                                         <input 
+                                            list="centers-list"
+                                            type="text" 
+                                            value={editCenter}
+                                            onChange={(e) => setEditCenter(e.target.value)}
+                                            placeholder="اكتب اسم المركز..."
+                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm focus:border-purple-500 focus:outline-none disabled:opacity-50"
+                                            disabled={currentUserProfile?.role === 'center_admin'}
+                                         />
+                                         <datalist id="centers-list">
+                                             {availableCenters.map(c => (
+                                                 <option key={c} value={c} />
+                                             ))}
+                                         </datalist>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="col-span-2 bg-purple-900/20 border border-purple-900/50 rounded-lg p-3 text-center">
+                                <span className="text-purple-400 text-sm font-bold flex items-center justify-center gap-2">
+                                    <Shield size={16} /> يملك كافة الصلاحيات على جميع المحافظات
+                                </span>
+                            </div>
                         )}
-                        
-                        <div className="col-span-2">
-                             <label className="text-xs text-slate-400 block mb-1">المركز / القسم</label>
-                             <input 
-                                type="text" 
-                                value={editCenter}
-                                onChange={(e) => setEditCenter(e.target.value)}
-                                placeholder="مثال: مركز شرطة شقبا"
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-sm"
-                             />
-                        </div>
                     </div>
                     
                     <button 
                         onClick={handleUpdateHierarchy}
-                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-bold transition-colors mt-2"
                     >
                         حفظ التعديلات الهيكلية
                     </button>
                 </div>
 
                 {/* Permissions Section */}
-                <div className="space-y-3">
-                    <h4 className="text-xs uppercase text-slate-500 font-bold">الصلاحيات الفنية</h4>
-                    
-                    {['can_create', 'can_see_others', 'can_navigate'].map(perm => (
-                        <div key={perm} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                            <span className="text-sm font-medium text-white">
-                                {perm === 'can_create' ? 'إضافة ملاحظات' : perm === 'can_see_others' ? 'رؤية الزملاء' : 'استخدام الملاحة'}
-                            </span>
-                            <button onClick={() => handlePermissionChange(perm as keyof UserPermissions)}>
-                                {selectedUserForPerms.permissions[perm as keyof UserPermissions] 
-                                    ? <ToggleRight className="text-green-500 w-8 h-8 transition-colors" /> 
-                                    : <ToggleLeft className="text-slate-600 w-8 h-8 transition-colors" />}
-                            </button>
-                        </div>
-                    ))}
-                </div>
+                {selectedUserForPerms.role !== 'super_admin' && (
+                    <div className="space-y-3">
+                        <h4 className="text-xs uppercase text-slate-500 font-bold">الصلاحيات الفنية</h4>
+                        
+                        {['can_create', 'can_see_others', 'can_navigate'].map(perm => (
+                            <div key={perm} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                <span className="text-sm font-medium text-white">
+                                    {perm === 'can_create' ? 'إضافة ملاحظات' : perm === 'can_see_others' ? 'رؤية الزملاء' : 'استخدام الملاحة'}
+                                </span>
+                                <button onClick={() => handlePermissionChange(perm as keyof UserPermissions)}>
+                                    {selectedUserForPerms.permissions[perm as keyof UserPermissions] 
+                                        ? <ToggleRight className="text-green-500 w-8 h-8 transition-colors" /> 
+                                        : <ToggleLeft className="text-slate-600 w-8 h-8 transition-colors" />}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="mt-6 pt-4 border-t border-slate-800">
                     <button 
                         onClick={() => setSelectedUserForPerms(null)}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors"
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors shadow-lg shadow-blue-900/20"
                     >
                         تم
                     </button>
