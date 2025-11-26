@@ -65,6 +65,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
+  const [isLocating, setIsLocating] = useState(false); // New state for location loading
 
   // Modal States
   const [showDashboard, setShowDashboard] = useState(false);
@@ -108,11 +109,32 @@ export default function App() {
 
   // --- 8. Handlers ---
   const locateUser = () => {
-    if (userLocation) {
-        setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17, timestamp: Date.now() });
-    } else {
-        alert("جاري تحديد الموقع...");
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+        alert("المتصفح لا يدعم تحديد الموقع.");
+        setIsLocating(false);
+        return;
     }
+
+    // Force a fresh read for instant response
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const { latitude, longitude } = pos.coords;
+            setFlyToTarget({ 
+                lat: latitude, 
+                lng: longitude, 
+                zoom: 17, 
+                timestamp: Date.now() 
+            });
+            setIsLocating(false);
+        },
+        (err) => {
+            console.error(err);
+            alert("تعذر تحديد الموقع الحالي. تأكد من تفعيل GPS.");
+            setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const handleToggleSOS = () => {
@@ -359,6 +381,7 @@ export default function App() {
           isSatellite={isSatellite}
           setIsSatellite={setIsSatellite}
           onLocateUser={locateUser}
+          isLocating={isLocating}
         />
 
         {/* Live Operations Log */}

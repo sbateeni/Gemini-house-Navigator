@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Navigation, Layers, Globe } from 'lucide-react';
+import { Menu, Navigation, Layers, Globe, Loader2 } from 'lucide-react';
 
 interface MapControlsProps {
   sidebarOpen: boolean;
@@ -7,6 +7,7 @@ interface MapControlsProps {
   isSatellite: boolean;
   setIsSatellite: (s: boolean) => void;
   onLocateUser: () => void;
+  isLocating?: boolean;
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -14,11 +15,12 @@ export const MapControls: React.FC<MapControlsProps> = ({
   setSidebarOpen,
   isSatellite,
   setIsSatellite,
-  onLocateUser
+  onLocateUser,
+  isLocating = false
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
-       {/* Sidebar Toggle (Always Visible) */}
+       {/* Sidebar Toggle */}
        <button 
          onClick={() => setSidebarOpen(!sidebarOpen)}
          className={`w-12 h-12 backdrop-blur text-white rounded-full shadow-xl border border-slate-700 flex items-center justify-center active:scale-95 transition-all
@@ -31,10 +33,11 @@ export const MapControls: React.FC<MapControlsProps> = ({
 
        <button 
          onClick={onLocateUser}
-         className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-xl border border-blue-500 flex items-center justify-center hover:bg-blue-500 active:scale-95 transition-all"
+         disabled={isLocating}
+         className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-xl border border-blue-500 flex items-center justify-center hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-wait"
          title="موقعي الحالي"
        >
-         <Navigation size={24} />
+         {isLocating ? <Loader2 size={24} className="animate-spin" /> : <Navigation size={24} />}
        </button>
        
        <button 

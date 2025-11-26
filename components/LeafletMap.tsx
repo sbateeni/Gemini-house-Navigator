@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
 import { offlineMaps } from '../services/offlineMaps';
 
@@ -27,6 +27,10 @@ interface LeafletMapProps {
   userRole?: string | null;
 }
 
+// Palestine Coordinates (General Center)
+const DEFAULT_CENTER: [number, number] = [31.9522, 35.2332]; // Near Jerusalem/Ramallah
+const DEFAULT_ZOOM = 9;
+
 export const LeafletMap: React.FC<LeafletMapProps> = ({
   isSatellite,
   notes,
@@ -53,6 +57,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const userMarkerRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkersRef = useRef<{ [key: string]: any }>({});
+  const hasInitial flownToUserRef = useRef(false);
 
   const notesRef = useRef(notes);
   const onNavigateRef = useRef(onNavigate);
@@ -71,7 +76,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       const map = window.L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false
-      }).setView([24.7136, 46.6753], 6); // Default to Middle East view
+      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM); // Set default view to Palestine
       
       layerGroupRef.current = window.L.layerGroup().addTo(map);
       routeLayerRef.current = window.L.layerGroup().addTo(map);
@@ -125,6 +130,17 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       }) as EventListener);
     }
   }, []);
+
+  // Auto-Fly to User Location on First Fix
+  useEffect(() => {
+    if (userLocation && mapInstanceRef.current && !hasInitial.flownToUserRef.current) {
+      mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, {
+        duration: 2,
+        easeLinearity: 0.25
+      });
+      hasInitial.flownToUserRef.current = true;
+    }
+  }, [userLocation]);
 
   // Update Offline/Online Layers
   useEffect(() => {
@@ -243,10 +259,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       duration: 1.5,
       easeLinearity: 0.25
     });
-
-    if (flyToTarget.showPulse) {
-         // Could add temporary pulse effect here if needed
-    }
   }, [flyToTarget]);
 
   // Handle Temporary Marker (Create Mode)
@@ -312,10 +324,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       if (!mapInstanceRef.current) return;
       const map = mapInstanceRef.current;
 
-      // Track current user IDs to identify removals
       const activeIds = new Set(otherUsers.map(u => u.id));
 
-      // Remove stale markers
       Object.keys(userMarkersRef.current).forEach(id => {
           if (!activeIds.has(id)) {
               map.removeLayer(userMarkersRef.current[id]);
@@ -323,7 +333,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           }
       });
 
-      // Update/Create markers
       otherUsers.forEach(user => {
           if (!canSeeOthers) return;
 
@@ -353,14 +362,11 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
           if (userMarkersRef.current[user.id]) {
               const marker = userMarkersRef.current[user.id];
-              const oldLatLng = marker.getLatLng();
-              // Smooth transition if distance is small, otherwise jump
               marker.setLatLng([user.lat, user.lng]);
               marker.setIcon(icon);
               marker.setZIndexOffset(100);
           } else {
               const marker = window.L.marker([user.lat, user.lng], { icon, zIndexOffset: 100 }).addTo(map);
-              // Handle Click on User Marker
               marker.on('click', () => {
                   if (onUserClick) onUserClick(user);
               });
@@ -368,7 +374,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           }
       });
 
-      // Cleanup if permission revoked
       if (!canSeeOthers) {
            Object.keys(userMarkersRef.current).forEach(id => {
               map.removeLayer(userMarkersRef.current[id]);
