@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
 import { offlineMaps } from '../services/offlineMaps';
@@ -57,7 +58,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   const userMarkerRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkersRef = useRef<{ [key: string]: any }>({});
-  const hasInitial flownToUserRef = useRef(false);
+  const hasInitialFlownToUserRef = useRef(false);
 
   const notesRef = useRef(notes);
   const onNavigateRef = useRef(onNavigate);
@@ -133,12 +134,12 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
   // Auto-Fly to User Location on First Fix
   useEffect(() => {
-    if (userLocation && mapInstanceRef.current && !hasInitial.flownToUserRef.current) {
+    if (userLocation && mapInstanceRef.current && !hasInitialFlownToUserRef.current) {
       mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, {
         duration: 2,
         easeLinearity: 0.25
       });
-      hasInitial.flownToUserRef.current = true;
+      hasInitialFlownToUserRef.current = true;
     }
   }, [userLocation]);
 
