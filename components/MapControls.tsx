@@ -1,8 +1,5 @@
-
 import React from 'react';
 import { Menu, Navigation, Layers, Globe, Loader2 } from 'lucide-react';
-import { NotificationBell } from './NotificationBell';
-import { Assignment } from '../types';
 
 interface MapControlsProps {
   sidebarOpen: boolean;
@@ -11,8 +8,6 @@ interface MapControlsProps {
   setIsSatellite: (s: boolean) => void;
   onLocateUser: () => void;
   isLocating?: boolean;
-  assignments?: Assignment[];
-  onAcceptAssignment?: (a: Assignment) => void;
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -21,9 +16,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
   isSatellite,
   setIsSatellite,
   onLocateUser,
-  isLocating = false,
-  assignments = [],
-  onAcceptAssignment
+  isLocating = false
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
@@ -54,13 +47,6 @@ export const MapControls: React.FC<MapControlsProps> = ({
        >
          {isSatellite ? <Globe size={24} /> : <Layers size={24} />}
        </button>
-
-       {/* Notification Bell (Tactical Assignments) */}
-       {onAcceptAssignment && (
-         <div className="mt-2">
-            <NotificationBell assignments={assignments} onAccept={onAcceptAssignment} />
-         </div>
-       )}
     </div>
   );
 };

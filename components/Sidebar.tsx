@@ -38,7 +38,7 @@ interface SidebarProps {
   myStatus: UnitStatus;
   setMyStatus: (s: UnitStatus) => void;
   onlineUsers: MapUser[]; 
-  currentUserId?: string;
+  currentUserId: string; // Passed for filtering self in list if needed
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -52,12 +52,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
 
+  // Fetch all profiles if admin (to show offline users too)
+  // Poll every minute to update last_seen statuses
   useEffect(() => {
-    if (isAdmin) {
-      db.getAllProfiles().then(setAllProfiles);
-    }
-  }, [isAdmin, isOpen]);
+    if (!isAdmin) return;
 
+    const fetchProfiles = () => {
+        db.getAllProfiles().then(setAllProfiles);
+    };
+
+    fetchProfiles(); // Initial fetch
+    const interval = setInterval(fetchProfiles, 60000); // Poll every minute
+
+    return () => clearInterval(interval);
+  }, [isAdmin]);
+
+  // --- AUTO CLOSE LOGIC ---
   useEffect(() => {
     if (!isOpen) return;
     let inactivityTimer: ReturnType<typeof setTimeout>;
@@ -107,6 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth pb-24 md:pb-4">
         
+        {/* Connection Status */}
         <div className="flex items-center justify-between px-2 mb-2">
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isConnected ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-red-900/20 text-red-400 border-red-900/30'}`}>
                 {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
@@ -124,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
         </div>
 
-        {isAdmin && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} currentUserId={currentUserId} />}
+        {isAdmin && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />}
 
         <SidebarNotes 
             notes={notes}

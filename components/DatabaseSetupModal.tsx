@@ -14,7 +14,7 @@ create table if not exists profiles (
   role text default 'user',
   is_approved boolean default false,
   email text,
-  permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb,
+  permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb,
   governorate text,
   center text,
   last_seen bigint, -- New column for background activity tracking
@@ -49,7 +49,7 @@ begin
     'user', 
     false, 
     new.email,
-    '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb
+    '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb
   );
   return new;
 end;

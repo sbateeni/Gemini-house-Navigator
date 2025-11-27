@@ -1,17 +1,12 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
 import { Assignment } from '../types';
 
-export function useAssignments(userId: string | undefined, onIncomingAssignment?: (a: Assignment) => void) {
+export function useAssignments(userId: string | undefined) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
-  const onIncomingRef = useRef(onIncomingAssignment);
-
-  useEffect(() => {
-    onIncomingRef.current = onIncomingAssignment;
-  }, [onIncomingAssignment]);
 
   useEffect(() => {
     if (!userId) return;
@@ -31,42 +26,14 @@ export function useAssignments(userId: string | undefined, onIncomingAssignment?
       .on(
         'postgres_changes',
         {
-          event: 'INSERT', // Listen specifically for new assignments
+          event: '*', // INSERT, UPDATE
           schema: 'public',
           table: 'assignments',
           filter: `target_user_id=eq.${userId}`
         },
-        (payload: any) => {
-          const newAssign: Assignment = {
-              id: payload.new.id,
-              targetUserId: payload.new.target_user_id,
-              locationId: payload.new.location_id,
-              locationName: payload.new.location_name,
-              lat: payload.new.lat,
-              lng: payload.new.lng,
-              instructions: payload.new.instructions,
-              status: payload.new.status,
-              createdBy: payload.new.created_by,
-              createdAt: payload.new.created_at
-          };
-          
-          setAssignments(prev => [newAssign, ...prev]);
-          
-          // Trigger the callback for auto-dispatch logic
-          if (onIncomingRef.current) {
-              onIncomingRef.current(newAssign);
-          }
+        () => {
+          fetchAssignments();
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE', 
-          schema: 'public',
-          table: 'assignments',
-          filter: `target_user_id=eq.${userId}`
-        },
-        () => { fetchAssignments(); }
       )
       .subscribe();
 

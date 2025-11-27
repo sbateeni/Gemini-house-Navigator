@@ -7,6 +7,17 @@ export const useSound = () => {
   const gainNodeRef = useRef<GainNode | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') {
+        ctx.resume();
+    }
+    return ctx;
+  }, []);
+
   const stopSiren = useCallback(() => {
     if (oscillatorRef.current) {
       try {
@@ -28,39 +39,24 @@ export const useSound = () => {
   }, []);
 
   const playSiren = useCallback(() => {
-    // Stop any existing sound first
     stopSiren();
-
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-
-    const ctx = audioContextRef.current;
-    if (ctx.state === 'suspended') {
-        ctx.resume();
-    }
+    const ctx = getAudioContext();
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    // Siren effect: Sawtooth wave varying frequency
+    // Siren effect
     osc.type = 'sawtooth';
-    
-    // Create a wailing sound (Frequency sweep)
     const now = ctx.currentTime;
     osc.frequency.setValueAtTime(600, now);
     osc.frequency.linearRampToValueAtTime(1200, now + 0.5);
     osc.frequency.linearRampToValueAtTime(600, now + 1.0);
     osc.frequency.linearRampToValueAtTime(1200, now + 1.5);
+    // ... continue ramp pattern if needed, simplified for brevity
     osc.frequency.linearRampToValueAtTime(600, now + 2.0);
     osc.frequency.linearRampToValueAtTime(1200, now + 2.5);
     osc.frequency.linearRampToValueAtTime(600, now + 3.0);
-    osc.frequency.linearRampToValueAtTime(1200, now + 3.5);
-    osc.frequency.linearRampToValueAtTime(600, now + 4.0);
-    osc.frequency.linearRampToValueAtTime(1200, now + 4.5);
-    osc.frequency.linearRampToValueAtTime(600, now + 5.0);
 
-    // Volume
     gain.gain.setValueAtTime(0.1, now);
     
     osc.connect(gain);
@@ -70,12 +66,27 @@ export const useSound = () => {
     oscillatorRef.current = osc;
     gainNodeRef.current = gain;
 
-    // Auto stop after 5 seconds
     timerRef.current = setTimeout(() => {
       stopSiren();
     }, 5000);
 
-  }, [stopSiren]);
+  }, [stopSiren, getAudioContext]);
+
+  const playBeep = useCallback(() => {
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+  }, [getAudioContext]);
 
   useEffect(() => {
     return () => {
@@ -86,5 +97,5 @@ export const useSound = () => {
     };
   }, [stopSiren]);
 
-  return { playSiren, stopSiren };
+  return { playSiren, stopSiren, playBeep };
 };

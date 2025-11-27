@@ -9,7 +9,10 @@ import { UserPermissions, UserProfile, UserRole } from '../types';
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
   can_see_others: true,
-  can_navigate: true
+  can_navigate: true,
+  can_edit_users: false,
+  can_dispatch: false,
+  can_view_logs: true
 };
 
 export function useAuth() {

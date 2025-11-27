@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { X, Shield, Search, Loader2 } from 'lucide-react';
 import { UnitStatus } from '../../types';
 
@@ -16,17 +16,6 @@ interface SidebarHeaderProps {
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   setIsOpen, myStatus, setMyStatus, searchQuery, setSearchQuery, isSearching, onSearch
 }) => {
-  const [localSearch, setLocalSearch] = useState(searchQuery);
-
-  useEffect(() => {
-    setLocalSearch(searchQuery);
-  }, [searchQuery]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalSearch(e.target.value);
-    setSearchQuery(e.target.value);
-  };
-
   const statusColors = {
     patrol: 'bg-green-500',
     busy: 'bg-yellow-500',
@@ -85,8 +74,8 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
         <form onSubmit={onSearch} className="relative">
           <input 
             type="text" 
-            value={localSearch}
-            onChange={handleChange}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="بحث عن موقع..." 
             className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 pr-10 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-right"
             disabled={isSearching}

@@ -35,6 +35,10 @@ export interface UserPermissions {
   can_create: boolean;
   can_see_others: boolean;
   can_navigate: boolean;
+  // New Granular Permissions
+  can_edit_users: boolean;
+  can_dispatch: boolean;
+  can_view_logs: boolean;
 }
 
 // Added 'officer' between center_admin and user

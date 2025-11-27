@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 
@@ -130,8 +131,6 @@ export default function App() {
           setIsSatellite={setIsSatellite}
           onLocateUser={locateUser}
           isLocating={isLocating}
-          assignments={assignments}
-          onAcceptAssignment={handleAcceptAssignment}
         />
 
         <ModalContainer

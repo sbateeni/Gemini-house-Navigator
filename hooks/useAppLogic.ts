@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
 import { searchPlace, identifyLocation } from '../services/gemini';
@@ -28,7 +28,7 @@ export function useAppLogic() {
   // --- 2. Tactical State ---
   const [myStatus, setMyStatus] = useState<UnitStatus>('patrol');
   const [isSOS, setIsSOS] = useState(false);
-  const { playSiren, stopSiren } = useSound();
+  const { playSiren, stopSiren, playBeep } = useSound();
 
   // --- 3. Core Data Hooks ---
   const { 
@@ -36,52 +36,23 @@ export function useAppLogic() {
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
   const { userLocation } = useGeolocation(session, hasAccess);
+  const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
-  // --- 4. Navigation Hook ---
+  // --- 4. Feature Hooks ---
+  const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
     currentRoute, secondaryRoute, setSecondaryRoute, calculateRoute, isRouting, 
     handleNavigateToNote, handleNavigateToPoint, handleStopNavigation, clearSecondaryRoute
   } = useNavigation(userLocation);
 
-  // Local UI State for FlyTo
-  const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
-
-  // --- 5. Assignments Logic ---
-  // Define callback first
-  const handleIncomingAssignment = useCallback((assignment: Assignment) => {
-      // Logic: If I am the target, I get the alert.
-      // If I am a basic 'user', I auto-accept and navigate.
-      playSiren();
-      setTimeout(() => stopSiren(), 3000);
-
-      if (userRole === 'user' || userRole === 'officer') {
-          // Auto-Dispatch for units
-          handleNavigateToPoint(assignment.lat, assignment.lng);
-          setFlyToTarget({ 
-              lat: assignment.lat, 
-              lng: assignment.lng, 
-              zoom: 16, 
-              timestamp: Date.now() 
-          });
-          alert(`⚠️ أمر عمليات عاجل: ${assignment.locationName}\nالتعليمات: ${assignment.instructions || 'توجه للموقع فوراً'}`);
-      } else {
-          // Admins just get the notification bell badge sound
-          // Optional: Show toast
-      }
-  }, [userRole, playSiren, stopSiren]); // Add dependencies if needed, handleNavigateToPoint is stable?
-
-  const { assignments, acceptAssignment } = useAssignments(session?.user?.id, handleIncomingAssignment);
-  
-  // --- 6. Feature Hooks ---
-  const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
-
-  // --- 7. Local UI State ---
+  // --- 5. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isSatellite, setIsSatellite] = useState(() => localStorage.getItem('gemini_map_mode') === 'satellite');
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
   // Modal States
@@ -98,13 +69,13 @@ export function useAppLogic() {
   // Find Distressed User (Someone else who triggered SOS)
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
 
-  // --- 8. Form Logic Hook ---
+  // --- 6. Form Logic Hook ---
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
       handleMapClick, handleEditNote, handleSaveNote, closeModal 
   } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen, userProfile);
 
-  // --- 9. Effects & Handlers ---
+  // --- 7. Effects & Handlers ---
   
   useEffect(() => {
     const handleResize = () => setSidebarOpen(window.innerWidth >= 768);
@@ -130,7 +101,7 @@ export function useAppLogic() {
     }
   }, [myStatus, session?.user?.id]);
 
-  // SOS Sound Logic
+  // SOS Sound Logic (Trigger if I am SOS OR someone else is SOS)
   useEffect(() => {
     if (isSOS || distressedUser) {
         playSiren();
@@ -261,7 +232,7 @@ export function useAppLogic() {
   };
 
   const onUserClick = (user: MapUser) => {
-    if (isAnyAdmin) {
+    if (isAnyAdmin || permissions.can_dispatch) {
       setCommandUser(user);
     }
   };
@@ -273,7 +244,11 @@ export function useAppLogic() {
   };
 
   const handleDispatch = () => {
-    setShowLocationPicker(true);
+    if (isAnyAdmin || permissions.can_dispatch) {
+      setShowLocationPicker(true);
+    } else {
+      alert("ليس لديك صلاحية التوجيه.");
+    }
   };
 
   const handleSelectDispatchLocation = async (note: MapNote) => {
@@ -293,7 +268,11 @@ export function useAppLogic() {
   };
 
   const handleOpenDispatchModal = (note: MapNote) => {
-    setDispatchTargetLocation(note);
+    if (isAnyAdmin || permissions.can_dispatch) {
+      setDispatchTargetLocation(note);
+    } else {
+      alert("ليس لديك صلاحية التوجيه.");
+    }
   };
 
   const handleSendDispatchOrder = async (targetUserId: string, instructions: string) => {
@@ -327,6 +306,23 @@ export function useAppLogic() {
     acceptAssignment(assignment.id);
     handleNavigateToPoint(assignment.lat, assignment.lng);
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
+  };
+
+  // Auto-Dispatch Logic for Users
+  const handleIncomingAssignment = (assignment: Assignment) => {
+      if (userRole === 'user' || userRole === 'officer') {
+          playSiren(); // Alert sound
+          setTimeout(() => stopSiren(), 2000);
+          
+          acceptAssignment(assignment.id);
+          handleNavigateToPoint(assignment.lat, assignment.lng);
+          setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
+          
+          alert("⚠️ أمر عمليات عاجل: تم بدء التوجيه للموقع المستهدف.");
+      } else {
+          // Admins just get a notification beep
+          playBeep();
+      }
   };
 
   return {

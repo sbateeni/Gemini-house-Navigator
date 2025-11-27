@@ -5,7 +5,10 @@ import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
   can_see_others: true,
-  can_navigate: true
+  can_navigate: true,
+  can_edit_users: false,
+  can_dispatch: false,
+  can_view_logs: true
 };
 
 const CACHE_KEY_NOTES = 'gemini_offline_notes';
@@ -191,7 +194,7 @@ export const db = {
         role: data.role,
         isApproved: data.is_approved === true,
         email: data.email,
-        permissions: data.permissions || DEFAULT_PERMISSIONS,
+        permissions: { ...DEFAULT_PERMISSIONS, ...(data.permissions || {}) },
         governorate: data.governorate,
         center: data.center,
         last_seen: data.last_seen
@@ -237,7 +240,7 @@ export const db = {
         role: row.role,
         isApproved: row.is_approved === true,
         email: row.email,
-        permissions: row.permissions || DEFAULT_PERMISSIONS,
+        permissions: { ...DEFAULT_PERMISSIONS, ...(row.permissions || {}) },
         governorate: row.governorate,
         center: row.center,
         last_seen: row.last_seen

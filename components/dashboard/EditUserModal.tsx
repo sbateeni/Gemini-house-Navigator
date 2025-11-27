@@ -48,9 +48,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     onUpdatePermissions(user, newPerms);
   };
 
+  const permLabels: Record<keyof UserPermissions, string> = {
+      can_create: 'إضافة ملاحظات',
+      can_see_others: 'رؤية الزملاء',
+      can_navigate: 'استخدام الملاحة',
+      can_edit_users: 'إدارة المستخدمين',
+      can_dispatch: 'إرسال التوجيهات',
+      can_view_logs: 'رؤية السجلات'
+  };
+
   return (
     <div className="absolute inset-0 z-[1300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95">
+        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h3 className="text-lg font-bold text-white">إدارة العنصر</h3>
@@ -76,7 +85,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         >
                             <option value="user">عنصر</option>
                             <option value="officer">ضابط</option>
-                            {/* Center Admin can modify users/officers, but cannot promote to center_admin usually, logic handles permissions above */}
                             <option value="center_admin">مدير مركز</option>
                             {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
                                 <>
@@ -152,18 +160,20 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                 <div className="space-y-3">
                     <h4 className="text-xs uppercase text-slate-500 font-bold">الصلاحيات الفنية</h4>
                     
-                    {['can_create', 'can_see_others', 'can_navigate'].map(perm => (
-                        <div key={perm} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                            <span className="text-sm font-medium text-white">
-                                {perm === 'can_create' ? 'إضافة ملاحظات' : perm === 'can_see_others' ? 'رؤية الزملاء' : 'استخدام الملاحة'}
-                            </span>
-                            <button onClick={() => handlePermChange(perm as keyof UserPermissions)}>
-                                {user.permissions[perm as keyof UserPermissions] 
-                                    ? <ToggleRight className="text-green-500 w-8 h-8 transition-colors" /> 
-                                    : <ToggleLeft className="text-slate-600 w-8 h-8 transition-colors" />}
-                            </button>
-                        </div>
-                    ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(Object.keys(permLabels) as Array<keyof UserPermissions>).map(perm => (
+                            <div key={perm} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                <span className="text-sm font-medium text-white">
+                                    {permLabels[perm]}
+                                </span>
+                                <button onClick={() => handlePermChange(perm)}>
+                                    {user.permissions[perm] 
+                                        ? <ToggleRight className="text-green-500 w-8 h-8 transition-colors" /> 
+                                        : <ToggleLeft className="text-slate-600 w-8 h-8 transition-colors" />}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
