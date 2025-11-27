@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { auth } from '../services/auth';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send, CheckSquare, Square } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -8,10 +9,20 @@ export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   const [showResend, setShowResend] = useState(false); 
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+
+  // Load saved email on mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('gemini_saved_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +38,13 @@ export const AuthPage: React.FC = () => {
         if (error) throw error;
         setMessage({ type: 'success', text: 'تم إرسال رابط استعادة كلمة المرور إلى بريدك!' });
       } else if (isLogin) {
+        // Handle Remember Me Logic
+        if (rememberMe) {
+            localStorage.setItem('gemini_saved_email', email);
+        } else {
+            localStorage.removeItem('gemini_saved_email');
+        }
+
         const { error } = await auth.signIn(email, password);
         if (error) {
           if (error.message.includes("Email not confirmed")) {
@@ -110,6 +128,8 @@ export const AuthPage: React.FC = () => {
               <User className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
               <input
                 type="text"
+                name="username"
+                autoComplete="username"
                 placeholder="اسم المستخدم"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -123,6 +143,8 @@ export const AuthPage: React.FC = () => {
             <Mail className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               placeholder="البريد الإلكتروني"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -136,6 +158,8 @@ export const AuthPage: React.FC = () => {
               <Lock className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
               <input
                 type="password"
+                name="password"
+                autoComplete={isLogin ? "current-password" : "new-password"}
                 placeholder="كلمة المرور"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -145,10 +169,27 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
 
+          {isLogin && !isReset && (
+            <div className="flex items-center gap-2 mt-2">
+                <button 
+                    type="button"
+                    onClick={() => setRememberMe(!rememberMe)}
+                    className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-sm"
+                >
+                    {rememberMe ? (
+                        <CheckSquare size={18} className="text-blue-500" />
+                    ) : (
+                        <Square size={18} />
+                    )}
+                    <span>تذكرني</span>
+                </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2"
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 mt-4"
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : (isReset ? 'إرسال الرابط' : (isLogin ? 'دخول' : 'تسجيل'))}
           </button>
