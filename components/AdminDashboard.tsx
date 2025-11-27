@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2 } from 'lucide-react';
+import { X, Shield, Loader2, UserPlus, Users } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole } from '../types';
 import { supabase } from '../services/supabase';
@@ -71,14 +71,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
 
   const handleUpdateHierarchy = async (user: UserProfile, gov: string, center: string) => {
      const updates: Partial<UserProfile> = {};
+     // Smart Hierarchy Logic
      if (user.role !== 'super_admin') {
          updates.governorate = gov;
+         // Governorate admins don't belong to a specific center, they manage the gov
          if (user.role !== 'governorate_admin') {
              updates.center = center;
          } else {
              updates.center = null;
          }
      } else {
+         // Super admin has no specific location (Global)
          updates.governorate = null;
          updates.center = null;
      }
@@ -172,26 +175,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="px-6 pt-4 pb-0 flex gap-4 border-b border-slate-800 bg-slate-900">
+        {/* Filters / Tabs */}
+        <div className="px-6 pt-4 pb-0 flex gap-6 border-b border-slate-800 bg-slate-900">
             <button 
                 onClick={() => setFilter('all')}
-                className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors ${filter === 'all' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${filter === 'all' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
+                <Users size={16} />
                 جميع المستخدمين ({profiles.length})
             </button>
             <button 
                 onClick={() => setFilter('pending')}
                 className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${filter === 'pending' ? 'border-yellow-500 text-yellow-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
-                قيد الانتظار
+                <UserPlus size={16} />
+                طلبات الانضمام
                 {pendingCount > 0 && (
-                    <span className="bg-yellow-500 text-slate-900 text-[10px] px-1.5 py-0.5 rounded-full">{pendingCount}</span>
+                    <span className="bg-yellow-500 text-slate-900 text-[10px] px-2 py-0.5 rounded-full animate-pulse">{pendingCount}</span>
                 )}
             </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-0">
+        <div className="flex-1 overflow-auto p-0 bg-slate-900/50">
            {loading ? (
              <div className="flex items-center justify-center h-64">
                <Loader2 className="animate-spin text-purple-500 w-8 h-8" />

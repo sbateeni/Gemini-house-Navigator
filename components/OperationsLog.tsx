@@ -27,7 +27,9 @@ export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
              message: payload.new.message,
              type: payload.new.type,
              timestamp: payload.new.timestamp,
-             userId: payload.new.user_id
+             userId: payload.new.user_id,
+             governorate: payload.new.governorate,
+             center: payload.new.center
           };
           setLogs(prev => [newLog, ...prev].slice(0, 50)); 
         }
@@ -41,20 +43,20 @@ export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-[1000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden cursor-pointer hover:bg-slate-900 transition-colors group" 
+      className="fixed bottom-0 left-0 right-0 z-[1000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden cursor-pointer hover:bg-slate-900 transition-colors group shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" 
       dir="rtl"
       onClick={onExpand}
-      title="اضغط لتوسيع السجل"
+      title="اضغط لعرض السجل الكامل"
     >
-      <div className="bg-slate-900/50 px-2 py-1 rounded border border-slate-700 ml-4 flex items-center gap-2 shrink-0">
+      <div className="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 ml-4 flex items-center gap-2 shrink-0 shadow-lg">
          <Activity size={14} className="text-green-500 animate-pulse" />
          <span className="text-green-500 font-bold tracking-wider">سجل العمليات</span>
       </div>
       
-      <div className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-none flex items-center gap-6" ref={scrollRef}>
+      <div className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-none flex items-center gap-8 px-4" ref={scrollRef}>
          {logs.map(log => (
             <div key={log.id} className={`flex items-center gap-2 animate-in fade-in slide-in-from-left-4 shrink-0 ${log.type === 'alert' ? 'text-red-400' : 'text-slate-400'}`}>
-               <span className="text-slate-600">[{formatTime(log.timestamp)}]</span>
+               <span className="text-slate-600 font-mono">[{formatTime(log.timestamp)}]</span>
                {log.type === 'alert' && <AlertTriangle size={12} />}
                {log.type === 'dispatch' && <Radio size={12} className="text-purple-400" />}
                <span className={`font-bold ${log.type === 'alert' ? 'text-red-500 uppercase' : 'text-slate-300'}`}>
@@ -65,7 +67,7 @@ export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
          {logs.length === 0 && <span className="text-slate-600 italic">النظام جاهز. بانتظار الأحداث...</span>}
       </div>
 
-      <div className="mr-4 text-slate-600 group-hover:text-white transition-colors">
+      <div className="mr-4 text-slate-600 group-hover:text-blue-400 transition-colors p-2 bg-slate-900/50 rounded-full">
           <Maximize2 size={16} />
       </div>
     </div>
