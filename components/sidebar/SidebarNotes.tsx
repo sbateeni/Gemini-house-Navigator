@@ -1,8 +1,6 @@
 
-
-
 import React from 'react';
-import { MapIcon, BookOpen, MapPin, Edit3, Trash2, Navigation2, Loader2, Sparkles, CheckCircle2, XSquare } from 'lucide-react';
+import { MapIcon, BookOpen, MapPin, Edit3, Trash2, Navigation2, Loader2, Sparkles, CheckCircle2, XSquare, Search } from 'lucide-react';
 import { MapNote } from '../../types';
 
 interface SidebarNotesProps {
@@ -16,10 +14,13 @@ interface SidebarNotesProps {
   onNavigateToNote: (n: MapNote) => void;
   onAnalyzeNote: (n: MapNote) => void;
   onUpdateStatus: (id: string, s: 'caught' | 'not_caught') => void;
+  noteSearchQuery: string; // New Prop
+  setNoteSearchQuery: (q: string) => void; // New Prop
 }
 
 export const SidebarNotes: React.FC<SidebarNotesProps> = ({
-  notes, selectedNote, canCreate, isAnalyzing, onFlyToNote, onEditNote, onDeleteNote, onNavigateToNote, onAnalyzeNote, onUpdateStatus
+  notes, selectedNote, canCreate, isAnalyzing, onFlyToNote, onEditNote, onDeleteNote, onNavigateToNote, onAnalyzeNote, onUpdateStatus,
+  noteSearchQuery, setNoteSearchQuery
 }) => {
   const getStatusStyle = (status?: string) => {
     if (status === 'caught') return 'border-green-500/50 bg-green-900/10';
@@ -27,21 +28,46 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
     return '';
   };
 
+  // Filter Notes based on search query
+  const filteredNotes = notes.filter(note => 
+    note.locationName.toLowerCase().includes(noteSearchQuery.toLowerCase()) || 
+    note.userNote.toLowerCase().includes(noteSearchQuery.toLowerCase())
+  );
+
   return (
     <div className="mt-2">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-2 flex items-center justify-between">
-            <span>المواقع المسجلة ({notes.length})</span>
+            <span>المواقع المسجلة ({filteredNotes.length})</span>
             <MapIcon size={12} />
         </h3>
+
+        {/* Local Search Input */}
+        <div className="px-1 mb-3">
+            <div className="relative">
+                <input 
+                    type="text"
+                    value={noteSearchQuery}
+                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                    placeholder="فلترة القائمة..."
+                    className="w-full bg-slate-800/50 border border-slate-700/50 rounded-lg py-1.5 pr-8 pl-2 text-xs text-white placeholder-slate-500 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all text-right"
+                />
+                <Search className="absolute right-2.5 top-1.5 text-slate-500" size={12} />
+            </div>
+        </div>
         
         {notes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-600 opacity-60">
                 <BookOpen size={32} strokeWidth={1.5} />
                 <p className="text-xs mt-2">لا توجد ملاحظات مسجلة</p>
             </div>
+        ) : filteredNotes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 text-slate-600 opacity-60">
+                <Search size={24} strokeWidth={1.5} />
+                <p className="text-xs mt-2">لا توجد نتائج مطابقة</p>
+            </div>
         ) : (
             <div className="space-y-2 pb-20">
-                {notes.map(note => (
+                {filteredNotes.map(note => (
                     <div 
                         key={note.id}
                         onClick={() => onFlyToNote(note)}

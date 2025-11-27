@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser } from '../types';
 import { Wifi, WifiOff, XCircle } from 'lucide-react';
@@ -40,7 +38,7 @@ interface SidebarProps {
   myStatus: UnitStatus;
   setMyStatus: (s: UnitStatus) => void;
   onlineUsers: MapUser[]; 
-  currentUserId: string; // Passed for filtering self in list if needed
+  currentUserId: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -50,12 +48,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   myStatus, setMyStatus, onlineUsers, currentUserId
 }) => {
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
+  const [noteSearchQuery, setNoteSearchQuery] = useState(""); // New State for Note Search
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
 
-  // Fetch all profiles if admin (to show offline users too)
-  // Poll every minute to update last_seen statuses
   useEffect(() => {
     if (!isAdmin) return;
 
@@ -63,13 +60,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         db.getAllProfiles().then(setAllProfiles);
     };
 
-    fetchProfiles(); // Initial fetch
-    const interval = setInterval(fetchProfiles, 60000); // Poll every minute
+    fetchProfiles(); 
+    const interval = setInterval(fetchProfiles, 60000); 
 
     return () => clearInterval(interval);
   }, [isAdmin]);
 
-  // --- AUTO CLOSE LOGIC ---
   useEffect(() => {
     if (!isOpen) return;
     let inactivityTimer: ReturnType<typeof setTimeout>;
@@ -119,7 +115,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth pb-24 md:pb-4">
         
-        {/* Connection Status */}
         <div className="flex items-center justify-between px-2 mb-2">
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isConnected ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-red-900/20 text-red-400 border-red-900/30'}`}>
                 {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
@@ -150,6 +145,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onNavigateToNote={onNavigateToNote}
             onAnalyzeNote={onAnalyzeNote}
             onUpdateStatus={onUpdateStatus}
+            noteSearchQuery={noteSearchQuery} // Pass Query
+            setNoteSearchQuery={setNoteSearchQuery} // Pass Setter
         />
       </div>
       
