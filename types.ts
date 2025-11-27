@@ -37,8 +37,8 @@ export interface UserPermissions {
   can_navigate: boolean;
 }
 
-// Added 'admin' for backward compatibility
-export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'user' | 'banned';
+// Added 'officer' between center_admin and user
+export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'officer' | 'user' | 'banned';
 
 export interface UserProfile {
   id: string;

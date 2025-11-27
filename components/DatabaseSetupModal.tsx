@@ -86,6 +86,7 @@ drop policy if exists "Admin delete" on notes;
 create policy "Auth read" on notes for select using (auth.role() = 'authenticated');
 create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
 create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
+-- Admin Delete Policy: Includes Super, Gov, Center admins
 create policy "Admin delete" on notes for delete using (
   exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin'))
 );

@@ -72,9 +72,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                             value={user.role}
                             onChange={(e) => onUpdateRole(user, e.target.value as UserRole)}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm focus:border-purple-500 focus:outline-none"
-                            disabled={currentUserProfile?.role !== 'super_admin' && currentUserProfile?.role !== 'admin' && currentUserProfile?.role !== 'governorate_admin'} 
+                            disabled={currentUserProfile?.role !== 'super_admin' && currentUserProfile?.role !== 'admin' && currentUserProfile?.role !== 'governorate_admin' && currentUserProfile?.role !== 'center_admin'} 
                         >
                             <option value="user">عنصر</option>
+                            <option value="officer">ضابط</option>
+                            {/* Center Admin can modify users/officers, but cannot promote to center_admin usually, logic handles permissions above */}
                             <option value="center_admin">مدير مركز</option>
                             {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
                                 <>
