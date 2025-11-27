@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // Updated credentials for project: znktftvhkoxrmmucdgms

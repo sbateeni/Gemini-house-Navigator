@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { MapIcon, BookOpen, MapPin, Edit3, Trash2, Navigation2, Loader2, Sparkles, CheckCircle2, XSquare } from 'lucide-react';
 import { MapNote } from '../../types';

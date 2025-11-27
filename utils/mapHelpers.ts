@@ -1,4 +1,6 @@
 
+
+
 import { MapNote, MapUser } from '../types';
 
 export const createNoteIconHtml = (isSatellite: boolean) => `

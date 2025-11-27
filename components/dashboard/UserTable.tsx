@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { UserProfile } from '../../types';
 import { Wifi, WifiOff, MapPin, Building2, CheckCircle2, Settings, Ban } from 'lucide-react';

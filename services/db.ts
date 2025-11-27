@@ -1,4 +1,6 @@
 
+
+
 import { supabase } from './supabase';
 import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
 

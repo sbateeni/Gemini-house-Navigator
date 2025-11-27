@@ -1,4 +1,6 @@
 
+
+
 import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
 import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';

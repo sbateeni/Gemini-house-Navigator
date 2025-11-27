@@ -1,4 +1,6 @@
 
+
+
 import React, { useEffect, useRef } from 'react';
 import { MapUser } from '../../types';
 import { createUserIconHtml } from '../../utils/mapHelpers';

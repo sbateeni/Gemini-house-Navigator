@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, Send, User, MapPin } from 'lucide-react';
 import { MapNote, UserProfile } from '../types';

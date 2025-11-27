@@ -1,4 +1,6 @@
 
+
+
 import { useEffect, useRef, useState } from 'react';
 
 const DEFAULT_CENTER: [number, number] = [31.9522, 35.2332]; // Palestine

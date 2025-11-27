@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { X, Navigation, MapPin, User, Shield } from 'lucide-react';
 import { MapUser } from '../types';
