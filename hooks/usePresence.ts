@@ -1,6 +1,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabase';
+import { db } from '../services/db';
 import { MapUser, UnitStatus } from '../types';
 
 export function usePresence(
@@ -22,6 +23,20 @@ export function usePresence(
     }
     return colors[Math.abs(hash) % colors.length];
   };
+
+  // Heartbeat: Update "Last Seen" in DB every 5 minutes to keep session alive even if tab is backgrounded
+  useEffect(() => {
+      if (!session?.user?.id || !hasAccess) return;
+      
+      // Initial update
+      db.updateLastSeen(session.user.id);
+
+      const interval = setInterval(() => {
+          db.updateLastSeen(session.user.id);
+      }, 5 * 60 * 1000); // 5 minutes
+
+      return () => clearInterval(interval);
+  }, [session?.user?.id, hasAccess]);
 
   useEffect(() => {
     if (!session?.user?.id || !hasAccess) return;
@@ -47,8 +62,9 @@ export function usePresence(
 
         Object.values(newState).forEach((presences: any) => {
             presences.forEach((p: any) => {
-                // Don't include myself in the "other users" list
-                if (p.user_id !== userId && p.lat && p.lng) {
+                // Don't include myself in the "other users" list logic for map filtering later if needed
+                // But generally we want everyone in the list for the sidebar
+                if (p.lat && p.lng) {
                     users.push({
                         id: p.user_id,
                         username: p.username,

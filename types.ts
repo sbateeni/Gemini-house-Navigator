@@ -50,6 +50,7 @@ export interface UserProfile {
   // Hierarchy Fields
   governorate?: string;
   center?: string;
+  last_seen?: number; // Timestamp for background activity tracking
 }
 
 export type UnitStatus = 'patrol' | 'busy' | 'pursuit' | 'offline';

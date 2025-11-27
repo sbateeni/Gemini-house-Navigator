@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users } from 'lucide-react';
+import { Users, Clock } from 'lucide-react';
 import { MapUser, UserProfile } from '../../types';
 
 interface SidebarUnitsProps {
@@ -24,13 +24,22 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
   };
 
   const onlineIds = new Set(onlineUsers.map(u => u.id));
+  
+  // Sort users: Online > Background (30min) > Offline
   const sortedUsers = [...allProfiles].sort((a, b) => {
     const aOnline = onlineIds.has(a.id);
     const bOnline = onlineIds.has(b.id);
     if (aOnline && !bOnline) return -1;
     if (!aOnline && bOnline) return 1;
-    return 0;
+    
+    // If both offline, check last seen
+    const aLastSeen = a.last_seen || 0;
+    const bLastSeen = b.last_seen || 0;
+    return bLastSeen - aLastSeen;
   });
+
+  const now = Date.now();
+  const THIRTY_MINS = 30 * 60 * 1000;
 
   return (
     <div className="mb-4 space-y-1">
@@ -38,18 +47,31 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
             <span>حالة القوات ({onlineUsers.length} متصل)</span>
             <Users size={12} />
         </h3>
-        {sortedUsers.slice(0, 10).map(u => {
+        {sortedUsers.slice(0, 15).map(u => {
             const isOnline = onlineIds.has(u.id);
             const onlineUser = onlineUsers.find(ou => ou.id === u.id);
-            const status = onlineUser?.status || 'offline';
             
+            // Check if user is "In Background" (Not connected to WS, but last_seen < 30 mins ago)
+            const lastSeenDelta = now - (u.last_seen || 0);
+            const isBackground = !isOnline && lastSeenDelta < THIRTY_MINS;
+            
+            let status = isOnline ? (onlineUser?.status || 'patrol') : 'offline';
+            let dotColor = isOnline ? statusColors[status] : isBackground ? 'bg-orange-500' : 'bg-red-500';
+            let textColor = isOnline ? 'text-slate-200' : isBackground ? 'text-orange-200' : 'text-slate-500';
+            let bgColor = isOnline ? 'bg-slate-800/40' : isBackground ? 'bg-orange-900/10' : 'bg-red-900/5';
+            let borderColor = isOnline ? 'border-slate-700/50' : isBackground ? 'border-orange-900/30' : 'border-red-900/20';
+
             return (
-                <div key={u.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/50">
+                <div key={u.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${bgColor} ${borderColor}`}>
                         <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${isOnline ? statusColors[status] || 'bg-slate-500' : 'bg-slate-500'} ${isOnline ? 'animate-pulse' : ''}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${dotColor} ${isOnline ? 'animate-pulse' : ''}`}></div>
                         <div className="flex flex-col">
-                            <span className={`text-xs font-bold ${isOnline ? 'text-slate-200' : 'text-slate-500'}`}>{u.username}</span>
-                            {isOnline && <span className="text-[9px] text-slate-500">{statusLabels[status]}</span>}
+                            <span className={`text-xs font-bold ${textColor}`}>{u.username}</span>
+                            <div className="flex items-center gap-1">
+                                {isOnline && <span className="text-[9px] text-slate-500">{statusLabels[status]}</span>}
+                                {isBackground && <span className="text-[9px] text-orange-400 flex items-center gap-0.5"><Clock size={8} /> نشط مؤخراً</span>}
+                                {!isOnline && !isBackground && <span className="text-[9px] text-red-900/50">غائب</span>}
+                            </div>
                         </div>
                         </div>
                 </div>

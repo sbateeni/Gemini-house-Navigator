@@ -193,7 +193,8 @@ export const db = {
         email: data.email,
         permissions: data.permissions || DEFAULT_PERMISSIONS,
         governorate: data.governorate,
-        center: data.center
+        center: data.center,
+        last_seen: data.last_seen
       };
     } catch (error) {
       return null;
@@ -238,7 +239,8 @@ export const db = {
         email: row.email,
         permissions: row.permissions || DEFAULT_PERMISSIONS,
         governorate: row.governorate,
-        center: row.center
+        center: row.center,
+        last_seen: row.last_seen
       }));
     } catch (error) {
       return [];
@@ -259,6 +261,10 @@ export const db = {
     } catch (error) {
       throw error;
     }
+  },
+
+  async updateLastSeen(userId: string): Promise<void> {
+      await supabase.from('profiles').update({ last_seen: Date.now() }).eq('id', userId);
   },
 
   async createAssignment(assignment: Omit<Assignment, 'id' | 'createdAt' | 'status'>): Promise<void> {

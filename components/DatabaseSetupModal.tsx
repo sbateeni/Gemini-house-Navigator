@@ -15,10 +15,14 @@ create table if not exists profiles (
   is_approved boolean default false,
   email text,
   permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true}'::jsonb,
-  governorate text, -- المحافظة
-  center text,      -- المركز
+  governorate text,
+  center text,
+  last_seen bigint, -- New column for background activity tracking
   primary key (id)
 );
+
+-- Update existing table
+alter table profiles add column if not exists last_seen bigint;
 
 -- 2. Enable Security on Profiles
 alter table profiles enable row level security;
@@ -79,7 +83,6 @@ drop policy if exists "Auth insert" on notes;
 drop policy if exists "Auth update" on notes;
 drop policy if exists "Admin delete" on notes;
 
--- Simple RLS for now, detailed filtering handled in app logic for speed
 create policy "Auth read" on notes for select using (auth.role() = 'authenticated');
 create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
 create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
@@ -156,13 +159,13 @@ create policy "Create logs" on logs for insert with check (auth.role() = 'authen
     <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex items-start gap-4">
-          <div className="p-3 bg-red-900/20 rounded-xl border border-red-900/50">
-            <ShieldAlert className="text-red-500 w-8 h-8" />
+          <div className="p-3 bg-purple-900/20 rounded-xl border border-purple-900/50">
+            <Database className="text-purple-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">تحديث النظام مطلوب: جدول السجلات</h1>
+            <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
             <p className="text-slate-400 text-sm">
-              التطبيق يحتاج لإنشاء جدول <span className="text-purple-400 font-bold mx-1">logs</span> لدعم شريط الأحداث ونظام SOS.
+              تم إضافة ميزات جديدة (تتبع النشاط في الخلفية). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">profiles</span>.
             </p>
           </div>
         </div>

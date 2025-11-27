@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { offlineMaps } from '../../services/offlineMaps';
 
 export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, isSatellite: boolean) {

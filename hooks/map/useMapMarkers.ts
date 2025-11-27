@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
 import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';
 
@@ -20,7 +20,7 @@ export function useMapMarkers(
   const userMarkerRef = useRef<any>(null);
   const hasInitialFlownToUserRef = useRef(false);
 
-  // Refs to keep closures fresh for popup events
+  // Use refs for data access inside event listener closures
   const notesRef = useRef(notes);
   const onNavigateRef = useRef(onNavigate);
   const onDispatchRef = useRef(onDispatch);
@@ -31,45 +31,35 @@ export function useMapMarkers(
     onDispatchRef.current = onDispatch;
   }, [notes, onNavigate, onDispatch]);
 
-  // 1. Setup Popup Event Delegation (Run once when map is ready)
+  // 1. Setup Global Event Listeners for Popup Buttons
+  // This replaces the fragile Leaflet 'popupopen' DOM traversal
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current;
+      const handleNavigate = (e: any) => {
+          const noteId = e.detail;
+          const note = notesRef.current.find(n => n.id === noteId);
+          if (note && onNavigateRef.current) {
+              onNavigateRef.current(note);
+              mapInstanceRef.current?.closePopup();
+          }
+      };
 
-    const handlePopupOpen = (e: any) => {
-         const popupNode = e.popup._contentNode;
-         if (!popupNode) return;
-         
-         const navBtn = popupNode.querySelector('.btn-navigate');
-         if (navBtn) {
-            navBtn.onclick = (evt: any) => {
-                evt.stopPropagation();
-                const noteId = navBtn.getAttribute('data-id');
-                const note = notesRef.current.find((n: MapNote) => n.id === noteId);
-                if (note && onNavigateRef.current) {
-                    onNavigateRef.current(note);
-                    map.closePopup();
-                }
-            };
-         }
-         
-         const dispatchBtn = popupNode.querySelector('.btn-dispatch');
-         if (dispatchBtn) {
-            dispatchBtn.onclick = (evt: any) => {
-                evt.stopPropagation();
-                const noteId = dispatchBtn.getAttribute('data-id');
-                const note = notesRef.current.find((n: MapNote) => n.id === noteId);
-                if (note && onDispatchRef.current) {
-                    onDispatchRef.current(note);
-                    map.closePopup();
-                }
-            };
-         }
-    };
+      const handleDispatch = (e: any) => {
+          const noteId = e.detail;
+          const note = notesRef.current.find(n => n.id === noteId);
+          if (note && onDispatchRef.current) {
+              onDispatchRef.current(note);
+              mapInstanceRef.current?.closePopup();
+          }
+      };
 
-    map.on('popupopen', handlePopupOpen);
-    return () => { map.off('popupopen', handlePopupOpen); };
-  }, [mapInstanceRef.current]);
+      window.addEventListener('map-navigate', handleNavigate);
+      window.addEventListener('map-dispatch', handleDispatch);
+
+      return () => {
+          window.removeEventListener('map-navigate', handleNavigate);
+          window.removeEventListener('map-dispatch', handleDispatch);
+      };
+  }, []); // Run once to attach global listeners
 
   // 2. Render Note Markers
   useEffect(() => {
