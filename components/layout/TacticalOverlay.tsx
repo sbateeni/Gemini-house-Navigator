@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { SOSButton } from '../SOSButton';
-import { NotificationBell } from '../NotificationBell';
 import { OperationsLog } from '../OperationsLog';
 import { PlaneView } from '../PlaneView';
 import { SOSAlertOverlay } from '../SOSAlertOverlay';
@@ -10,18 +9,16 @@ import { Assignment, MapUser } from '../../types';
 interface TacticalOverlayProps {
   isSOS: boolean;
   onToggleSOS: () => void;
-  assignments: Assignment[];
+  assignments: Assignment[]; // Kept for interface compatibility but not used for bell here
   onAcceptAssignment: (assignment: Assignment) => void;
   onExpandLogs: () => void;
-  distressedUser?: MapUser; // The user sending SOS (if any)
+  distressedUser?: MapUser;
   onLocateSOS?: () => void;
 }
 
 export const TacticalOverlay: React.FC<TacticalOverlayProps> = ({
   isSOS,
   onToggleSOS,
-  assignments,
-  onAcceptAssignment,
   onExpandLogs,
   distressedUser,
   onLocateSOS
@@ -36,17 +33,13 @@ export const TacticalOverlay: React.FC<TacticalOverlayProps> = ({
         <SOSAlertOverlay sosUser={distressedUser} onLocate={onLocateSOS} />
       )}
 
-      {/* HUD Elements */}
-      <NotificationBell 
-        assignments={assignments}
-        onAccept={onAcceptAssignment}
-      />
-      
+      {/* Floating Action Buttons */}
       <SOSButton 
         isActive={isSOS}
         onToggle={onToggleSOS}
       />
       
+      {/* Bottom Ticker */}
       <OperationsLog onExpand={onExpandLogs} />
     </>
   );

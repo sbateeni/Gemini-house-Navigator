@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
-import { identifyLocation } from '../services/gemini';
-import { searchLocation } from '../services/search'; // Switched to OSM Search
+import { searchPlace, identifyLocation } from '../services/gemini';
 
 // Hooks
 import { useAuth } from './useAuth';
@@ -37,23 +36,52 @@ export function useAppLogic() {
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
   const { userLocation } = useGeolocation(session, hasAccess);
-  const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
-  // --- 4. Feature Hooks ---
-  const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
+  // --- 4. Navigation Hook ---
   const { 
     currentRoute, secondaryRoute, setSecondaryRoute, calculateRoute, isRouting, 
     handleNavigateToNote, handleNavigateToPoint, handleStopNavigation, clearSecondaryRoute
   } = useNavigation(userLocation);
 
-  // --- 5. Local UI State ---
+  // Local UI State for FlyTo
+  const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
+
+  // --- 5. Assignments Logic ---
+  // Define callback first
+  const handleIncomingAssignment = useCallback((assignment: Assignment) => {
+      // Logic: If I am the target, I get the alert.
+      // If I am a basic 'user', I auto-accept and navigate.
+      playSiren();
+      setTimeout(() => stopSiren(), 3000);
+
+      if (userRole === 'user' || userRole === 'officer') {
+          // Auto-Dispatch for units
+          handleNavigateToPoint(assignment.lat, assignment.lng);
+          setFlyToTarget({ 
+              lat: assignment.lat, 
+              lng: assignment.lng, 
+              zoom: 16, 
+              timestamp: Date.now() 
+          });
+          alert(`⚠️ أمر عمليات عاجل: ${assignment.locationName}\nالتعليمات: ${assignment.instructions || 'توجه للموقع فوراً'}`);
+      } else {
+          // Admins just get the notification bell badge sound
+          // Optional: Show toast
+      }
+  }, [userRole, playSiren, stopSiren]); // Add dependencies if needed, handleNavigateToPoint is stable?
+
+  const { assignments, acceptAssignment } = useAssignments(session?.user?.id, handleIncomingAssignment);
+  
+  // --- 6. Feature Hooks ---
+  const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
+
+  // --- 7. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isSatellite, setIsSatellite] = useState(() => localStorage.getItem('gemini_map_mode') === 'satellite');
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [flyToTarget, setFlyToTarget] = useState<{lat: number, lng: number, zoom?: number, timestamp: number, showPulse?: boolean} | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
   // Modal States
@@ -70,13 +98,13 @@ export function useAppLogic() {
   // Find Distressed User (Someone else who triggered SOS)
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
 
-  // --- 6. Form Logic Hook ---
+  // --- 8. Form Logic Hook ---
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
       handleMapClick, handleEditNote, handleSaveNote, closeModal 
   } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen, userProfile);
 
-  // --- 7. Effects & Handlers ---
+  // --- 9. Effects & Handlers ---
   
   useEffect(() => {
     const handleResize = () => setSidebarOpen(window.innerWidth >= 768);
@@ -102,7 +130,7 @@ export function useAppLogic() {
     }
   }, [myStatus, session?.user?.id]);
 
-  // SOS Sound Logic (Trigger if I am SOS OR someone else is SOS)
+  // SOS Sound Logic
   useEffect(() => {
     if (isSOS || distressedUser) {
         playSiren();
@@ -120,7 +148,6 @@ export function useAppLogic() {
         return;
     }
 
-    // Define success handler
     const onSuccess = (pos: GeolocationPosition) => {
         const { latitude, longitude } = pos.coords;
         setFlyToTarget({ 
@@ -129,19 +156,16 @@ export function useAppLogic() {
         setIsLocating(false);
     };
 
-    // Define error handler for Low Accuracy fallback
     const onLowAccError = (err: GeolocationPositionError) => {
         console.error("GPS Fallback failed:", err);
         alert("تعذر تحديد الموقع. الرجاء التحقق من إعدادات GPS.");
         setIsLocating(false);
     };
 
-    // 1. Try High Accuracy first
     navigator.geolocation.getCurrentPosition(
         onSuccess,
         (err) => {
             console.warn("High accuracy GPS failed, trying low accuracy...", err);
-            // 2. Fallback to Low Accuracy (Wifi/Cell) - Fixes Safari/Indoor timeout issues
             navigator.geolocation.getCurrentPosition(
                 onSuccess,
                 onLowAccError,
@@ -186,18 +210,13 @@ export function useAppLogic() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    
-    // Use the new OSM Search Service
-    const result = await searchLocation(searchQuery);
-    
+    const result = await searchPlace(searchQuery);
     setIsSearching(false);
     if (result) {
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
       handleStopNavigation();
       if (window.innerWidth < 768) setSidebarOpen(false);
-    } else {
-      alert("لم يتم العثور على الموقع. حاول كتابة اسم المدينة أو المنطقة.");
     }
   };
 
@@ -308,25 +327,6 @@ export function useAppLogic() {
     acceptAssignment(assignment.id);
     handleNavigateToPoint(assignment.lat, assignment.lng);
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
-  };
-
-  // Auto-Dispatch Logic for Users
-  const handleIncomingAssignment = (assignment: Assignment) => {
-      // If I am a normal user (not admin), auto-accept and navigate
-      if (userRole === 'user') {
-          playSiren(); // Brief alert sound
-          setTimeout(() => stopSiren(), 2000);
-          
-          acceptAssignment(assignment.id);
-          handleNavigateToPoint(assignment.lat, assignment.lng);
-          setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
-          
-          alert("⚠️ أمر عمليات عاجل: تم بدء التوجيه للموقع المستهدف.");
-      } else {
-          // Admins/Commanders get notified via the bell/log, no auto-nav
-          playSiren();
-          setTimeout(() => stopSiren(), 1000);
-      }
   };
 
   return {

@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, GroundingSource } from '../types';
 
@@ -11,7 +10,45 @@ const getClient = () => {
   return client;
 };
 
-// NOTE: Search functionality has been moved to services/search.ts using OpenStreetMap
+export const searchPlace = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
+  const ai = getClient();
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: 'user',
+        parts: [{ text: `
+          Find the geographic location for: "${query}" using Google Maps.
+          Return ONLY a valid JSON object with these keys:
+          - "lat": number (latitude)
+          - "lng": number (longitude)
+          - "name": string (the official name of the place found)
+          
+          Do not include markdown formatting or explanations. Just the JSON.
+        ` }]
+      }],
+      config: {
+        tools: [{ googleMaps: {} }],
+        // Note: responseMimeType is not allowed with tools, so we parse manually
+      }
+    });
+
+    let text = response.text || "{}";
+    // Clean up markdown if present
+    text = text.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+    
+    const data = JSON.parse(text);
+    
+    if (data.lat && data.lng) {
+      return { lat: data.lat, lng: data.lng, name: data.name || query };
+    }
+    return null;
+
+  } catch (error) {
+    console.error("Search Error:", error);
+    return null;
+  }
+};
 
 export const identifyLocation = async (
   lat: number, 
@@ -27,11 +64,14 @@ export const identifyLocation = async (
         {
           role: 'user',
           parts: [{ text: `
-            I am at coordinates: ${lat}, ${lng}.
-            My note: "${userNote}".
+            I am creating a map journal entry at coordinates: ${lat}, ${lng}.
+            My personal note is: "${userNote}".
             
-            Identify this place and provide a short, tactical description relevant to operations.
-            Return valid JSON only: { "name": "string", "details": "string" }
+            Using Google Maps data:
+            1. Identify the specific name of this location (Business, Park, Landmark, or Address).
+            2. Provide a rich, interesting description of what is here, combining my note with real-world facts.
+            
+            Format the response as a simple JSON object with keys: 'name' (string) and 'details' (string).
           ` }]
         }
       ],
@@ -46,9 +86,9 @@ export const identifyLocation = async (
     });
 
     let text = response.text || "{}";
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) text = jsonMatch[0];
+    if (text.trim().startsWith("```")) {
+      text = text.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+    }
 
     let data = { name: "Unknown Location", details: "No data available." };
     
@@ -56,7 +96,7 @@ export const identifyLocation = async (
       data = JSON.parse(text);
     } catch (e) {
       console.error("Failed to parse JSON", e);
-      data.details = response.text || "Analysis failed."; 
+      data.details = text; 
     }
 
     const sources: GroundingSource[] = [];

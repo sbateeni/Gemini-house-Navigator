@@ -83,6 +83,7 @@ export default function App() {
         myStatus={myStatus}
         setMyStatus={setMyStatus}
         onlineUsers={onlineUsers}
+        currentUserId={session.user.id}
       />
 
       <div className="flex-1 relative w-full h-full">
@@ -129,6 +130,8 @@ export default function App() {
           setIsSatellite={setIsSatellite}
           onLocateUser={locateUser}
           isLocating={isLocating}
+          assignments={assignments}
+          onAcceptAssignment={handleAcceptAssignment}
         />
 
         <ModalContainer
