@@ -18,7 +18,7 @@ export default function App() {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
     notes, isConnected, tableMissing, updateStatus,
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
-    onlineUsers, userLocation,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser,
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
@@ -92,6 +92,8 @@ export default function App() {
           assignments={assignments}
           onAcceptAssignment={handleAcceptAssignment}
           onExpandLogs={() => setShowFullLogs(true)}
+          distressedUser={distressedUser}
+          onLocateSOS={handleLocateSOSUser}
         />
 
         <LeafletMap 

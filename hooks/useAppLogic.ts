@@ -66,6 +66,9 @@ export function useAppLogic() {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dispatchTargetLocation, setDispatchTargetLocation] = useState<MapNote | null>(null);
 
+  // Find Distressed User (Someone else who triggered SOS)
+  const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
+
   // --- 6. Form Logic Hook ---
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
@@ -98,15 +101,15 @@ export function useAppLogic() {
     }
   }, [myStatus, session?.user?.id]);
 
-  // SOS Sound Logic
+  // SOS Sound Logic (Trigger if I am SOS OR someone else is SOS)
   useEffect(() => {
-    if (isSOS) {
+    if (isSOS || distressedUser) {
         playSiren();
     } else {
         stopSiren();
     }
     return () => stopSiren();
-  }, [isSOS, playSiren, stopSiren]);
+  }, [isSOS, distressedUser, playSiren, stopSiren]);
 
   const locateUser = () => {
     setIsLocating(true);
@@ -163,6 +166,19 @@ export function useAppLogic() {
              center: userProfile?.center
          });
      }
+  };
+
+  const handleLocateSOSUser = () => {
+      if (distressedUser) {
+          handleNavigateToPoint(distressedUser.lat, distressedUser.lng);
+          setFlyToTarget({ 
+              lat: distressedUser.lat, 
+              lng: distressedUser.lng, 
+              zoom: 17, 
+              timestamp: Date.now(),
+              showPulse: true 
+          });
+      }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -288,6 +304,25 @@ export function useAppLogic() {
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
   };
 
+  // Auto-Dispatch Logic for Users
+  const handleIncomingAssignment = (assignment: Assignment) => {
+      // If I am a normal user (not admin), auto-accept and navigate
+      if (userRole === 'user') {
+          playSiren(); // Brief alert sound
+          setTimeout(() => stopSiren(), 2000);
+          
+          acceptAssignment(assignment.id);
+          handleNavigateToPoint(assignment.lat, assignment.lng);
+          setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
+          
+          alert("⚠️ أمر عمليات عاجل: تم بدء التوجيه للموقع المستهدف.");
+      } else {
+          // Admins/Commanders get notified via the bell/log, no auto-nav
+          playSiren();
+          setTimeout(() => stopSiren(), 1000);
+      }
+  };
+
   return {
     // Auth
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
@@ -295,7 +330,7 @@ export function useAppLogic() {
     notes, isConnected, tableMissing, updateStatus,
     // Tactical
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
-    onlineUsers, userLocation,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser,
     // Navigation
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
     // UI State
