@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
-import { searchPlace, identifyLocation } from '../services/gemini';
+import { identifyLocation } from '../services/gemini';
+import { searchLocation } from '../services/search'; // Switched to OSM Search
 
 // Hooks
 import { useAuth } from './useAuth';
@@ -185,13 +186,18 @@ export function useAppLogic() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    const result = await searchPlace(searchQuery);
+    
+    // Use the new OSM Search Service
+    const result = await searchLocation(searchQuery);
+    
     setIsSearching(false);
     if (result) {
       setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
       setSearchQuery("");
       handleStopNavigation();
       if (window.innerWidth < 768) setSidebarOpen(false);
+    } else {
+      alert("لم يتم العثور على الموقع. حاول كتابة اسم المدينة أو المنطقة.");
     }
   };
 
