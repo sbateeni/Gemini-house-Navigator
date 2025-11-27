@@ -115,20 +115,36 @@ export function useAppLogic() {
         setIsLocating(false);
         return;
     }
+
+    // Define success handler
+    const onSuccess = (pos: GeolocationPosition) => {
+        const { latitude, longitude } = pos.coords;
+        setFlyToTarget({ 
+            lat: latitude, lng: longitude, zoom: 17, timestamp: Date.now() 
+        });
+        setIsLocating(false);
+    };
+
+    // Define error handler for Low Accuracy fallback
+    const onLowAccError = (err: GeolocationPositionError) => {
+        console.error("GPS Fallback failed:", err);
+        alert("تعذر تحديد الموقع. الرجاء التحقق من إعدادات GPS.");
+        setIsLocating(false);
+    };
+
+    // 1. Try High Accuracy first
     navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const { latitude, longitude } = pos.coords;
-            setFlyToTarget({ 
-                lat: latitude, lng: longitude, zoom: 17, timestamp: Date.now() 
-            });
-            setIsLocating(false);
-        },
+        onSuccess,
         (err) => {
-            console.error(err);
-            alert("تعذر تحديد الموقع الحالي. تأكد من تفعيل GPS.");
-            setIsLocating(false);
+            console.warn("High accuracy GPS failed, trying low accuracy...", err);
+            // 2. Fallback to Low Accuracy (Wifi/Cell) - Fixes Safari/Indoor timeout issues
+            navigator.geolocation.getCurrentPosition(
+                onSuccess,
+                onLowAccError,
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 }
+            );
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
 

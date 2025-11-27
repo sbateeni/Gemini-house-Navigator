@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 
 export function useGeolocation(session: any, isApproved: boolean) {
@@ -17,8 +18,8 @@ export function useGeolocation(session: any, isApproved: boolean) {
             (err) => console.log("Location access denied or error", err),
             { 
               enableHighAccuracy: true,
-              maximumAge: 0,
-              timeout: 15000
+              maximumAge: 10000, // Accept positions up to 10s old (Fixes Safari flickering)
+              timeout: 20000     // Wait 20s before timing out
             }
         );
         return () => navigator.geolocation.clearWatch(watchId);
