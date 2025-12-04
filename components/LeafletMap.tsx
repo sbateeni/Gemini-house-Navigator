@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
 import { useMapInstance } from '../hooks/map/useMapInstance';
@@ -17,6 +15,7 @@ declare global {
 
 interface LeafletMapProps {
   isSatellite: boolean;
+  mapProvider: string; // New Prop
   notes: MapNote[];
   selectedNote: MapNote | null;
   setSelectedNote: (note: MapNote | null) => void;
@@ -32,14 +31,12 @@ interface LeafletMapProps {
   onNavigate?: (note: MapNote) => void;
   onDispatch?: (note: MapNote) => void;
   userRole?: string | null;
-  currentUserId?: string; // Passed but used in filtering inside parent before passing otherUsers usually, or we filter here if needed. 
-  // Note: The filtering was moved to LeafletMap props in App.tsx previously (currentUserId logic), 
-  // but hooks/usePresence.ts in this version returns all users. 
-  // We will handle filtering in useMapUsers if `currentUserId` is passed, or rely on App.tsx logic.
+  currentUserId?: string; 
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
   isSatellite,
+  mapProvider, // Used here
   notes,
   selectedNote,
   setSelectedNote,
@@ -60,8 +57,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   // 1. Initialize Map
   const { mapContainerRef, mapInstanceRef } = useMapInstance(onMapClick);
 
-  // 2. Manage Tile Layers (Satellite/Street/Offline)
-  useMapTiles(mapInstanceRef, isSatellite);
+  // 2. Manage Tile Layers (Google/Esri/OSM/Dark)
+  useMapTiles(mapInstanceRef, mapProvider);
 
   // 3. Manage Markers (Notes, Temp, Self)
   useMapMarkers(
@@ -75,7 +72,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     onNavigate, 
     onDispatch, 
     userRole, 
-    isSatellite
+    isSatellite // Keep logic for marker colors based on general type
   );
 
   // Filter out self from otherUsers if currentUserId is provided to avoid duplicate markers

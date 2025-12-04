@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import { CreateNoteModal } from './CreateNoteModal';
 import { AdminDashboard } from './AdminDashboard';
@@ -33,8 +31,8 @@ interface ModalContainerProps {
   closeSettings: () => void;
   user: any;
   userRole: UserRole | null;
-  isSatellite: boolean;
-  setIsSatellite: (val: boolean) => void;
+  mapProvider: string;
+  setMapProvider: (val: string) => void;
 
   // Tactical Command Props
   commandUser: MapUser | null;
@@ -76,8 +74,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeSettings,
   user,
   userRole,
-  isSatellite,
-  setIsSatellite,
+  mapProvider,
+  setMapProvider,
   commandUser,
   closeCommandUser,
   onIntercept,
@@ -118,8 +116,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         onClose={closeSettings}
         user={user}
         userRole={userRole}
-        isSatellite={isSatellite}
-        setIsSatellite={setIsSatellite}
+        mapProvider={mapProvider}
+        setMapProvider={setMapProvider}
       />
 
       <UserCommandModal 

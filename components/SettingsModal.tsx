@@ -1,8 +1,6 @@
 
-
-
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle, Trash2, Database, AlertTriangle } from 'lucide-react';
+import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -11,8 +9,8 @@ interface SettingsModalProps {
   onClose: () => void;
   user: any; 
   userRole: UserRole | null;
-  isSatellite: boolean;
-  setIsSatellite: (isSat: boolean) => void;
+  mapProvider: string;
+  setMapProvider: (provider: string) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -20,8 +18,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   user,
   userRole,
-  isSatellite,
-  setIsSatellite
+  mapProvider,
+  setMapProvider
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -67,6 +65,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
   };
 
+  const providers = [
+      { id: 'google', name: 'Google Hybrid', desc: 'أقمار صناعية + شوارع (دقة عالية)', icon: Globe, color: 'blue' },
+      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (دقة متوسطة)', icon: Globe, color: 'cyan' },
+      { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي', icon: Layers, color: 'slate' },
+      { id: 'osm', name: 'OpenStreetMap', desc: 'خريطة شوارع قياسية', icon: Map, color: 'green' },
+  ];
+
   return (
     <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -104,28 +109,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
-          {/* Preferences Section */}
+          {/* Map Provider Section */}
           <section>
-            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">نمط العرض</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button 
-                onClick={() => setIsSatellite(false)}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${!isSatellite ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
-              >
-                <Map size={24} />
-                <span className="font-medium">خريطة شوارع</span>
-              </button>
-              
-              <button 
-                onClick={() => setIsSatellite(true)}
-                className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${isSatellite ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'}`}
-              >
-                <div className="relative">
-                  <Globe size={24} />
-                  <Layers size={14} className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5" />
-                </div>
-                <span className="font-medium">أقمار صناعية</span>
-              </button>
+            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
+            <div className="space-y-2">
+                {providers.map(p => (
+                    <button
+                        key={p.id}
+                        onClick={() => setMapProvider(p.id)}
+                        className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
+                    >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 text-${p.color}-400`}`}>
+                            <p.icon size={20} />
+                        </div>
+                        <div className="text-right flex-1">
+                            <div className={`font-bold ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
+                            <div className="text-xs text-slate-400">{p.desc}</div>
+                        </div>
+                        {mapProvider === p.id && <CheckCircle2 className="text-blue-500" size={20} />}
+                    </button>
+                ))}
             </div>
           </section>
 

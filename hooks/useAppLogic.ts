@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
@@ -50,7 +48,15 @@ export function useAppLogic() {
   // --- 5. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
-  const [isSatellite, setIsSatellite] = useState(() => localStorage.getItem('gemini_map_mode') === 'satellite');
+  
+  // Map Provider Logic
+  const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('gemini_map_provider') || 'google');
+  // Derived state for backward compatibility with UI components relying on simple boolean
+  const isSatellite = mapProvider === 'google' || mapProvider === 'esri';
+  const setIsSatellite = (val: boolean) => {
+      // Toggle between default satellite (google) and default dark (carto)
+      setMapProvider(val ? 'google' : 'carto');
+  };
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -86,8 +92,8 @@ export function useAppLogic() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('gemini_map_mode', isSatellite ? 'satellite' : 'street');
-  }, [isSatellite]);
+    localStorage.setItem('gemini_map_provider', mapProvider);
+  }, [mapProvider]);
 
   // Log Status Changes
   useEffect(() => {
@@ -338,7 +344,7 @@ export function useAppLogic() {
     // Navigation
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
     // UI State
-    sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite,
+    sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     // Search & FlyTo
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
     // Note Actions

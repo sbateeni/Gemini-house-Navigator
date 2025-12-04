@@ -20,7 +20,7 @@ export default function App() {
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser,
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
-    sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite,
+    sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
     selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote, handleDeleteNote, isAnalyzing,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
@@ -97,6 +97,7 @@ export default function App() {
 
         <LeafletMap 
           isSatellite={isSatellite}
+          mapProvider={mapProvider}
           notes={notes}
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
@@ -151,8 +152,8 @@ export default function App() {
             closeSettings={() => setShowSettings(false)}
             user={session.user}
             userRole={userRole}
-            isSatellite={isSatellite}
-            setIsSatellite={setIsSatellite}
+            mapProvider={mapProvider}
+            setMapProvider={setMapProvider}
             
             commandUser={commandUser}
             closeCommandUser={() => setCommandUser(null)}

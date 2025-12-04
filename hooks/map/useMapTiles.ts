@@ -1,10 +1,8 @@
 
-
-
 import React, { useEffect } from 'react';
 import { offlineMaps } from '../../services/offlineMaps';
 
-export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, isSatellite: boolean) {
+export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProvider: string) {
   useEffect(() => {
     if (!mapInstanceRef.current || !window.L) return;
     
@@ -34,25 +32,44 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, isSatel
         }
     });
 
-    if (isSatellite) {
-      const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
-      });
-      const labels = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
-      });
-      const transport = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
-      });
-      layerGroup.addLayer(imagery);
-      layerGroup.addLayer(transport);
-      layerGroup.addLayer(labels);
+    if (mapProvider === 'google') {
+       // Google Hybrid (Satellite + Labels) - High Zoom (up to 22)
+       const googleHybrid = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+         maxZoom: 22,
+         subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+         attribution: 'Google Maps'
+       });
+       layerGroup.addLayer(googleHybrid);
+       
+    } else if (mapProvider === 'esri') {
+       // Esri Satellite (Current Default)
+       const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+         maxZoom: 19,
+         attribution: 'Esri'
+       });
+       const labels = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+         maxZoom: 19
+       });
+       layerGroup.addLayer(imagery);
+       layerGroup.addLayer(labels);
+
+    } else if (mapProvider === 'osm') {
+       // OpenStreetMap (Standard Streets)
+       const osm = new OfflineTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+         maxZoom: 19,
+         attribution: '© OpenStreetMap contributors'
+       });
+       layerGroup.addLayer(osm);
+
     } else {
+       // Carto Dark (Tactical Default)
        const darkLayer = new OfflineTileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 20
-      });
-      layerGroup.addLayer(darkLayer);
+         subdomains: 'abcd',
+         maxZoom: 20,
+         attribution: 'CartoDB'
+       });
+       layerGroup.addLayer(darkLayer);
     }
-  }, [isSatellite, mapInstanceRef.current]); // Re-run when satellite mode changes
+
+  }, [mapProvider, mapInstanceRef.current]); 
 }
