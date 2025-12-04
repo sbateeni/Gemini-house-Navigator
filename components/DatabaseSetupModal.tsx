@@ -17,12 +17,16 @@ create table if not exists profiles (
   permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb,
   governorate text,
   center text,
-  last_seen bigint, -- New column for background activity tracking
+  last_seen bigint, 
+  lat float8, -- New: Store last known latitude
+  lng float8, -- New: Store last known longitude
   primary key (id)
 );
 
 -- Update existing table
 alter table profiles add column if not exists last_seen bigint;
+alter table profiles add column if not exists lat float8;
+alter table profiles add column if not exists lng float8;
 
 -- 2. Enable Security on Profiles
 alter table profiles enable row level security;
@@ -171,7 +175,7 @@ create policy "Admin delete logs" on logs for delete using (
           <div>
             <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
             <p className="text-slate-400 text-sm">
-              تم إضافة ميزات جديدة (تتبع النشاط في الخلفية). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">profiles</span>.
+              تم إضافة ميزات جديدة (حفظ الموقع الأخير). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">profiles</span>.
             </p>
           </div>
         </div>

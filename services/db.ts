@@ -250,6 +250,24 @@ export const db = {
     }
   },
 
+  // Updated to include fetching users active in the last X minutes
+  async getRecentlyActiveUsers(minutes: number = 20): Promise<any[]> {
+    try {
+      const cutoff = Date.now() - (minutes * 60 * 1000);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, last_seen, lat, lng, role')
+        .gt('last_seen', cutoff)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null);
+
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
+    }
+  },
+
   async updateProfile(id: string, updates: Partial<UserProfile>): Promise<void> {
     try {
       const dbUpdates: any = {};
@@ -266,8 +284,13 @@ export const db = {
     }
   },
 
-  async updateLastSeen(userId: string): Promise<void> {
-      await supabase.from('profiles').update({ last_seen: Date.now() }).eq('id', userId);
+  // Updated to save location data
+  async updateLastSeen(userId: string, lat?: number, lng?: number): Promise<void> {
+      const updates: any = { last_seen: Date.now() };
+      if (lat !== undefined) updates.lat = lat;
+      if (lng !== undefined) updates.lng = lng;
+      
+      await supabase.from('profiles').update(updates).eq('id', userId);
   },
 
   async createAssignment(assignment: Omit<Assignment, 'id' | 'createdAt' | 'status'>): Promise<void> {

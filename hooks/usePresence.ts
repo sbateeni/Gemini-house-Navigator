@@ -1,6 +1,4 @@
 
-
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { db } from '../services/db';
@@ -13,6 +11,8 @@ export function usePresence(
     myStatus: UnitStatus = 'patrol',
     isSOS: boolean = false
 ) {
+  const [presenceUsers, setPresenceUsers] = useState<MapUser[]>([]);
+  const [dbUsers, setDbUsers] = useState<MapUser[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<MapUser[]>([]);
   const channelRef = useRef<any>(null);
 
@@ -26,20 +26,54 @@ export function usePresence(
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Heartbeat: Update "Last Seen" in DB every 1 minute to keep session alive even if tab is backgrounded
+  // 1. Heartbeat: Update "Last Seen" AND "Location" in DB every 1 minute
+  // This persistence allows users to appear "Active recently" even if WS disconnects
   useEffect(() => {
       if (!session?.user?.id || !hasAccess) return;
       
+      const updateDB = () => {
+         if (userLocation) {
+             db.updateLastSeen(session.user.id, userLocation.lat, userLocation.lng);
+         } else {
+             db.updateLastSeen(session.user.id);
+         }
+      };
+
       // Initial update
-      db.updateLastSeen(session.user.id);
+      updateDB();
 
-      const interval = setInterval(() => {
-          db.updateLastSeen(session.user.id);
-      }, 60 * 1000); // 1 minute (was 5 mins)
+      const interval = setInterval(updateDB, 60 * 1000); 
 
+      return () => clearInterval(interval);
+  }, [session?.user?.id, hasAccess, userLocation?.lat, userLocation?.lng]);
+
+  // 2. Poll Database for "Recently Active" users (Background/Disconnected but recent)
+  // Fetches users seen in last 20 minutes
+  useEffect(() => {
+      if (!session?.user?.id || !hasAccess) return;
+
+      const fetchRecentUsers = async () => {
+          const recentData = await db.getRecentlyActiveUsers(20); // 20 minutes buffer
+          const mappedUsers: MapUser[] = recentData.map((u: any) => ({
+              id: u.id,
+              username: u.username || 'User',
+              lat: u.lat,
+              lng: u.lng,
+              color: getUserColor(u.id),
+              lastUpdated: u.last_seen,
+              status: 'offline' as UnitStatus, // Default to offline for DB users, effectively "Last Seen"
+              isSOS: false
+          })).filter((u: MapUser) => u.id !== session.user.id); // Exclude self
+          
+          setDbUsers(mappedUsers);
+      };
+
+      fetchRecentUsers();
+      const interval = setInterval(fetchRecentUsers, 30 * 1000); // Poll every 30s
       return () => clearInterval(interval);
   }, [session?.user?.id, hasAccess]);
 
+  // 3. Setup Supabase Presence (Realtime Live Connection)
   useEffect(() => {
     if (!session?.user?.id || !hasAccess) return;
 
@@ -47,7 +81,6 @@ export function usePresence(
     const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Unknown';
     const userColor = getUserColor(userId);
 
-    // Create a presence channel
     const channel = supabase.channel('online-users', {
       config: {
         presence: {
@@ -72,18 +105,17 @@ export function usePresence(
                         lng: p.lng,
                         color: p.color,
                         lastUpdated: p.online_at,
-                        status: p.status || 'patrol',
+                        status: (p.status || 'patrol') as UnitStatus,
                         isSOS: p.isSOS || false
                     });
                 }
             });
         });
-        setOnlineUsers(users);
+        setPresenceUsers(users);
     });
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        // Initial track (even if no location yet)
         await channel.track({
           user_id: userId,
           username: username,
@@ -102,10 +134,9 @@ export function usePresence(
     };
   }, [session?.user?.id, hasAccess]);
 
-  // Update location/status in realtime when user moves or changes state
+  // 4. Update Presence Track when location changes
   useEffect(() => {
       if (channelRef.current && userLocation) {
-          // We intentionally don't await this to prevent blocking
           channelRef.current.track({
               user_id: session?.user?.id,
               username: session?.user?.user_metadata?.username || 'User',
@@ -118,6 +149,25 @@ export function usePresence(
           });
       }
   }, [userLocation, myStatus, isSOS]);
+
+  // 5. Merge Strategy: Presence (Realtime) > Database (Recent History)
+  useEffect(() => {
+      // Start with all realtime users
+      const mergedMap = new Map<string, MapUser>();
+      
+      // 1. Add DB users (Background/History)
+      dbUsers.forEach(u => {
+          mergedMap.set(u.id, u);
+      });
+
+      // 2. Add/Override with Presence users (Live) - they are fresher
+      presenceUsers.forEach(u => {
+          mergedMap.set(u.id, u);
+      });
+
+      setOnlineUsers(Array.from(mergedMap.values()));
+
+  }, [presenceUsers, dbUsers]);
 
   return { onlineUsers };
 }
