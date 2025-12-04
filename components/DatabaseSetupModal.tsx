@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Database, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
 import { supabase } from '../services/supabase';
@@ -139,6 +138,11 @@ create policy "Read logs" on logs for select using (true);
 
 drop policy if exists "Create logs" on logs;
 create policy "Create logs" on logs for insert with check (auth.role() = 'authenticated');
+
+drop policy if exists "Admin delete logs" on logs;
+create policy "Admin delete logs" on logs for delete using (
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'admin'))
+);
 `;
 
   const copyToClipboard = () => {

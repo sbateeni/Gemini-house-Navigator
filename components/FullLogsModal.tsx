@@ -1,19 +1,20 @@
 
-
-
 import React, { useState, useEffect } from 'react';
-import { X, Activity, AlertTriangle, Radio, Info, MapPin } from 'lucide-react';
+import { X, Activity, AlertTriangle, Radio, Info, MapPin, Trash2 } from 'lucide-react';
 import { db } from '../services/db';
-import { LogEntry } from '../types';
+import { LogEntry, UserRole } from '../types';
 
 interface FullLogsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  userRole?: UserRole | null;
 }
 
-export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose }) => {
+export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose, userRole }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
 
   useEffect(() => {
     if (isOpen) {
@@ -24,6 +25,18 @@ export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose })
       });
     }
   }, [isOpen]);
+
+  const handleClearLogs = async () => {
+      if (!confirm("تحذير: سيتم حذف جميع السجلات نهائياً من قاعدة البيانات. هل أنت متأكد؟")) return;
+      try {
+          await db.clearAllLogs();
+          setLogs([]);
+          alert("تم مسح السجلات بنجاح.");
+      } catch (e) {
+          console.error(e);
+          alert("فشل مسح السجلات. قد لا تملك الصلاحية أو أن سياسة قاعدة البيانات تمنع الحذف.");
+      }
+  };
 
   if (!isOpen) return null;
 
@@ -43,9 +56,21 @@ export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose })
                 <p className="text-xs text-slate-400">جميع الأحداث والتنبيهات المسجلة</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+          
+          <div className="flex items-center gap-2">
+              {isAdmin && (
+                  <button 
+                    onClick={handleClearLogs}
+                    className="p-2 hover:bg-red-900/20 rounded-full text-slate-500 hover:text-red-400 transition-colors"
+                    title="مسح جميع السجلات"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+              )}
+              <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-0 font-mono text-sm scrollbar-thin scrollbar-thumb-slate-700 bg-slate-950">

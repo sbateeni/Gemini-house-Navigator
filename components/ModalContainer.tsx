@@ -147,6 +147,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
       <FullLogsModal 
         isOpen={showFullLogs}
         onClose={closeFullLogs}
+        userRole={userRole}
       />
     </>
   );

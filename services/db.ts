@@ -1,6 +1,4 @@
 
-
-
 import { supabase } from './supabase';
 import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
 
@@ -365,5 +363,11 @@ export const db = {
     } catch {
       return [];
     }
+  },
+
+  async clearAllLogs(): Promise<void> {
+    if (!navigator.onLine) throw new Error("Cannot clear logs while offline.");
+    const { error } = await supabase.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw error;
   }
 };
