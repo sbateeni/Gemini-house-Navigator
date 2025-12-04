@@ -1,8 +1,6 @@
 
-
-
 import React from 'react';
-import { Users, Clock } from 'lucide-react';
+import { Users, Clock, Shield, Award, User, Lock } from 'lucide-react';
 import { MapUser, UserProfile } from '../../types';
 
 interface SidebarUnitsProps {
@@ -23,6 +21,25 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
     busy: 'مشغول',
     pursuit: 'مطاردة',
     offline: 'غير متصل'
+  };
+
+  const roleLabels: Record<string, string> = {
+    super_admin: 'قائد عام',
+    governorate_admin: 'مدير محافظة',
+    center_admin: 'مدير مركز',
+    officer: 'ضابط',
+    user: 'عنصر',
+    admin: 'مسؤول',
+    banned: 'محظور'
+  };
+
+  const getRoleStyle = (role: string) => {
+    if (role === 'super_admin' || role === 'admin') return 'bg-purple-900/40 text-purple-300 border-purple-700/50';
+    if (role === 'governorate_admin') return 'bg-indigo-900/40 text-indigo-300 border-indigo-700/50';
+    if (role === 'center_admin') return 'bg-blue-900/40 text-blue-300 border-blue-700/50';
+    if (role === 'officer') return 'bg-sky-900/40 text-sky-300 border-sky-700/50';
+    if (role === 'banned') return 'bg-red-900/40 text-red-300 border-red-700/50';
+    return 'bg-slate-700/40 text-slate-400 border-slate-600/50';
   };
 
   const onlineIds = new Set(onlineUsers.map(u => u.id));
@@ -65,16 +82,35 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
 
             return (
                 <div key={u.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${bgColor} ${borderColor}`}>
-                        <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${dotColor} ${isOnline ? 'animate-pulse' : ''}`}></div>
-                        <div className="flex flex-col">
-                            <span className={`text-xs font-bold ${textColor}`}>{u.username}</span>
-                            <div className="flex items-center gap-1">
-                                {isOnline && <span className="text-[9px] text-slate-500">{statusLabels[status]}</span>}
-                                {isBackground && <span className="text-[9px] text-orange-400 flex items-center gap-0.5"><Clock size={8} /> نشط مؤخراً</span>}
-                                {!isOnline && !isBackground && <span className="text-[9px] text-red-900/50">غائب</span>}
+                        <div className="flex items-center gap-2 w-full">
+                            {/* Status Dot */}
+                            <div className={`w-2 h-2 shrink-0 rounded-full ${dotColor} ${isOnline ? 'animate-pulse' : ''}`}></div>
+                            
+                            <div className="flex flex-col w-full min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className={`text-xs font-bold truncate ${textColor}`}>{u.username}</span>
+                                    
+                                    {/* Rank Badge */}
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${getRoleStyle(u.role)} flex items-center gap-1 shrink-0`}>
+                                        {u.role === 'super_admin' && <Shield size={8} />}
+                                        {u.role === 'officer' && <Award size={8} />}
+                                        {roleLabels[u.role] || 'عنصر'}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-1 mt-0.5">
+                                    {isOnline && <span className="text-[9px] text-slate-500">{statusLabels[status]}</span>}
+                                    {isBackground && <span className="text-[9px] text-orange-400 flex items-center gap-0.5"><Clock size={8} /> نشط مؤخراً</span>}
+                                    {!isOnline && !isBackground && <span className="text-[9px] text-red-900/50">غائب</span>}
+                                    
+                                    {/* Optional Location Text */}
+                                    {u.governorate && (
+                                        <span className="text-[9px] text-slate-600 mr-auto truncate dir-rtl">
+                                            {u.center ? ` - ${u.center}` : ` - ${u.governorate}`}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
                         </div>
                 </div>
             );
