@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle } from 'lucide-react';
+import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -66,10 +66,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const providers = [
-      { id: 'google', name: 'Google Hybrid', desc: 'أقمار صناعية + شوارع (دقة عالية)', icon: Globe, color: 'blue' },
-      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (دقة متوسطة)', icon: Globe, color: 'cyan' },
+      { id: 'google', name: 'Google Hybrid', desc: 'أقمار صناعية + تسميات (دقة عالية 22x)', icon: Globe, color: 'blue' },
+      { id: 'google_streets', name: 'Google Streets', desc: 'شوارع وتفاصيل مدنية (دقة عالية 22x)', icon: Map, color: 'blue' },
+      { id: 'google_terrain', name: 'Google Terrain', desc: 'تضاريس وجبال (طبيعة)', icon: Mountain, color: 'emerald' },
+      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (بديل)', icon: Globe, color: 'cyan' },
+      { id: 'esri_streets', name: 'Esri Streets', desc: 'شوارع احترافية', icon: Map, color: 'cyan' },
       { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي', icon: Layers, color: 'slate' },
-      { id: 'osm', name: 'OpenStreetMap', desc: 'خريطة شوارع قياسية', icon: Map, color: 'green' },
+      { id: 'osm', name: 'OpenStreetMap', desc: 'قياسية (مفتوحة المصدر)', icon: Map, color: 'orange' },
   ];
 
   return (
@@ -111,22 +114,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Map Provider Section */}
           <section>
-            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
-            <div className="space-y-2">
+            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">نوع الخريطة (المصدر)</h3>
+            <div className="space-y-2 grid grid-cols-1 gap-2">
                 {providers.map(p => (
                     <button
                         key={p.id}
                         onClick={() => setMapProvider(p.id)}
-                        className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
+                        className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
                     >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 text-${p.color}-400`}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 text-${p.color}-400`}`}>
                             <p.icon size={20} />
                         </div>
-                        <div className="text-right flex-1">
-                            <div className={`font-bold ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
-                            <div className="text-xs text-slate-400">{p.desc}</div>
+                        <div className="text-right flex-1 min-w-0">
+                            <div className={`font-bold truncate ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
+                            <div className="text-[10px] text-slate-400 truncate">{p.desc}</div>
                         </div>
-                        {mapProvider === p.id && <CheckCircle2 className="text-blue-500" size={20} />}
+                        {mapProvider === p.id && <CheckCircle2 className="text-blue-500 shrink-0" size={20} />}
                     </button>
                 ))}
             </div>

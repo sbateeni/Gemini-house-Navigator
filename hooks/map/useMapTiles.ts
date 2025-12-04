@@ -32,17 +32,45 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
         }
     });
 
-    if (mapProvider === 'google') {
-       // Google Hybrid (Satellite + Labels) - High Zoom (up to 22)
+    // --- GOOGLE MAPS (Highest Zoom & Quality) ---
+    if (mapProvider === 'google' || mapProvider === 'google_hybrid') {
+       // Google Hybrid (Satellite + Labels) - Max Zoom 22
        const googleHybrid = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
          maxZoom: 22,
          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
          attribution: 'Google Maps'
        });
        layerGroup.addLayer(googleHybrid);
-       
+
+    } else if (mapProvider === 'google_streets') {
+        // Google Streets - Max Zoom 22
+        const googleStreets = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 22,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Maps'
+        });
+        layerGroup.addLayer(googleStreets);
+
+    } else if (mapProvider === 'google_terrain') {
+        // Google Terrain - Max Zoom 20 (Good for geography)
+        const googleTerrain = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Maps'
+        });
+        layerGroup.addLayer(googleTerrain);
+
+    // --- ESRI MAPS (Professional Cartography) ---
+    } else if (mapProvider === 'esri_streets') {
+        // Esri World Street Map
+        const esriStreets = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Esri'
+        });
+        layerGroup.addLayer(esriStreets);
+
     } else if (mapProvider === 'esri') {
-       // Esri Satellite (Current Default)
+       // Esri Satellite (Standard)
        const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
          maxZoom: 19,
          attribution: 'Esri'
@@ -53,8 +81,9 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
        layerGroup.addLayer(imagery);
        layerGroup.addLayer(labels);
 
+    // --- OPEN SOURCES ---
     } else if (mapProvider === 'osm') {
-       // OpenStreetMap (Standard Streets)
+       // OpenStreetMap
        const osm = new OfflineTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
          maxZoom: 19,
          attribution: '© OpenStreetMap contributors'
