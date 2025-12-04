@@ -32,9 +32,8 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
         }
     });
 
-    // --- GOOGLE MAPS (Highest Zoom & Quality) ---
+    // --- GOOGLE MAPS (Highest Zoom 22x) ---
     if (mapProvider === 'google' || mapProvider === 'google_hybrid') {
-       // Google Hybrid (Satellite + Labels) - Max Zoom 22
        const googleHybrid = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
          maxZoom: 22,
          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -43,7 +42,6 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
        layerGroup.addLayer(googleHybrid);
 
     } else if (mapProvider === 'google_streets') {
-        // Google Streets - Max Zoom 22
         const googleStreets = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 22,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -52,7 +50,6 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
         layerGroup.addLayer(googleStreets);
 
     } else if (mapProvider === 'google_terrain') {
-        // Google Terrain - Max Zoom 20 (Good for geography)
         const googleTerrain = new OfflineTileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -60,9 +57,21 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
         });
         layerGroup.addLayer(googleTerrain);
 
-    // --- ESRI MAPS (Professional Cartography) ---
+    // --- ESRI MAPS ---
+    } else if (mapProvider === 'esri_clarity') {
+        // Esri Clarity (Focus on "Newest" imagery, beta version)
+        const clarity = new OfflineTileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Esri Clarity'
+        });
+        // Add labels on top so we know where we are
+        const labels = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19
+        });
+        layerGroup.addLayer(clarity);
+        layerGroup.addLayer(labels);
+
     } else if (mapProvider === 'esri_streets') {
-        // Esri World Street Map
         const esriStreets = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: 'Esri'
@@ -70,7 +79,6 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
         layerGroup.addLayer(esriStreets);
 
     } else if (mapProvider === 'esri') {
-       // Esri Satellite (Standard)
        const imagery = new OfflineTileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
          maxZoom: 19,
          attribution: 'Esri'
@@ -81,9 +89,16 @@ export function useMapTiles(mapInstanceRef: React.MutableRefObject<any>, mapProv
        layerGroup.addLayer(imagery);
        layerGroup.addLayer(labels);
 
-    // --- OPEN SOURCES ---
+    // --- CARTO (High Quality Vector-like) ---
+    } else if (mapProvider === 'carto_voyager') {
+        const voyager = new OfflineTileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            attribution: 'CartoDB'
+        });
+        layerGroup.addLayer(voyager);
+
     } else if (mapProvider === 'osm') {
-       // OpenStreetMap
        const osm = new OfflineTileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
          maxZoom: 19,
          attribution: '© OpenStreetMap contributors'

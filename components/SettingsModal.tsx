@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain } from 'lucide-react';
+import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -66,13 +66,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const providers = [
-      { id: 'google', name: 'Google Hybrid', desc: 'أقمار صناعية + تسميات (دقة عالية 22x)', icon: Globe, color: 'blue' },
-      { id: 'google_streets', name: 'Google Streets', desc: 'شوارع وتفاصيل مدنية (دقة عالية 22x)', icon: Map, color: 'blue' },
+      { id: 'google', name: 'Google Hybrid', desc: 'أفضل دقة زوم (22x) - هجين', icon: Globe, color: 'blue' },
+      { id: 'esri_clarity', name: 'Esri Clarity (الأحدث)', desc: 'أحدث صور جوية (قديمة أقل، زوم 19x)', icon: Satellite, color: 'purple' },
+      { id: 'google_streets', name: 'Google Streets', desc: 'شوارع وتفاصيل مدنية (دقة عالية)', icon: Map, color: 'blue' },
+      { id: 'carto_voyager', name: 'Voyager HD', desc: 'خريطة شوارع ملونة وعالية الوضوح', icon: Map, color: 'emerald' },
       { id: 'google_terrain', name: 'Google Terrain', desc: 'تضاريس وجبال (طبيعة)', icon: Mountain, color: 'emerald' },
-      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (بديل)', icon: Globe, color: 'cyan' },
-      { id: 'esri_streets', name: 'Esri Streets', desc: 'شوارع احترافية', icon: Map, color: 'cyan' },
-      { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي', icon: Layers, color: 'slate' },
-      { id: 'osm', name: 'OpenStreetMap', desc: 'قياسية (مفتوحة المصدر)', icon: Map, color: 'orange' },
+      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (قياسية)', icon: Globe, color: 'cyan' },
+      { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي (منخفض التوهج)', icon: Layers, color: 'slate' },
   ];
 
   return (
@@ -114,7 +114,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Map Provider Section */}
           <section>
-            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">نوع الخريطة (المصدر)</h3>
+            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
             <div className="space-y-2 grid grid-cols-1 gap-2">
                 {providers.map(p => (
                     <button
@@ -133,6 +133,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                 ))}
             </div>
+            <p className="text-[10px] text-slate-500 mt-2 text-center">
+                ملاحظة: "Esri Clarity" توفر صوراً أحدث للمباني الجديدة، بينما "Google Hybrid" توفر أفضل تقريب (Zoom).
+            </p>
           </section>
 
           {/* Offline Maps Section */}
