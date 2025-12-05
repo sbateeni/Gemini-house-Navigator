@@ -154,8 +154,13 @@ create table if not exists access_codes (
   created_at bigint,
   expires_at bigint,
   label text,
-  is_active boolean default true
+  is_active boolean default true,
+  device_id text -- New column for device binding
 );
+
+-- Ensure device_id column exists
+alter table access_codes add column if not exists device_id text;
+
 alter table access_codes enable row level security;
 drop policy if exists "Code Manage" on access_codes;
 create policy "Code Manage" on access_codes for all using (
@@ -168,50 +173,85 @@ create policy "Code Read Public" on access_codes for select using (true);
 -- 4. الدوال (Functions)
 -- ==========================================
 
--- Source Note RPC (Updated for visibility)
+-- Function to securely claim an access code for a device
+create or replace function claim_access_code(
+  p_code text,
+  p_device_id text
+)
+returns jsonb as $$
+declare
+  v_record record;
+begin
+  -- Find the code
+  select * into v_record from access_codes where code = p_code;
+  
+  -- Check existence
+  if v_record is null then
+    return jsonb_build_object('success', false, 'message', 'الكود غير صحيح');
+  end if;
+  
+  -- Check active status
+  if v_record.is_active = false then
+     return jsonb_build_object('success', false, 'message', 'تم تعطيل هذا الكود');
+  end if;
+
+  -- Check expiry
+  if (extract(epoch from now()) * 1000) > v_record.expires_at then
+     return jsonb_build_object('success', false, 'message', 'انتهت صلاحية الكود');
+  end if;
+
+  -- Check Device Binding (Security)
+  if v_record.device_id is not null and v_record.device_id != p_device_id then
+     return jsonb_build_object('success', false, 'message', 'تم استخدام هذا الكود على جهاز آخر مسبقاً. لا يمكن مشاركة الكود.');
+  end if;
+
+  -- Bind Device if it's the first time
+  if v_record.device_id is null then
+     update access_codes set device_id = p_device_id where code = p_code;
+  end if;
+
+  return jsonb_build_object('success', true, 'expires_at', v_record.expires_at);
+end;
+$$ language plpgsql security definer;
+
+-- RPC for Source Note Creation (Bypassing Auth for Guests)
 create or replace function create_source_note(
   p_code text,
   p_note_data jsonb
 )
 returns void as $$
 declare
-  v_expires bigint;
-  v_active boolean;
+  v_exists boolean;
 begin
-  select expires_at, is_active into v_expires, v_active 
-  from access_codes where code = p_code;
+  -- Verify code validity
+  select exists(
+    select 1 from access_codes 
+    where code = p_code 
+    and is_active = true 
+    and expires_at > (extract(epoch from now()) * 1000)
+  ) into v_exists;
 
-  if v_expires is null OR not v_active OR (extract(epoch from now()) * 1000)::bigint > v_expires then
-    raise exception 'Invalid or Expired Code';
+  if not v_exists then
+    raise exception 'Invalid or expired access code';
   end if;
 
+  -- Insert Note
   insert into notes (
     id, lat, lng, user_note, location_name, ai_analysis, 
     created_at, status, sources, access_code, visibility
   ) values (
-    p_note_data->>'id',
+    (p_note_data->>'id'),
     (p_note_data->>'lat')::float8,
     (p_note_data->>'lng')::float8,
-    p_note_data->>'userNote',
-    p_note_data->>'locationName',
-    p_note_data->>'aiAnalysis',
+    (p_note_data->>'userNote'),
+    (p_note_data->>'locationName'),
+    (p_note_data->>'aiAnalysis'),
     (p_note_data->>'createdAt')::bigint,
-    p_note_data->>'status',
-    p_note_data->'sources',
+    (p_note_data->>'status'),
+    (p_note_data->'sources'),
     p_code,
     coalesce(p_note_data->>'visibility', 'private')
   );
-end;
-$$ language plpgsql security definer;
-
--- Auto Profile Trigger
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, username, role, is_approved, email, permissions)
-  values (new.id, new.raw_user_meta_data->>'username', 'user', false, new.email,
-  '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb);
-  return new;
 end;
 $$ language plpgsql security definer;
 `;
@@ -222,61 +262,62 @@ $$ language plpgsql security definer;
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openSupabaseSQL = () => {
-    const projectUrl = (supabase as any).supabaseUrl || '';
-    const projectId = projectUrl.split('//')[1]?.split('.')[0];
-    const dashboardUrl = projectId 
-      ? `https://supabase.com/dashboard/project/${projectId}/sql/new` 
-      : 'https://supabase.com/dashboard';
-    
-    window.open(dashboardUrl, '_blank');
+  const openSupabase = () => {
+    window.open('https://supabase.com/dashboard/project/_/sql', '_blank');
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-slate-800 bg-slate-900 flex items-start gap-4">
-          <div className="p-3 bg-red-900/20 rounded-xl border border-red-900/50">
-            <ShieldAlert className="text-red-500 w-8 h-8 animate-pulse" />
+    <div className="fixed inset-0 z-[1500] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in zoom-in-95">
+        
+        <div className="p-6 border-b border-slate-800 flex items-start gap-4">
+          <div className="bg-red-900/20 p-3 rounded-xl border border-red-900/50">
+            <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">تحديث أمني عالي الأهمية</h1>
-            <p className="text-slate-400 text-sm">
-              تم إضافة سياسات أمان صارمة (RLS) وتصنيف المواقع (عام/خاص). يجب تنفيذ هذا الكود في قاعدة البيانات لضمان سرية المعلومات.
+            <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              تم اكتشاف نقص في جداول أو أعمدة قاعدة البيانات (مثل نظام الحماية للجهاز `device_id` أو `visibility`). <br/>
+              لضمان عمل النظام بشكل صحيح، يجب تشغيل الكود التالي في محرر SQL في Supabase.
             </p>
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden relative bg-slate-950 p-0 group">
-          <pre className="h-full overflow-auto p-6 text-xs md:text-sm font-mono text-green-400/90 leading-relaxed scrollbar-thin text-left" dir="ltr">
+        <div className="flex-1 overflow-hidden relative group">
+          <pre className="w-full h-full bg-slate-950 p-4 text-xs font-mono text-green-400 overflow-auto custom-scrollbar text-left" dir="ltr">
             {setupSQL}
           </pre>
           <button 
             onClick={copyToClipboard}
-            className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-xs font-bold border border-slate-600 flex items-center gap-2 shadow-xl transition-all"
+            className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg shadow-lg border border-slate-600 transition-all opacity-0 group-hover:opacity-100"
+            title="نسخ الكود"
           >
-            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-            {copied ? 'تم النسخ' : 'نسخ الكود'}
+            {copied ? <Check size={18} className="text-green-400" /> : <Copy size={18} />}
           </button>
         </div>
 
-        <div className="p-6 border-t border-slate-800 bg-slate-900 shrink-0">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-             <button 
-               onClick={openSupabaseSQL}
-               className="w-full md:w-auto flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20"
-             >
-               <ExternalLink size={18} />
-               فتح محرر Supabase SQL
-             </button>
-             <button 
-               onClick={() => window.location.reload()}
-               className="w-full md:w-auto px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium transition-all"
-             >
-               تم التحديث، إعادة تحميل
-             </button>
+        <div className="p-6 border-t border-slate-800 bg-slate-900 rounded-b-2xl flex items-center justify-between gap-4">
+          <div className="text-xs text-slate-500 flex items-center gap-2">
+            <Database size={14} />
+            <span>انسخ الكود أعلاه وشغله في Supabase SQL Editor</span>
+          </div>
+          
+          <div className="flex gap-3">
+            <button 
+                onClick={copyToClipboard}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold text-sm transition-colors border border-slate-700"
+            >
+                {copied ? 'تم النسخ' : 'نسخ الكود'}
+            </button>
+            <button 
+                onClick={openSupabase}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-sm transition-colors shadow-lg shadow-blue-900/20 flex items-center gap-2"
+            >
+                فتح Supabase SQL <ExternalLink size={16} />
+            </button>
           </div>
         </div>
+
       </div>
     </div>
   );

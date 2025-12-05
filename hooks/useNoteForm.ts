@@ -35,8 +35,12 @@ export function useNoteForm(
     setShowModal(true);
   };
 
-  const handleSaveNote = async (visibility: 'public' | 'private' = 'private') => {
+  const handleSaveNote = async (visibility: 'public' | 'private' = 'private', title?: string) => {
     if (!tempCoords) return;
+
+    // Use custom title if provided, otherwise generic name based on visibility
+    const defaultName = visibility === 'public' ? 'موقع عام' : 'موقع خاص (سري)';
+    const finalLocationName = title?.trim() ? title : (isEditingNote && editingNoteData ? editingNoteData.locationName : defaultName);
 
     try {
       if (isEditingNote && editingNoteData) {
@@ -44,20 +48,19 @@ export function useNoteForm(
         const updatedNote: MapNote = {
           ...editingNoteData,
           userNote: userNoteInput,
+          locationName: finalLocationName,
           visibility: visibility // Update visibility
         };
         await updateNote(updatedNote);
         setSelectedNote(updatedNote);
       } else {
         // CREATE NEW
-        const locationName = visibility === 'public' ? 'موقع عام' : 'موقع خاص (سري)';
-        
         const newNote: MapNote = {
           id: crypto.randomUUID(),
           lat: tempCoords.lat,
           lng: tempCoords.lng,
           userNote: userNoteInput,
-          locationName: locationName,
+          locationName: finalLocationName,
           aiAnalysis: "",
           sources: [],
           createdAt: Date.now(),

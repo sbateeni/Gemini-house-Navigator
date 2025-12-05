@@ -106,6 +106,7 @@ export interface AccessCode {
   expires_at: number;
   label?: string; // Optional name for the operation
   is_active: boolean;
+  device_id?: string; // Linked device ID for security
 }
 
 export interface SourceSession {

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MapPin, X, Plus, Edit3, Globe, Lock } from 'lucide-react';
+import { MapPin, X, Plus, Edit3, Globe, Lock, Type } from 'lucide-react';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface CreateNoteModalProps {
   tempCoords: { lat: number; lng: number } | null;
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
-  onSave: (visibility: 'public' | 'private') => void;
+  onSave: (visibility: 'public' | 'private', title?: string) => void;
   isAnalyzing: boolean;
   mode?: 'create' | 'edit';
 }
@@ -24,6 +24,7 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   mode = 'create'
 }) => {
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [title, setTitle] = useState("");
 
   if (!isOpen) return null;
 
@@ -65,17 +66,29 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
             </button>
         </div>
 
+        {/* Title Input (New) */}
+        <div className="relative mb-3">
+            <input 
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="اسم الموقع (اختياري - يظهر على الخريطة للعامة)"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pr-10 pl-4 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-right"
+            />
+            <Type className="absolute right-3 top-3 text-slate-500" size={16} />
+        </div>
+
         <textarea
           autoFocus
           value={userNoteInput}
           onChange={(e) => setUserNoteInput(e.target.value)}
           placeholder="أدخل ملاحظاتك الاستخباراتية هنا..."
-          className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-base text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-h-[140px] resize-none placeholder-slate-600 mb-6 text-right"
+          className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-4 text-base text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all min-h-[100px] resize-none placeholder-slate-600 mb-6 text-right"
         />
         
         <button 
-          onClick={() => onSave(visibility)}
-          disabled={!userNoteInput.trim()}
+          onClick={() => onSave(visibility, title)}
+          disabled={!userNoteInput.trim() && !title.trim()}
           className={`w-full text-white py-4 rounded-xl text-base font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 mb-2 disabled:opacity-50 disabled:cursor-not-allowed
             ${mode === 'edit' 
               ? 'bg-yellow-600 hover:bg-yellow-500 shadow-yellow-900/20' 

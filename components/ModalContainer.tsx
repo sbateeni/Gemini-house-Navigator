@@ -16,7 +16,7 @@ interface ModalContainerProps {
   tempCoords: { lat: number; lng: number } | null;
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
-  onSaveNote: (visibility: 'public' | 'private') => void;
+  onSaveNote: (visibility: 'public' | 'private', title?: string) => void;
   isAnalyzing: boolean;
   isEditingNote: boolean;
 

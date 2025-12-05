@@ -35,6 +35,16 @@ const safeString = (val: any, fallback: string = ''): string => {
   return fallback;
 };
 
+// Helper to get or create a unique Device ID for this browser
+const getDeviceId = () => {
+    let id = localStorage.getItem('gemini_device_id');
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem('gemini_device_id', id);
+    }
+    return id;
+};
+
 export const db = {
   // --- OFFLINE SYNC LOGIC ---
   async syncPendingNotes() {
@@ -70,22 +80,37 @@ export const db = {
 
   // --- SOURCE ACCESS LOGIC ---
   
-  // Verify access code
+  // Verify access code using secure RPC with Device Binding
   async verifyAccessCode(code: string): Promise<{ valid: boolean, error?: string, expiresAt?: number }> {
      try {
-         const { data, error } = await supabase
-            .from('access_codes')
-            .select('*')
-            .eq('code', code)
-            .single();
+         const deviceId = getDeviceId();
          
-         if (error) return { valid: false, error: 'الكود غير صحيح' };
-         if (!data.is_active) return { valid: false, error: 'تم تعطيل هذا الكود من قبل المسؤول' };
-         if (Date.now() > data.expires_at) return { valid: false, error: 'انتهت صلاحية هذا الكود' };
+         // Call RPC to check code and bind to this device ID
+         const { data, error } = await supabase.rpc('claim_access_code', {
+             p_code: code,
+             p_device_id: deviceId
+         });
 
-         return { valid: true, expiresAt: data.expires_at };
-     } catch (e) {
-         return { valid: false, error: 'خطأ في الاتصال' };
+         if (error) {
+             console.error("RPC Error (claim_access_code)", error);
+             // Return specific error to trigger database setup modal if RPC is missing
+             if (error.code === 'PGRST202' || error.message?.includes('function claim_access_code') || error.code === '42883') { 
+                 const e: any = new Error("Database Schema Missing");
+                 e.code = 'TABLE_MISSING';
+                 throw e;
+             }
+             return { valid: false, error: 'خطأ في الاتصال بقاعدة البيانات' };
+         }
+
+         // RPC returns: { success: boolean, message?: string, expires_at?: number }
+         if (data && data.success) {
+             return { valid: true, expiresAt: data.expires_at };
+         } else {
+             return { valid: false, error: data?.message || 'كود غير صالح أو مستخدم على جهاز آخر' };
+         }
+     } catch (e: any) {
+         if (e.code === 'TABLE_MISSING') throw e;
+         return { valid: false, error: 'خطأ في النظام' };
      }
   },
 
@@ -134,19 +159,6 @@ export const db = {
       const { error } = await supabase
         .from('access_codes')
         .update({ is_active: false })
-        .eq('code', code);
-      if (error) throw error;
-  },
-
-  // Extend code (Reactivate + 30 mins from NOW)
-  async extendAccessCode(code: string): Promise<void> {
-      const newExpiry = Date.now() + (30 * 60 * 1000); // Add 30 mins from now
-      const { error } = await supabase
-        .from('access_codes')
-        .update({ 
-            is_active: true, 
-            expires_at: newExpiry 
-        })
         .eq('code', code);
       if (error) throw error;
   },
@@ -246,9 +258,7 @@ export const db = {
       console.warn("Fetching failed or offline, checking for cache or schema error...", error);
 
       // CRITICAL FIX: Prioritize Schema Errors (Missing Column/Table) over Cache
-      // Code 42703 = undefined_column
-      // Code 42P01 = undefined_table
-      if (error.code === 'PGRST205' || error.code === '42P01' || error.code === '42703') {
+      if (error.code === 'PGRST205' || error.code === '42P01' || error.code === '42703' || error.code === 'TABLE_MISSING') {
         const missingError: any = new Error('Table/Column Missing');
         missingError.code = 'TABLE_MISSING';
         throw missingError;
