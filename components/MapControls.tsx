@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Menu, Navigation, Layers, Globe, Loader2 } from 'lucide-react';
+import { Menu, Navigation, Layers, Globe, Loader2, X } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Assignment } from '../types';
 
@@ -14,6 +14,9 @@ interface MapControlsProps {
   // New props for Notifications
   assignments: Assignment[];
   onAcceptAssignment: (a: Assignment) => void;
+  // New props for Routing
+  hasActiveRoute: boolean;
+  onClearRoute: () => void;
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -24,7 +27,9 @@ export const MapControls: React.FC<MapControlsProps> = ({
   onLocateUser,
   isLocating = false,
   assignments,
-  onAcceptAssignment
+  onAcceptAssignment,
+  hasActiveRoute,
+  onClearRoute
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
@@ -38,6 +43,17 @@ export const MapControls: React.FC<MapControlsProps> = ({
        >
          <Menu size={24} />
        </button>
+
+       {/* Clear Route Button - Only shows when routing */}
+       {hasActiveRoute && (
+         <button 
+           onClick={onClearRoute}
+           className="w-12 h-12 bg-red-600 text-white rounded-full shadow-xl border border-red-500 flex items-center justify-center hover:bg-red-500 active:scale-95 transition-all animate-in zoom-in duration-300"
+           title="إلغاء المسار الحالي"
+         >
+           <X size={24} />
+         </button>
+       )}
 
        <button 
          onClick={onLocateUser}

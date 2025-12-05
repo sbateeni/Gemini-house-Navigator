@@ -1,10 +1,8 @@
 
-
-
 import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2, UserPlus, Users } from 'lucide-react';
+import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2 } from 'lucide-react';
 import { db } from '../services/db';
-import { UserProfile, UserPermissions, UserRole } from '../types';
+import { UserProfile, UserPermissions, UserRole, AccessCode } from '../types';
 import { supabase } from '../services/supabase';
 import { UserTable } from './dashboard/UserTable';
 import { EditUserModal } from './dashboard/EditUserModal';
@@ -24,21 +22,32 @@ const PALESTINE_GOVERNORATES = [
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, currentUserId, currentUserProfile }) => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [selectedUserForPerms, setSelectedUserForPerms] = useState<UserProfile | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'sources'>('all');
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [newCodeLabel, setNewCodeLabel] = useState("");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(currentUserProfile?.role || '');
+
+  const fetchData = async () => {
     setLoading(true);
     const users = await db.getAllProfiles(currentUserProfile || undefined);
     setProfiles(users);
+    
+    if (isOfficerOrAbove) {
+        const codes = await db.getMyAccessCodes();
+        setAccessCodes(codes);
+    }
     setLoading(false);
   };
 
   useEffect(() => {
     if (isOpen) {
-      fetchUsers();
+      fetchData();
     }
   }, [isOpen]);
 
@@ -67,23 +76,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
       await db.updateProfile(user.id, { isApproved: newValue });
     } catch (error) {
       console.error("Failed to update approval", error);
-      fetchUsers();
+      fetchData();
     }
   };
 
   const handleUpdateHierarchy = async (user: UserProfile, gov: string, center: string) => {
      const updates: Partial<UserProfile> = {};
-     // Smart Hierarchy Logic
      if (user.role !== 'super_admin') {
          updates.governorate = gov;
-         // Governorate admins don't belong to a specific center, they manage the gov
          if (user.role !== 'governorate_admin') {
              updates.center = center;
          } else {
              updates.center = null;
          }
      } else {
-         // Super admin has no specific location (Global)
          updates.governorate = null;
          updates.center = null;
      }
@@ -94,8 +100,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
      try {
          await db.updateProfile(user.id, updates);
      } catch (e) {
-         console.error("Failed update hierarchy", e);
-         fetchUsers();
+         fetchData();
      }
   };
 
@@ -103,12 +108,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
       const updatedUser = { ...user, role: newRole };
       setProfiles(prev => prev.map(p => p.id === user.id ? updatedUser : p));
       setSelectedUserForPerms(updatedUser);
-      
       try {
           await db.updateProfile(user.id, { role: newRole });
       } catch (error) {
-          console.error("Failed to update role", error);
-          fetchUsers();
+          fetchData();
       }
   };
 
@@ -121,7 +124,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
         try {
             await db.updateProfile(user.id, { role: newRole, isApproved: isBanned });
         } catch (error) {
-            fetchUsers();
+            fetchData();
         }
     }
   };
@@ -136,6 +139,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
       }
   };
 
+  // --- SOURCE CODE LOGIC ---
+  const handleGenerateCode = async () => {
+      if (!newCodeLabel.trim()) return;
+      setGeneratingCode(true);
+      try {
+          const newCode = await db.createAccessCode(newCodeLabel);
+          setAccessCodes([newCode, ...accessCodes]);
+          setNewCodeLabel("");
+      } catch (e) {
+          alert("فشل إنشاء الكود");
+      } finally {
+          setGeneratingCode(false);
+      }
+  };
+
+  const handleRevokeCode = async (codeStr: string) => {
+      if (confirm("هل أنت متأكد من إيقاف هذا الكود؟ لن يتمكن المصدر من الدخول مرة أخرى.")) {
+          try {
+              await db.revokeAccessCode(codeStr);
+              setAccessCodes(prev => prev.map(c => c.code === codeStr ? { ...c, is_active: false } : c));
+          } catch (e) {
+              alert("فشل إيقاف الكود");
+          }
+      }
+  };
+
+  const copyCode = (code: string) => {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+  };
+  
   const getCentersForGov = (gov: string) => {
       const centers = new Set<string>();
       profiles.forEach(p => {
@@ -147,7 +182,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
   };
 
   const pendingCount = profiles.filter(p => !p.isApproved && p.role !== 'banned').length;
-  
+  const activeCodesCount = accessCodes.filter(c => c.is_active && c.expires_at > Date.now()).length;
+
   const filteredProfiles = profiles.filter(user => {
       if (filter === 'pending') return !user.isApproved && user.role !== 'banned';
       return true;
@@ -184,7 +220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                 className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${filter === 'all' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
             >
                 <Users size={16} />
-                جميع المستخدمين ({profiles.length})
+                جميع المستخدمين
             </button>
             <button 
                 onClick={() => setFilter('pending')}
@@ -196,6 +232,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                     <span className="bg-yellow-500 text-slate-900 text-[10px] px-2 py-0.5 rounded-full animate-pulse">{pendingCount}</span>
                 )}
             </button>
+            
+            {isOfficerOrAbove && (
+                <button 
+                    onClick={() => setFilter('sources')}
+                    className={`pb-3 px-2 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${filter === 'sources' ? 'border-green-500 text-green-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                >
+                    <KeyRound size={16} />
+                    المصادر المؤقتة
+                    {activeCodesCount > 0 && (
+                        <span className="bg-green-500 text-slate-900 text-[10px] px-2 py-0.5 rounded-full animate-pulse">{activeCodesCount}</span>
+                    )}
+                </button>
+            )}
         </div>
 
         <div className="flex-1 overflow-auto p-0 bg-slate-900/50">
@@ -203,6 +252,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
              <div className="flex items-center justify-center h-64">
                <Loader2 className="animate-spin text-purple-500 w-8 h-8" />
              </div>
+           ) : filter === 'sources' ? (
+               <div className="p-6 space-y-6">
+                   {/* Generator */}
+                   <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex gap-4 items-end">
+                       <div className="flex-1">
+                           <label className="text-xs text-slate-400 mb-1 block">اسم المصدر / العملية (اختياري)</label>
+                           <input 
+                              type="text" 
+                              value={newCodeLabel}
+                              onChange={e => setNewCodeLabel(e.target.value)}
+                              placeholder="مثال: مصدر منطقة X"
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-sm text-white focus:border-green-500 focus:outline-none"
+                           />
+                       </div>
+                       <button 
+                           onClick={handleGenerateCode}
+                           disabled={generatingCode || !newCodeLabel.trim()}
+                           className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50"
+                       >
+                           {generatingCode ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
+                           توليد كود (30 دقيقة)
+                       </button>
+                   </div>
+
+                   {/* Codes List */}
+                   <div className="space-y-3">
+                       {accessCodes.length === 0 && <p className="text-center text-slate-500 py-8">لم تقم بإنشاء أي أكواد مصادر بعد.</p>}
+                       {accessCodes.map(ac => {
+                           const isExpired = Date.now() > ac.expires_at;
+                           const timeLeft = Math.max(0, Math.ceil((ac.expires_at - Date.now()) / 60000));
+                           
+                           return (
+                               <div key={ac.code} className={`flex items-center justify-between p-4 rounded-xl border ${ac.is_active && !isExpired ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+                                   <div className="flex items-center gap-4">
+                                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-lg bg-slate-950 border ${ac.is_active && !isExpired ? 'border-green-500/30 text-green-400' : 'border-red-900/30 text-red-500'}`}>
+                                           {ac.is_active && !isExpired ? <KeyRound size={20} /> : <X size={20} />}
+                                       </div>
+                                       <div>
+                                           <div className="text-white font-bold">{ac.label || 'بدون اسم'}</div>
+                                           <div className="text-xs font-mono text-slate-400 mt-1 flex items-center gap-2">
+                                               {ac.code.match(/.{1,4}/g)?.join(' ')}
+                                               <button onClick={() => copyCode(ac.code)} className="hover:text-white">
+                                                   {copiedCode === ac.code ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                                               </button>
+                                           </div>
+                                       </div>
+                                   </div>
+
+                                   <div className="flex items-center gap-6">
+                                       <div className="text-right">
+                                           <div className={`text-xs font-bold ${ac.is_active && !isExpired ? 'text-green-400' : 'text-red-500'}`}>
+                                               {!ac.is_active ? 'متوقف' : isExpired ? 'منتهي' : 'نشط'}
+                                           </div>
+                                           {ac.is_active && !isExpired && (
+                                               <div className="text-[10px] text-slate-500">متبقي {timeLeft} دقيقة</div>
+                                           )}
+                                       </div>
+                                       
+                                       {ac.is_active && !isExpired && (
+                                           <button 
+                                               onClick={() => handleRevokeCode(ac.code)}
+                                               className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
+                                               title="إيقاف الكود فوراً"
+                                           >
+                                               <Trash2 size={16} />
+                                           </button>
+                                       )}
+                                   </div>
+                               </div>
+                           );
+                       })}
+                   </div>
+               </div>
            ) : (
              <UserTable 
                 users={filteredProfiles}

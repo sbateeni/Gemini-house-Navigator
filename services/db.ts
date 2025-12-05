@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry } from '../types';
+import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry, AccessCode } from '../types';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -15,7 +15,6 @@ const CACHE_KEY_NOTES = 'gemini_offline_notes';
 const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
 
 // Define Numeric Ranks for visibility comparison
-// Higher number = Higher Rank
 const ROLE_RANKS: Record<string, number> = {
   super_admin: 100,
   admin: 90,
@@ -23,6 +22,7 @@ const ROLE_RANKS: Record<string, number> = {
   center_admin: 70,
   officer: 60,
   user: 50,
+  source: 0, // Sources have lowest rank
   banned: 0
 };
 
@@ -61,13 +61,105 @@ export const db = {
     }
   },
 
+  // --- SOURCE ACCESS LOGIC ---
+  
+  // Verify access code
+  async verifyAccessCode(code: string): Promise<{ valid: boolean, error?: string, expiresAt?: number }> {
+     try {
+         const { data, error } = await supabase
+            .from('access_codes')
+            .select('*')
+            .eq('code', code)
+            .single();
+         
+         if (error) return { valid: false, error: 'الكود غير صحيح' };
+         if (!data.is_active) return { valid: false, error: 'تم تعطيل هذا الكود من قبل المسؤول' };
+         if (Date.now() > data.expires_at) return { valid: false, error: 'انتهت صلاحية هذا الكود' };
+
+         return { valid: true, expiresAt: data.expires_at };
+     } catch (e) {
+         return { valid: false, error: 'خطأ في الاتصال' };
+     }
+  },
+
+  // Generate new code (Officer+)
+  async createAccessCode(label: string): Promise<AccessCode> {
+      // 16-digit numeric string
+      const code = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
+      const createdAt = Date.now();
+      const expiresAt = createdAt + (30 * 60 * 1000); // 30 mins
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const newCode: AccessCode = {
+          code,
+          created_by: user?.id || '',
+          created_at: createdAt,
+          expires_at: expiresAt,
+          is_active: true,
+          label
+      };
+
+      const { error } = await supabase.from('access_codes').insert(newCode);
+      if (error) throw error;
+      return newCode;
+  },
+
+  // Get active codes created by me
+  async getMyAccessCodes(): Promise<AccessCode[]> {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      
+      const { data } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+        
+      return data || [];
+  },
+
+  // Revoke code
+  async revokeAccessCode(code: string): Promise<void> {
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ is_active: false })
+        .eq('code', code);
+      if (error) throw error;
+  },
+
+
   // --- CORE FUNCTIONS ---
 
-  async getAllNotes(currentUserProfile?: UserProfile): Promise<MapNote[]> {
+  async getAllNotes(currentUserProfile?: UserProfile, sourceCode?: string): Promise<MapNote[]> {
     try {
       if (!navigator.onLine) throw new Error("Offline");
 
-      // 1. Start with basic hierarchy filtering (Governorate/Center)
+      // CASE 1: Source Login (Guest)
+      if (sourceCode) {
+          // Sources ONLY see notes created by their own code
+          const { data, error } = await supabase
+             .from('notes')
+             .select('*')
+             .eq('access_code', sourceCode);
+          
+          if (error) throw error;
+          
+          return (data || []).map((row: any) => ({
+             id: row.id,
+             lat: row.lat,
+             lng: row.lng,
+             userNote: row.user_note,
+             locationName: row.location_name,
+             aiAnalysis: row.ai_analysis,
+             createdAt: row.created_at,
+             status: row.status,
+             sources: row.sources,
+             accessCode: row.access_code
+          }));
+      }
+
+      // CASE 2: Authenticated User (Standard Hierarchy)
       let query = supabase
         .from('notes')
         .select(`
@@ -98,14 +190,18 @@ export const db = {
       if (error) throw error;
 
       // 2. Apply Rank-Based Filtering (Visibility Logic)
-      // Rule: Viewer Rank >= Creator Rank
-      // "Higher rank sees lower. Lower rank DOES NOT see higher."
       const currentRank = getRankValue(currentUserProfile?.role);
       const currentUserId = currentUserProfile?.id;
 
       const filteredData = (data || []).filter((row: any) => {
           // Always see my own notes
           if (row.created_by === currentUserId) return true;
+
+          // If note is from a "Source" (has access_code), check if I am authorized to see it
+          // Generally, officers+ should see source notes.
+          if (row.access_code) {
+             return currentRank >= getRankValue('user'); // Basic users and up see source notes
+          }
 
           // If no creator info (legacy notes), assume visible (or treat as lowest rank)
           if (!row.creator_profile) return true;
@@ -128,7 +224,8 @@ export const db = {
         sources: row.sources,
         governorate: row.governorate,
         center: row.center,
-        createdBy: row.created_by
+        createdBy: row.created_by,
+        accessCode: row.access_code
       })) as MapNote[];
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
@@ -157,6 +254,21 @@ export const db = {
   },
 
   async addNote(note: MapNote, forceOnline = false): Promise<void> {
+    // Check if this is a "Source" note (has accessCode but no user session usually)
+    if (note.accessCode) {
+        // Use RPC to bypass auth check
+        const { error } = await supabase.rpc('create_source_note', {
+            p_code: note.accessCode,
+            p_note_data: note
+        });
+        if (error) {
+             console.error("RPC Error", error);
+             throw error;
+        }
+        return;
+    }
+
+    // Standard User Logic
     if (!navigator.onLine && !forceOnline) {
       console.log("Offline: Saving note to pending queue");
       const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
@@ -179,24 +291,21 @@ export const db = {
         created_at: note.createdAt,
         status: note.status || null,
         sources: note.sources || [],
-        governorate: note.governorate, // Add Hierarchy Tags
+        governorate: note.governorate, 
         center: note.center,
-        created_by: user?.id // SAVE OWNER
+        created_by: user?.id
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
       if (error) {
-        // Check for missing column error specifically
-        if (error.code === '42703') { 
-            throw new Error("DATABASE_SCHEMA_MISMATCH");
-        }
+        if (error.code === '42703') throw new Error("DATABASE_SCHEMA_MISMATCH");
         throw error;
       }
       
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
       if (error.message === "DATABASE_SCHEMA_MISMATCH") {
-          alert("خطأ: قاعدة البيانات تحتاج لتحديث. الأعمدة (governorate, center, created_by) مفقودة.");
+          alert("خطأ: قاعدة البيانات تحتاج لتحديث.");
           throw error;
       }
 
@@ -260,7 +369,7 @@ export const db = {
         if (role === 'super_admin' || role === 'admin') {
            // No filter
         }
-        // Governorate Admin sees users in their gov OR unassigned users (to assign them)
+        // Governorate Admin sees users in their gov OR unassigned users
         else if (role === 'governorate_admin' && currentUserProfile.governorate) {
            query = query.or(`governorate.eq.${currentUserProfile.governorate},governorate.is.null`);
         } 
@@ -290,7 +399,6 @@ export const db = {
     }
   },
 
-  // Updated to include fetching users active in the last X minutes
   async getRecentlyActiveUsers(minutes: number = 20): Promise<any[]> {
     try {
       const cutoff = Date.now() - (minutes * 60 * 1000);
@@ -324,7 +432,6 @@ export const db = {
     }
   },
 
-  // Updated to save location data
   async updateLastSeen(userId: string, lat?: number, lng?: number): Promise<void> {
       const updates: any = { last_seen: Date.now() };
       if (lat !== undefined) updates.lat = lat;
@@ -381,7 +488,6 @@ export const db = {
     if (error) throw error;
   },
 
-  // Logging
   async createLogEntry(log: Omit<LogEntry, 'id'>): Promise<void> {
     try {
       const row: any = {
@@ -395,7 +501,6 @@ export const db = {
 
       await supabase.from('logs').insert(row);
     } catch (e) {
-      // logs are best effort
       console.error("Log failed", e);
     }
   },
@@ -409,7 +514,6 @@ export const db = {
         .limit(50);
 
       if (error) {
-          // If table missing, return empty to prevent crash
           if (error.code === 'PGRST205' || error.code === '42P01') return [];
           throw error;
       }

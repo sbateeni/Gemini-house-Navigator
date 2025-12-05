@@ -77,11 +77,13 @@ create table if not exists notes (
   sources jsonb,
   governorate text,
   center text,
-  created_by uuid references auth.users(id) -- New: Track creator for Rank Logic
+  created_by uuid references auth.users(id),
+  access_code text -- New field for Source Logic
 );
 
 -- Update existing notes table if exists
 alter table notes add column if not exists created_by uuid references auth.users(id);
+alter table notes add column if not exists access_code text;
 
 alter table notes enable row level security;
 
@@ -91,7 +93,12 @@ drop policy if exists "Auth insert" on notes;
 drop policy if exists "Auth update" on notes;
 drop policy if exists "Admin delete" on notes;
 
-create policy "Auth read" on notes for select using (auth.role() = 'authenticated');
+-- Allow authenticated users to read everything (subject to hierarchy filter in client, but RLS allows read)
+-- Update: Allow read if auth OR if access_code matches (handled in function or simplified policy)
+create policy "Auth read" on notes for select using (
+  auth.role() = 'authenticated' OR access_code IS NOT NULL
+);
+
 create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
 create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
 -- Admin Delete Policy: Includes Super, Gov, Center admins
@@ -151,6 +158,76 @@ drop policy if exists "Admin delete logs" on logs;
 create policy "Admin delete logs" on logs for delete using (
   exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'admin'))
 );
+
+-- 7. NEW: Access Codes Table (For Sources)
+create table if not exists access_codes (
+  code text primary key,
+  created_by uuid references auth.users(id),
+  created_at bigint,
+  expires_at bigint,
+  label text,
+  is_active boolean default true
+);
+
+alter table access_codes enable row level security;
+
+-- Allow officers+ to view/create codes
+drop policy if exists "Officer manage codes" on access_codes;
+create policy "Officer manage codes" on access_codes for all using (
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'admin'))
+);
+
+-- Allow public read (needed for login check) - We can restrict this by only allowing SELECT via exact ID match but Supabase doesn't support "Select by PK only" easily in policies.
+-- Ideally we use a Remote Procedure Call (RPC) for login to keep table private.
+-- For now, allow public select to check validity.
+drop policy if exists "Public check code" on access_codes;
+create policy "Public check code" on access_codes for select using (true);
+
+
+-- 8. RPC: Create Note as Source (Bypasses Auth)
+create or replace function create_source_note(
+  p_code text,
+  p_note_data jsonb
+)
+returns void as $$
+declare
+  v_expires bigint;
+  v_active boolean;
+begin
+  -- Check if code exists and is valid
+  select expires_at, is_active into v_expires, v_active 
+  from access_codes where code = p_code;
+
+  if v_expires is null then
+    raise exception 'Invalid Code';
+  end if;
+
+  if not v_active then
+     raise exception 'Code Deactivated';
+  end if;
+
+  if (extract(epoch from now()) * 1000)::bigint > v_expires then
+     raise exception 'Code Expired';
+  end if;
+
+  -- Insert Note
+  insert into notes (
+    id, lat, lng, user_note, location_name, ai_analysis, 
+    created_at, status, sources, access_code
+  ) values (
+    p_note_data->>'id',
+    (p_note_data->>'lat')::float8,
+    (p_note_data->>'lng')::float8,
+    p_note_data->>'userNote',
+    p_note_data->>'locationName',
+    p_note_data->>'aiAnalysis',
+    (p_note_data->>'createdAt')::bigint,
+    p_note_data->>'status',
+    p_note_data->'sources',
+    p_code
+  );
+end;
+$$ language plpgsql security definer;
 `;
 
   const copyToClipboard = () => {
@@ -179,7 +256,7 @@ create policy "Admin delete logs" on logs for delete using (
           <div>
             <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
             <p className="text-slate-400 text-sm">
-              تم تفعيل نظام الرتب (Rank System). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">notes</span> لإضافة عمود `created_by`.
+              تم إضافة نظام "المصادر" (Access Codes). يرجى تحديث قاعدة البيانات لإضافة جدول <span className="text-yellow-400 font-bold mx-1">access_codes</span>.
             </p>
           </div>
         </div>

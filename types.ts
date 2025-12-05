@@ -12,7 +12,8 @@ export interface MapNote {
   // Hierarchy Fields
   governorate?: string;
   center?: string;
-  createdBy?: string; // UUID of the creator
+  createdBy?: string; // UUID of the creator (Normal Users)
+  accessCode?: string; // For Source/Guest Users
 }
 
 export interface GroundingSource {
@@ -43,7 +44,7 @@ export interface UserPermissions {
 }
 
 // Added 'officer' between center_admin and user
-export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'officer' | 'user' | 'banned';
+export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'officer' | 'user' | 'banned' | 'source';
 
 export interface UserProfile {
   id: string;
@@ -93,4 +94,19 @@ export interface LogEntry {
   timestamp: number;
   governorate?: string;
   center?: string;
+}
+
+// New Interface for Source Codes
+export interface AccessCode {
+  code: string;
+  created_by: string; // Officer ID
+  created_at: number;
+  expires_at: number;
+  label?: string; // Optional name for the operation
+  is_active: boolean;
+}
+
+export interface SourceSession {
+  code: string;
+  expiresAt: number;
 }

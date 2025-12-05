@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
@@ -32,7 +31,7 @@ export function useAppLogic() {
 
   // --- 3. Core Data Hooks ---
   const { 
-    notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setIsConnected 
+    notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
   const { userLocation } = useGeolocation(session, hasAccess);
@@ -337,7 +336,7 @@ export function useAppLogic() {
     // Auth
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
     // Core Data
-    notes, isConnected, tableMissing, updateStatus,
+    notes, isConnected, tableMissing, updateStatus, setNotes,
     // Tactical
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser,

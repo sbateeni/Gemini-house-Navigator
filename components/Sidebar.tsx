@@ -48,13 +48,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   myStatus, setMyStatus, onlineUsers, currentUserId
 }) => {
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
-  const [noteSearchQuery, setNoteSearchQuery] = useState(""); // New State for Note Search
+  const [noteSearchQuery, setNoteSearchQuery] = useState(""); 
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+  const isSource = userRole === 'source';
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || isSource) return;
 
     const fetchProfiles = () => {
         db.getAllProfiles().then(setAllProfiles);
@@ -64,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const interval = setInterval(fetchProfiles, 60000); 
 
     return () => clearInterval(interval);
-  }, [isAdmin]);
+  }, [isAdmin, isSource]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -116,10 +117,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth pb-24 md:pb-4">
         
         <div className="flex items-center justify-between px-2 mb-2">
-            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isConnected ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-red-900/20 text-red-400 border-red-900/30'}`}>
-                {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-                {isConnected ? 'متصل بالسحابة' : 'وضع غير متصل'}
-            </div>
+            {!isSource && (
+              <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isConnected ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-red-900/20 text-red-400 border-red-900/30'}`}>
+                  {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
+                  {isConnected ? 'متصل بالسحابة' : 'وضع غير متصل'}
+              </div>
+            )}
+            {/* Show Source Label instead of Wifi status for sources */}
+            {isSource && (
+              <div className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-900/20 text-green-400 border-green-900/30">
+                  مصدر سري (نشط)
+              </div>
+            )}
+
             {routeData && (
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-blue-400 font-bold">
@@ -132,21 +142,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
         </div>
 
-        {isAdmin && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />}
+        {isAdmin && !isSource && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />}
 
         <SidebarNotes 
             notes={notes}
             selectedNote={selectedNote}
             canCreate={canCreate}
-            isAnalyzing={isAnalyzing}
+            isAnalyzing={!isSource && isAnalyzing} // Disable analyzing for source
             onFlyToNote={onFlyToNote}
             onEditNote={onEditNote}
             onDeleteNote={onDeleteNote}
             onNavigateToNote={onNavigateToNote}
             onAnalyzeNote={onAnalyzeNote}
             onUpdateStatus={onUpdateStatus}
-            noteSearchQuery={noteSearchQuery} // Pass Query
-            setNoteSearchQuery={setNoteSearchQuery} // Pass Setter
+            noteSearchQuery={noteSearchQuery}
+            setNoteSearchQuery={setNoteSearchQuery}
         />
       </div>
       
