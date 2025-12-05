@@ -89,30 +89,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [isOpen, setIsOpen]);
 
-  // --- SOURCE MODE VIEW (MINIMAL) ---
+  // --- SOURCE MODE VIEW (FIXED LAYOUT) ---
   if (isSource) {
       return (
         <div 
             ref={sidebarRef}
             className={`
-                fixed inset-y-0 right-0 z-[1000] 
+                fixed inset-y-0 right-0 z-[1500] 
                 w-full md:w-80 
                 bg-slate-900/95 backdrop-blur-xl 
                 border-l border-slate-800 
                 shadow-2xl 
                 transform transition-transform duration-300 ease-in-out
                 flex flex-col text-right
+                pb-20 /* Padding bottom to ensure content is above the Operations Log bar */
                 ${isOpen ? 'translate-x-0' : 'translate-x-full'}
                 md:relative md:translate-x-0
                 ${!isOpen && 'md:!w-0 md:!border-0'}
             `}
         >
-            <div className="p-6 flex flex-col items-center justify-center h-full text-center space-y-4">
+            <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center border border-green-500/30 animate-pulse">
                     <ShieldCheck size={32} className="text-green-500" />
                 </div>
                 <h2 className="text-xl font-bold text-white">وضع المصدر الآمن</h2>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-400 leading-relaxed">
                     يمكنك إضافة المواقع بالنقر على الخريطة. <br/>
                     لا يتم عرض البيانات المسجلة هنا لسلامتك.
                 </p>
@@ -134,13 +135,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div 
       ref={sidebarRef}
       className={`
-        fixed inset-y-0 right-0 z-[1000] 
+        fixed inset-y-0 right-0 z-[1500] 
         w-full md:w-80 
         bg-slate-900/95 backdrop-blur-xl 
         border-l border-slate-800 
         shadow-2xl 
         transform transition-transform duration-300 ease-in-out
         flex flex-col text-right
+        pb-20 /* Padding bottom to ensure footer is above the Operations Log bar */
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         md:relative md:translate-x-0
         ${!isOpen && 'md:!w-0 md:!border-0'}
@@ -156,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onSearch={onSearch}
       />
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth pb-24 md:pb-4">
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth">
         
         <div className="flex items-center justify-between px-2 mb-2">
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${isConnected ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-red-900/20 text-red-400 border-red-900/30'}`}>
