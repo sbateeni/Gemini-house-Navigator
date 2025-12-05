@@ -23,8 +23,7 @@ export default function App() {
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
 
   // --- 2. AUTH & LOGIC HOOKS ---
-  // Note: We access app logic, but some parts depend on authentication which Source users lack.
-  // We will handle this by mocking necessary profile/permission data for the Source user.
+  // Pass true if sourceSession exists to enable specific logic like geolocation
   const {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
     notes, isConnected, tableMissing, updateStatus, setNotes,
@@ -44,7 +43,7 @@ export default function App() {
     targetUserFilter, setTargetUserFilter,
     // Flight Props
     isFlightMode, setIsFlightMode, flightHeading
-  } = useAppLogic();
+  } = useAppLogic(!!sourceSession);
 
   // --- 3. SOURCE MODE LOGIC ---
   

@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { X, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Wrench, LogOut, Mountain, Satellite, EyeOff, Map } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Wrench, LogOut, Mountain, Satellite, EyeOff, Map, KeyRound, Copy, RefreshCcw, Plus } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
-import { UserRole } from '../types';
+import { db } from '../services/db';
+import { UserRole, AccessCode } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -27,9 +28,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  
+  // Source Codes State
+  const [myCodes, setMyCodes] = useState<AccessCode[]>([]);
+  const [newCodeLabel, setNewCodeLabel] = useState("");
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+  const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(userRole || '');
   const isSource = userRole === 'source';
+
+  useEffect(() => {
+      if (isOpen && isOfficerOrAbove) {
+          fetchCodes();
+      }
+  }, [isOpen, isOfficerOrAbove]);
+
+  const fetchCodes = async () => {
+      try {
+          const codes = await db.getMyAccessCodes();
+          setMyCodes(codes);
+      } catch (e) {
+          console.error("Failed to fetch codes", e);
+      }
+  };
+
+  const handleGenerateCode = async () => {
+      if (!newCodeLabel.trim()) return;
+      setGeneratingCode(true);
+      try {
+          await db.createAccessCode(newCodeLabel);
+          setNewCodeLabel("");
+          await fetchCodes();
+      } catch (e) {
+          alert("فشل إنشاء الكود");
+      } finally {
+          setGeneratingCode(false);
+      }
+  };
+
+  const handleDeleteCode = async (code: string) => {
+      if (confirm("حذف هذا الكود نهائياً؟")) {
+          await db.revokeAccessCode(code);
+          fetchCodes();
+      }
+  };
+
+  const copyCode = (code: string) => {
+      navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+  };
 
   if (!isOpen) return null;
 
@@ -89,6 +139,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const email = user?.email || '';
   const initialChar = username.charAt(0).toUpperCase();
 
+  // Correct Role Label Display
+  let roleLabel = 'عنصر';
+  if (userRole === 'super_admin') roleLabel = 'قائد عام';
+  else if (userRole === 'governorate_admin') roleLabel = 'مدير محافظة';
+  else if (userRole === 'center_admin') roleLabel = 'مدير مركز';
+  else if (userRole === 'officer') roleLabel = 'ضابط';
+  else if (userRole === 'admin') roleLabel = 'مسؤول';
+  else if (userRole === 'source') roleLabel = 'مصدر مؤقت';
+
   return (
     <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
@@ -111,8 +170,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div>
                   <div className="text-white font-bold text-lg">{username}</div>
                   <div className="text-slate-400 text-sm flex items-center gap-1.5">
-                    <Shield size={12} className={isAdmin ? 'text-purple-400' : 'text-slate-500'} />
-                    <span className="capitalize">{isAdmin ? 'مدير النظام' : isSource ? 'مصدر مؤقت' : 'عنصر'}</span>
+                    <Shield size={12} className={isOfficerOrAbove ? 'text-purple-400' : 'text-slate-500'} />
+                    <span>{roleLabel}</span>
                   </div>
                 </div>
               </div>
@@ -133,6 +192,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
+          {/* --- NEW: SOURCE MANAGEMENT FOR OFFICERS+ --- */}
+          {isOfficerOrAbove && (
+              <section>
+                  <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">إدارة المصادر (16 رقم)</h3>
+                      <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">صلاحية ضابط</span>
+                  </div>
+                  
+                  <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
+                      {/* Generator */}
+                      <div className="flex gap-2">
+                          <input 
+                              type="text"
+                              value={newCodeLabel}
+                              onChange={(e) => setNewCodeLabel(e.target.value)}
+                              placeholder="اسم المصدر/المهمة"
+                              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 text-sm text-white focus:border-green-500 focus:outline-none"
+                          />
+                          <button 
+                              onClick={handleGenerateCode}
+                              disabled={generatingCode || !newCodeLabel.trim()}
+                              className="bg-green-600 hover:bg-green-500 text-white p-2 rounded-lg transition-colors"
+                          >
+                              <Plus size={20} />
+                          </button>
+                      </div>
+
+                      {/* List */}
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                          {myCodes.length === 0 && <p className="text-center text-xs text-slate-500 py-2">لا توجد أكواد نشطة.</p>}
+                          {myCodes.map(code => (
+                              <div key={code.code} className="bg-slate-900 border border-slate-700 p-2 rounded-lg flex items-center justify-between">
+                                  <div>
+                                      <div className="text-xs font-bold text-white">{code.label}</div>
+                                      <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
+                                          {code.code.slice(0, 4)}...{code.code.slice(-4)}
+                                          <button onClick={() => copyCode(code.code)} className="hover:text-white">
+                                              {copiedCode === code.code ? <CheckCircle2 size={10} className="text-green-400" /> : <Copy size={10} />}
+                                          </button>
+                                      </div>
+                                  </div>
+                                  <button onClick={() => handleDeleteCode(code.code)} className="text-slate-500 hover:text-red-400 p-1">
+                                      <Trash2 size={14} />
+                                  </button>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </section>
+          )}
+
           {isSource ? (
               // RESTRICTED VIEW FOR SOURCE
               <section className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-8 text-center space-y-4">
@@ -142,93 +252,90 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div>
                       <h3 className="text-white font-bold text-lg">بيانات مقيدة</h3>
                       <p className="text-slate-400 text-sm mt-2">
-                          تم إخفاء بيانات الوحدات الأخرى والخرائط التفصيلية لأسباب أمنية.
+                          تم إخفاء بيانات الوحدات الأخرى وسجلات النظام لأسباب أمنية.
                       </p>
                   </div>
               </section>
           ) : (
               // NORMAL VIEW FOR USERS/ADMINS
-              <>
-                {/* Map Provider Section */}
-                <section>
-                    <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
-                    <div className="space-y-2 grid grid-cols-1 gap-2">
-                        {providers.map(p => (
-                            <button
-                                key={p.id}
-                                onClick={() => setMapProvider(p.id)}
-                                className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
-                            >
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 ${p.iconColor}`}`}>
-                                    <p.icon size={20} />
-                                </div>
-                                <div className="text-right flex-1 min-w-0">
-                                    <div className={`font-bold truncate ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
-                                    <div className="text-[10px] text-slate-400 truncate">{p.desc}</div>
-                                </div>
-                                {mapProvider === p.id && <CheckCircle2 className="text-blue-500 shrink-0" size={20} />}
-                            </button>
-                        ))}
-                    </div>
-                </section>
+              <section>
+                  <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">البيانات</h3>
+                      <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">متصل</span>
+                  </div>
+                  
+                  <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
+                      <div className="border-b border-slate-700/50 pb-4 mb-2">
+                          <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                              <Download size={16} className="text-blue-400" />
+                              تحميل المنطقة
+                          </h4>
+                          {isDownloading ? (
+                              <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
+                                  <div className="flex justify-between text-xs text-white mb-1">
+                                      <span>جاري التحميل...</span>
+                                      <span>{downloadProgress ? Math.round((downloadProgress.current / downloadProgress.total) * 100) : 0}%</span>
+                                  </div>
+                                  <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                                      <div 
+                                          className="bg-blue-500 h-full transition-all duration-300"
+                                          style={{ width: `${downloadProgress ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` }}
+                                      ></div>
+                                  </div>
+                              </div>
+                          ) : (
+                              <button 
+                                  onClick={handleDownloadMap}
+                                  className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                              >
+                                  <Download size={16} /> تحميل
+                              </button>
+                          )}
+                      </div>
 
-                {/* Offline Maps Section */}
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">البيانات</h3>
-                        <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">متصل</span>
-                    </div>
-                    
-                    <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
-                        <div className="border-b border-slate-700/50 pb-4 mb-2">
-                            <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                                <Download size={16} className="text-blue-400" />
-                                تحميل المنطقة
-                            </h4>
-                            {isDownloading ? (
-                                <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
-                                    <div className="flex justify-between text-xs text-white mb-1">
-                                        <span>جاري التحميل...</span>
-                                        <span>{downloadProgress ? Math.round((downloadProgress.current / downloadProgress.total) * 100) : 0}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                        <div 
-                                            className="bg-blue-500 h-full transition-all duration-300"
-                                            style={{ width: `${downloadProgress ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button 
-                                    onClick={handleDownloadMap}
-                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Download size={16} /> تحميل
-                                </button>
-                            )}
-                        </div>
+                      <div className="flex flex-col gap-2">
+                          <button 
+                              onClick={handleClearCache}
+                              className="w-full text-slate-400 hover:text-white hover:bg-slate-700 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-slate-700/50"
+                          >
+                              <Trash2 size={14} /> حذف الكاش
+                          </button>
 
-                        <div className="flex flex-col gap-2">
-                            <button 
-                                onClick={handleClearCache}
-                                className="w-full text-slate-400 hover:text-white hover:bg-slate-700 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-slate-700/50"
-                            >
-                                <Trash2 size={14} /> حذف الكاش
-                            </button>
-
-                            {onOpenDatabaseFix && (
-                                <button 
-                                    onClick={onOpenDatabaseFix}
-                                    className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-900/30 mt-2"
-                                >
-                                    <Wrench size={14} /> إصلاح مشاكل قاعدة البيانات (SQL)
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </section>
-              </>
+                          {onOpenDatabaseFix && (
+                              <button 
+                                  onClick={onOpenDatabaseFix}
+                                  className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-900/30 mt-2"
+                              >
+                                  <Wrench size={14} /> إصلاح مشاكل قاعدة البيانات (SQL)
+                              </button>
+                          )}
+                      </div>
+                  </div>
+              </section>
           )}
+
+          {/* Map Provider Section */}
+          <section>
+              <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
+              <div className="space-y-2 grid grid-cols-1 gap-2">
+                  {providers.map(p => (
+                      <button
+                          key={p.id}
+                          onClick={() => setMapProvider(p.id)}
+                          className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
+                      >
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 ${p.iconColor}`}`}>
+                              <p.icon size={20} />
+                          </div>
+                          <div className="text-right flex-1 min-w-0">
+                              <div className={`font-bold truncate ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
+                              <div className="text-[10px] text-slate-400 truncate">{p.desc}</div>
+                          </div>
+                          {mapProvider === p.id && <CheckCircle2 className="text-blue-500 shrink-0" size={20} />}
+                      </button>
+                  ))}
+              </div>
+          </section>
         </div>
       </div>
     </div>

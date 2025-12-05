@@ -14,7 +14,7 @@ import { useNoteForm } from './useNoteForm';
 import { useAssignments } from './useAssignments';
 import { useSound } from './useSound';
 
-export function useAppLogic() {
+export function useAppLogic(isSourceMode: boolean = false) {
   // --- 1. Authentication & User Data ---
   const { 
     session, authLoading, userRole, isApproved, permissions, 
@@ -35,7 +35,9 @@ export function useAppLogic() {
     notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
-  const { userLocation: gpsLocation } = useGeolocation(session, hasAccess);
+  // Enable Geolocation if Access Granted OR Source Mode
+  const { userLocation: gpsLocation } = useGeolocation(hasAccess || isSourceMode);
+  
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
   // --- FLIGHT MODE LOGIC ---
@@ -55,7 +57,7 @@ export function useAppLogic() {
         };
         setFlightState({ ...flightRef.current });
     }
-  }, [isFlightMode]); // gpsLocation dependency removed to prevent reset during flight
+  }, [isFlightMode]); 
 
   // Flight Controls
   useEffect(() => {
@@ -81,11 +83,6 @@ export function useAppLogic() {
         const { lat, heading, speed } = flightRef.current;
         
         if (speed > 0) {
-            // Simple Geo Calculation
-            // heading 0 = North (Up)
-            const rad = (heading - 90) * (Math.PI / 180); // Adjusting because standard trig 0 is East
-            // Actually, let's keep it simple: 0 deg = North
-            
             const dLat = speed * Math.cos(heading * Math.PI / 180);
             const dLng = speed * Math.sin(heading * Math.PI / 180) / Math.cos(lat * Math.PI / 180);
             
@@ -119,7 +116,7 @@ export function useAppLogic() {
   
   // Map Provider Logic
   const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('gemini_map_provider') || 'google');
-  // Derived state for backward compatibility with UI components relying on simple boolean
+  
   const isSatellite = mapProvider === 'google' || mapProvider === 'esri';
   const setIsSatellite = (val: boolean) => {
       // Toggle between default satellite (google) and default dark (carto)
@@ -135,7 +132,7 @@ export function useAppLogic() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFullLogs, setShowFullLogs] = useState(false);
-  const [showCampaigns, setShowCampaigns] = useState(false); // New
+  const [showCampaigns, setShowCampaigns] = useState(false); 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Tactical Command States
@@ -181,7 +178,7 @@ export function useAppLogic() {
     }
   }, [myStatus, session?.user?.id]);
 
-  // SOS Sound Logic (Trigger if I am SOS OR someone else is SOS)
+  // SOS Sound Logic
   useEffect(() => {
     if (isSOS || distressedUser) {
         playSiren();

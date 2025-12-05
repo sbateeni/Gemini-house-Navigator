@@ -1,13 +1,11 @@
 
-
-
 import { useState, useEffect } from 'react';
 
-export function useGeolocation(session: any, isApproved: boolean) {
+export function useGeolocation(enabled: boolean) {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
 
   useEffect(() => {
-    if (!session || !isApproved) return;
+    if (!enabled) return;
     
     if (navigator.geolocation) {
         const watchId = navigator.geolocation.watchPosition(
@@ -26,7 +24,7 @@ export function useGeolocation(session: any, isApproved: boolean) {
         );
         return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [session, isApproved]);
+  }, [enabled]);
 
   return { userLocation };
 }

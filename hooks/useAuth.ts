@@ -1,6 +1,4 @@
 
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
@@ -121,27 +119,36 @@ export function useAuth() {
         (payload: any) => {
           const newProfile = payload.new;
           if (newProfile) {
-             const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+             // Map snake_case from DB to camelCase for App State
+             const mappedProfile: Partial<UserProfile> = {
+                 role: newProfile.role,
+                 isApproved: newProfile.is_approved === true,
+                 permissions: newProfile.permissions,
+                 governorate: newProfile.governorate,
+                 center: newProfile.center
+             };
+
+             const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(mappedProfile.role || '');
              
              // Update Approval
-             if (isAdmin || newProfile.is_approved === true) {
+             if (isAdmin || mappedProfile.isApproved) {
                setIsApproved(true);
              }
              
-             if (newProfile.role === 'banned') {
+             if (mappedProfile.role === 'banned') {
                setIsApproved(false);
                setUserRole('banned');
              } else {
-               setUserRole(newProfile.role);
+               setUserRole(mappedProfile.role as UserRole);
              }
 
              // Update Permissions
-             if (newProfile.permissions) {
-               setPermissions(newProfile.permissions);
+             if (mappedProfile.permissions) {
+               setPermissions(mappedProfile.permissions);
              }
              
-             // Update full profile object
-             setUserProfile(prev => prev ? ({ ...prev, ...newProfile, permissions: newProfile.permissions }) : null);
+             // Update full profile object safely
+             setUserProfile(prev => prev ? ({ ...prev, ...mappedProfile }) : null);
           }
         }
       )
