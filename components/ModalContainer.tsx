@@ -8,7 +8,7 @@ import { LocationPickerModal } from './LocationPickerModal';
 import { DispatchModal } from './DispatchModal';
 import { FullLogsModal } from './FullLogsModal';
 import { CampaignsModal } from './CampaignsModal';
-import { MapNote, UserProfile, UserRole, MapUser } from '../types';
+import { MapNote, UserProfile, UserRole, MapUser, ActiveCampaign } from '../types';
 
 interface ModalContainerProps {
   // Create Modal Props
@@ -26,7 +26,8 @@ interface ModalContainerProps {
   closeDashboard: () => void;
   currentUserId: string;
   currentUserProfile: UserProfile | null;
-  onlineUsers: MapUser[]; // Pass the live list
+  onlineUsers: MapUser[]; 
+  allProfiles: UserProfile[]; // New
 
   // Settings Props
   showSettings: boolean;
@@ -62,6 +63,9 @@ interface ModalContainerProps {
   // Campaigns Props
   showCampaigns: boolean;
   closeCampaigns: () => void;
+  activeCampaign: ActiveCampaign | null;
+  onStartCampaign: (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => void;
+  onUpdateCampaign: (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => void;
 
   // Filter
   onFilterByUser: (userId: string, userName: string) => void;
@@ -84,6 +88,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   currentUserId,
   currentUserProfile,
   onlineUsers,
+  allProfiles,
   showSettings,
   closeSettings,
   user,
@@ -107,6 +112,9 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeFullLogs,
   showCampaigns,
   closeCampaigns,
+  activeCampaign,
+  onStartCampaign,
+  onUpdateCampaign,
   onFilterByUser,
   onLogout
 }) => {
@@ -177,8 +185,12 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         isOpen={showCampaigns}
         onClose={closeCampaigns}
         onlineUsers={onlineUsers}
+        allProfiles={allProfiles}
         notes={notes}
         currentUserProfile={currentUserProfile}
+        activeCampaign={activeCampaign}
+        onStartCampaign={onStartCampaign}
+        onUpdateCampaign={onUpdateCampaign}
       />
     </>
   );

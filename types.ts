@@ -117,3 +117,11 @@ export interface SourceSession {
   expiresAt: number;
   label?: string; // Operation Name
 }
+
+export interface ActiveCampaign {
+  name: string;
+  participantIds: Set<string>;
+  targetIds: Set<string>;
+  commanderIds: Set<string>;
+  startTime: number;
+}

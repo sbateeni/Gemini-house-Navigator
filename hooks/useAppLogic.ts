@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
+import { MapNote, MapUser, UnitStatus, Assignment, ActiveCampaign, UserProfile } from '../types';
 import { db } from '../services/db';
 import { searchPlace, identifyLocation } from '../services/gemini';
 
@@ -32,7 +32,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
 
   // --- 3. Core Data Hooks ---
   const { 
-    notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setNotes, setIsConnected 
+    notes, isConnected, tableMissing, addNote, updateNote, deleteNote, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
   // Enable Geolocation if Access Granted OR Source Mode
@@ -50,13 +50,13 @@ export function useAppLogic(isSourceMode: boolean = false) {
   // --- 5. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
+  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   
   // Map Provider Logic
   const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('gemini_map_provider') || 'google');
   
   const isSatellite = mapProvider === 'google' || mapProvider === 'esri';
   const setIsSatellite = (val: boolean) => {
-      // Toggle between default satellite (google) and default dark (carto)
       setMapProvider(val ? 'google' : 'carto');
   };
   
@@ -80,7 +80,10 @@ export function useAppLogic(isSourceMode: boolean = false) {
   // ADMIN FILTER STATE
   const [targetUserFilter, setTargetUserFilter] = useState<{id: string, name: string} | null>(null);
 
-  // Find Distressed User (Someone else who triggered SOS)
+  // CAMPAIGN STATE
+  const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null);
+
+  // Find Distressed User
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
 
   // --- 6. Form Logic Hook ---
@@ -100,6 +103,13 @@ export function useAppLogic(isSourceMode: boolean = false) {
   useEffect(() => {
     localStorage.setItem('gemini_map_provider', mapProvider);
   }, [mapProvider]);
+
+  // Fetch All Profiles for Campaign Management (Offline users included)
+  useEffect(() => {
+      if (hasAccess && isAnyAdmin) {
+          db.getAllProfiles().then(setAllProfiles);
+      }
+  }, [hasAccess, isAnyAdmin, showCampaigns]); // Refresh when opening modal
 
   // Log Status Changes
   useEffect(() => {
@@ -141,21 +151,11 @@ export function useAppLogic(isSourceMode: boolean = false) {
         setIsLocating(false);
     };
 
-    const onLowAccError = (err: GeolocationPositionError) => {
-        console.error("GPS Fallback failed:", err);
-        alert("تعذر تحديد الموقع. الرجاء التحقق من إعدادات GPS.");
-        setIsLocating(false);
-    };
-
     navigator.geolocation.getCurrentPosition(
         onSuccess,
         (err) => {
-            console.warn("High accuracy GPS failed, trying low accuracy...", err);
-            navigator.geolocation.getCurrentPosition(
-                onSuccess,
-                onLowAccError,
-                { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 }
-            );
+            console.warn("GPS failed", err);
+            setIsLocating(false);
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
@@ -301,14 +301,6 @@ export function useAppLogic(isSourceMode: boolean = false) {
         instructions,
         createdBy: session.user.id
       });
-      await db.createLogEntry({
-          message: `تم إرسال تكليف للوحدة`,
-          type: 'dispatch',
-          userId: session.user.id,
-          timestamp: Date.now(),
-          governorate: userProfile?.governorate,
-          center: userProfile?.center
-      });
       alert("تم الإرسال بنجاح!");
     } catch (e) {
       console.error("Dispatch failed", e);
@@ -322,6 +314,51 @@ export function useAppLogic(isSourceMode: boolean = false) {
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
   };
 
+  // --- CAMPAIGN LOGIC ---
+
+  const handleStartCampaign = (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
+      setActiveCampaign({
+          name,
+          participantIds: participants,
+          targetIds: targets,
+          commanderIds: commanders,
+          startTime: Date.now()
+      });
+      handleStopNavigation();
+  };
+
+  const handleUpdateCampaign = (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
+      if (!activeCampaign) return;
+      setActiveCampaign({
+          ...activeCampaign,
+          name,
+          participantIds: participants,
+          targetIds: targets,
+          commanderIds: commanders
+      });
+  };
+
+  const handleEndCampaign = () => {
+      setActiveCampaign(null);
+  };
+
+  // Modified Update Status to handle Campaign Cleanup
+  const updateStatus = async (id: string, status: 'caught' | 'not_caught') => {
+    const note = notes.find(n => n.id === id);
+    if (note) {
+      await updateNote({ ...note, status });
+      
+      // AUTO-REMOVE FROM CAMPAIGN if Caught
+      if (status === 'caught' && activeCampaign && activeCampaign.targetIds.has(id)) {
+          const newTargets = new Set(activeCampaign.targetIds);
+          newTargets.delete(id);
+          setActiveCampaign({ ...activeCampaign, targetIds: newTargets });
+          // Optional: Notify user
+          // alert("تم حذف الهدف من قائمة الحملة النشطة.");
+      }
+    }
+  };
+
   return {
     // Auth
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
@@ -329,7 +366,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
     notes, isConnected, tableMissing, updateStatus, setNotes,
     // Tactical
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
-    onlineUsers, userLocation, distressedUser, handleLocateSOSUser,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser, allProfiles,
     // Navigation
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
     // UI State
@@ -349,6 +386,8 @@ export function useAppLogic(isSourceMode: boolean = false) {
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
     // Admin Filters
-    targetUserFilter, setTargetUserFilter
+    targetUserFilter, setTargetUserFilter,
+    // Campaign
+    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign
   };
 }

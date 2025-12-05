@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession, UserPermissions, UserProfile } from './types';
 import { db } from './services/db';
-import { Timer, LogOut, X, ShieldAlert, KeyRound } from 'lucide-react';
+import { Timer, LogOut, X, ShieldAlert, KeyRound, Gamepad2, Edit3 } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -23,12 +23,11 @@ export default function App() {
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
 
   // --- 2. AUTH & LOGIC HOOKS ---
-  // Pass true if sourceSession exists to enable specific logic like geolocation
   const {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
     notes, isConnected, tableMissing, updateStatus, setNotes,
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
-    onlineUsers, userLocation, distressedUser, handleLocateSOSUser,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser, allProfiles,
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
@@ -40,7 +39,8 @@ export default function App() {
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    targetUserFilter, setTargetUserFilter
+    targetUserFilter, setTargetUserFilter,
+    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign
   } = useAppLogic(!!sourceSession);
 
   // --- 3. SOURCE MODE LOGIC ---
@@ -71,10 +71,23 @@ export default function App() {
   const activePermissions = sourceSession ? sourcePermissions : permissions;
   const activeUserRole = sourceSession ? 'source' : userRole;
   
-  // Filter Logic
-  const displayedNotes = targetUserFilter 
-    ? notes.filter(n => n.createdBy === targetUserFilter.id)
-    : notes;
+  // --- FILTERING LOGIC ---
+  // 1. Filter Notes based on Campaign OR User Filter
+  let displayedNotes = notes;
+  
+  if (activeCampaign) {
+      // In campaign mode, ONLY show target IDs (auto-updated when caught)
+      displayedNotes = notes.filter(n => activeCampaign.targetIds.has(n.id));
+  } else if (targetUserFilter) {
+      displayedNotes = notes.filter(n => n.createdBy === targetUserFilter.id);
+  }
+
+  // 2. Filter Users based on Campaign
+  let displayedUsers = onlineUsers;
+  if (activeCampaign) {
+      // In campaign mode, ONLY show participating user IDs
+      displayedUsers = onlineUsers.filter(u => activeCampaign.participantIds.has(u.id));
+  }
 
   const handleSourceLogin = async (session: SourceSession) => {
       setSourceSession(session);
@@ -170,6 +183,38 @@ export default function App() {
       
       {showDatabaseFix && <DatabaseSetupModal onClose={() => setShowDatabaseFix(false)} />}
 
+      {/* ACTIVE CAMPAIGN BANNER (TOP) */}
+      {activeCampaign && (
+          <div className="fixed top-0 left-0 right-0 z-[2000] bg-red-900/90 backdrop-blur-md border-b-2 border-red-500 shadow-2xl flex items-center justify-between px-4 py-2 animate-in slide-in-from-top-full">
+              <div className="flex items-center gap-3">
+                  <div className="bg-red-500 rounded-full p-2 animate-pulse">
+                      <Gamepad2 className="text-white w-5 h-5" />
+                  </div>
+                  <div>
+                      <div className="text-white font-bold text-sm tracking-wider">عملية نشطة: {activeCampaign.name}</div>
+                      <div className="text-[10px] text-red-200 font-mono">
+                          القوة: {activeCampaign.participantIds.size} | الأهداف: {activeCampaign.targetIds.size}
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                  <button 
+                      onClick={() => setShowCampaigns(true)}
+                      className="bg-red-800/50 hover:bg-red-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-red-500/50"
+                  >
+                      <Edit3 size={14} /> تعديل
+                  </button>
+                  <button 
+                      onClick={handleEndCampaign}
+                      className="bg-white text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-lg"
+                  >
+                      إنهاء
+                  </button>
+              </div>
+          </div>
+      )}
+
       {/* --- SOURCE MODE TACTICAL HUD --- */}
       {sourceSession && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex flex-col items-center gap-2 animate-in slide-in-from-top-5">
@@ -211,7 +256,7 @@ export default function App() {
       )}
 
       {/* Admin Filter Banner */}
-      {targetUserFilter && (
+      {targetUserFilter && !activeCampaign && (
          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1000] bg-purple-900/90 border border-purple-500 rounded-full pl-2 pr-6 py-2 shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10">
              <span className="text-white text-sm font-bold">
                  تصفية المواقع للمستخدم: <span className="text-yellow-300">{targetUserFilter.name}</span>
@@ -258,7 +303,7 @@ export default function App() {
           canCreate={activePermissions.can_create} 
           myStatus={myStatus}
           setMyStatus={setMyStatus}
-          onlineUsers={sourceSession ? [] : onlineUsers} 
+          onlineUsers={sourceSession ? [] : displayedUsers} 
           currentUserId={activeUserProfile?.id || ''}
       />
 
@@ -295,7 +340,7 @@ export default function App() {
           userLocation={userLocation}
           currentRoute={currentRoute}
           secondaryRoute={secondaryRoute}
-          otherUsers={sourceSession ? [] : onlineUsers} // Hide others from source
+          otherUsers={sourceSession ? [] : displayedUsers} // Hide others from source, apply campaign filter
           onUserClick={onUserClick}
           canSeeOthers={activePermissions.can_see_others}
           onNavigate={(note) => {
@@ -338,8 +383,9 @@ export default function App() {
             currentUserId={activeUserProfile?.id || ''}
             currentUserProfile={activeUserProfile}
             
-            // PASS ONLINE USERS FROM ROOT TO DASHBOARD
+            // PASS ALL USERS (for campaign selection) & ONLINE USERS
             onlineUsers={onlineUsers}
+            allProfiles={allProfiles}
 
             showSettings={showSettings}
             closeSettings={() => setShowSettings(false)}
@@ -369,6 +415,9 @@ export default function App() {
 
             showCampaigns={showCampaigns}
             closeCampaigns={() => setShowCampaigns(false)}
+            activeCampaign={activeCampaign}
+            onStartCampaign={handleStartCampaign}
+            onUpdateCampaign={handleUpdateCampaign}
 
             onFilterByUser={(uid, name) => {
                 setTargetUserFilter({ id: uid, name });
