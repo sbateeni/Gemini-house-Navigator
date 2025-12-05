@@ -7,60 +7,10 @@ export const DatabaseSetupModal: React.FC = () => {
 
   const setupSQL = `
 -- ==========================================
--- إصلاح الخطأ: PGRST202 (Function Missing)
+-- إصلاح شامل لقاعدة البيانات والعلاقات
 -- ==========================================
 
--- 1. التأكد من وجود عمود device_id في جدول الأكواد
-alter table access_codes add column if not exists device_id text;
-
--- 2. حذف الدالة القديمة (لتجنب تعارض التوقيع)
-drop function if exists claim_access_code;
-
--- 3. إنشاء الدالة الأمنية للتحقق من الكود والجهاز
-create or replace function claim_access_code(
-  p_code text,
-  p_device_id text
-)
-returns jsonb as $$
-declare
-  v_record record;
-begin
-  -- البحث عن الكود
-  select * into v_record from access_codes where code = p_code;
-  
-  -- 1. هل الكود موجود؟
-  if v_record is null then
-    return jsonb_build_object('success', false, 'message', 'الكود غير صحيح');
-  end if;
-  
-  -- 2. هل الكود فعال؟
-  if v_record.is_active = false then
-     return jsonb_build_object('success', false, 'message', 'تم تعطيل هذا الكود');
-  end if;
-
-  -- 3. هل انتهت الصلاحية؟
-  if (extract(epoch from now()) * 1000) > v_record.expires_at then
-     return jsonb_build_object('success', false, 'message', 'انتهت صلاحية الكود');
-  end if;
-
-  -- 4. التحقق من تطابق الجهاز (Device Binding)
-  if v_record.device_id is not null and v_record.device_id != p_device_id then
-     return jsonb_build_object('success', false, 'message', 'هذا الكود مرتبط بجهاز آخر. لا يمكن استخدامه هنا.');
-  end if;
-
-  -- 5. ربط الجهاز لأول مرة
-  if v_record.device_id is null then
-     update access_codes set device_id = p_device_id where code = p_code;
-  end if;
-
-  return jsonb_build_object('success', true, 'expires_at', v_record.expires_at);
-end;
-$$ language plpgsql security definer;
-
--- ==========================================
--- 4. إعداد باقي الجداول (لضمان عمل النظام)
--- ==========================================
-
+-- 1. التأكد من وجود الجداول الأساسية
 create table if not exists profiles (
   id uuid references auth.users on delete cascade primary key,
   username text,
@@ -74,10 +24,6 @@ create table if not exists profiles (
   lat float8,
   lng float8
 );
-alter table profiles enable row level security;
-create policy "Public profiles" on profiles for select using (auth.role() = 'authenticated');
-create policy "Self insert" on profiles for insert with check (auth.uid() = id);
-create policy "Self update" on profiles for update using (auth.uid() = id);
 
 create table if not exists notes (
   id text primary key,
@@ -95,11 +41,6 @@ create table if not exists notes (
   access_code text,
   visibility text default 'private'
 );
-alter table notes enable row level security;
-create policy "Public Read" on notes for select using (true); 
-create policy "Auth Insert" on notes for insert with check (true);
-create policy "Auth Update" on notes for update using (true);
-create policy "Auth Delete" on notes for delete using (true);
 
 create table if not exists access_codes (
   code text primary key,
@@ -110,11 +51,107 @@ create table if not exists access_codes (
   is_active boolean default true,
   device_id text
 );
-alter table access_codes enable row level security;
-create policy "Public Access" on access_codes for select using (true);
-create policy "Auth Manage" on access_codes for all using (auth.role() = 'authenticated');
 
--- Reload Schema Cache (Often fixes PGRST202 instantly)
+create table if not exists logs (
+  id uuid default gen_random_uuid() primary key,
+  message text,
+  type text,
+  user_id uuid references auth.users(id),
+  timestamp bigint,
+  governorate text,
+  center text
+);
+
+create table if not exists assignments (
+  id uuid default gen_random_uuid() primary key,
+  target_user_id uuid references auth.users(id),
+  location_id text,
+  location_name text,
+  lat float8,
+  lng float8,
+  instructions text,
+  status text default 'pending', 
+  created_by uuid references auth.users(id),
+  created_at bigint
+);
+
+-- 2. إصلاح العلاقات (Foreign Keys) بشكل صريح لحل خطأ PGRST200
+-- هذا يضمن أن Supabase يتعرف على العلاقة بين الجداول
+
+-- إصلاح علاقة الملاحظات بالمستخدمين
+ALTER TABLE public.notes DROP CONSTRAINT IF EXISTS notes_created_by_fkey;
+ALTER TABLE public.notes ADD CONSTRAINT notes_created_by_fkey 
+FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+-- إصلاح علاقة الملفات الشخصية
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_id_fkey 
+FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- 3. تفعيل الحماية (RLS)
+alter table profiles enable row level security;
+alter table notes enable row level security;
+alter table access_codes enable row level security;
+alter table logs enable row level security;
+alter table assignments enable row level security;
+
+-- 4. سياسات الوصول (Policies)
+
+-- Profiles
+create policy "Public profiles" on profiles for select using (auth.role() = 'authenticated');
+create policy "Self insert" on profiles for insert with check (auth.uid() = id);
+create policy "Self update" on profiles for update using (auth.uid() = id OR exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'admin')));
+
+-- Notes
+create policy "Read Notes" on notes for select using (true); 
+create policy "Insert Notes" on notes for insert with check (auth.role() = 'authenticated' OR access_code IS NOT NULL);
+create policy "Update Notes" on notes for update using (auth.role() = 'authenticated');
+create policy "Delete Notes" on notes for delete using (auth.role() = 'authenticated');
+
+-- Access Codes
+create policy "Read Codes" on access_codes for select using (true);
+create policy "Manage Codes" on access_codes for all using (auth.role() = 'authenticated');
+
+-- Logs & Assignments
+create policy "Read Logs" on logs for select using (true);
+create policy "Insert Logs" on logs for insert with check (auth.role() = 'authenticated');
+create policy "Manage Assignments" on assignments for all using (auth.role() = 'authenticated');
+
+-- 5. إصلاح الدالة المفقودة (claim_access_code)
+create or replace function claim_access_code(p_code text, p_device_id text)
+returns jsonb as $$
+declare
+  v_record record;
+begin
+  select * into v_record from access_codes where code = p_code;
+  if v_record is null then return jsonb_build_object('success', false, 'message', 'الكود غير صحيح'); end if;
+  if v_record.is_active = false then return jsonb_build_object('success', false, 'message', 'تم تعطيل هذا الكود'); end if;
+  if (extract(epoch from now()) * 1000) > v_record.expires_at then return jsonb_build_object('success', false, 'message', 'انتهت صلاحية الكود'); end if;
+  if v_record.device_id is not null and v_record.device_id != p_device_id then return jsonb_build_object('success', false, 'message', 'الكود مرتبط بجهاز آخر'); end if;
+  if v_record.device_id is null then update access_codes set device_id = p_device_id where code = p_code; end if;
+  return jsonb_build_object('success', true, 'expires_at', v_record.expires_at);
+end;
+$$ language plpgsql security definer;
+
+-- 6. إنشاء دالة المصدر (create_source_note)
+create or replace function create_source_note(p_code text, p_note_data jsonb)
+returns void as $$
+begin
+  if exists (select 1 from access_codes where code = p_code and is_active = true) then
+    insert into notes (id, lat, lng, user_note, location_name, ai_analysis, created_at, status, sources, access_code, visibility)
+    values (
+      (p_note_data->>'id'), (p_note_data->>'lat')::float8, (p_note_data->>'lng')::float8,
+      (p_note_data->>'userNote'), (p_note_data->>'locationName'), (p_note_data->>'aiAnalysis'),
+      (p_note_data->>'createdAt')::bigint, (p_note_data->>'status'), (p_note_data->'sources'),
+      p_code, coalesce(p_note_data->>'visibility', 'private')
+    );
+  else
+    raise exception 'Invalid code';
+  end if;
+end;
+$$ language plpgsql security definer;
+
+-- تحديث الكاش
 NOTIFY pgrst, 'reload schema';
 `;
 
@@ -137,11 +174,10 @@ NOTIFY pgrst, 'reload schema';
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">خطأ في الاتصال بقاعدة البيانات (PGRST202)</h1>
+            <h1 className="text-xl font-bold text-white mb-1">إصلاح قاعدة البيانات (SQL Fix)</h1>
             <p className="text-slate-400 text-sm leading-relaxed">
-              الدالة المطلوبة <code>claim_access_code</code> غير موجودة أو أن توقيعها (Parameters) قديم.
-              <br/>
-              الرجاء نسخ الكود بالأسفل وتشغيله في محرر SQL في Supabase لإصلاح المشكلة.
+              تم اكتشاف أخطاء في العلاقات (PGRST200) أو دوال مفقودة. <br/>
+              الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase لإصلاح الهيكلية بالكامل.
             </p>
           </div>
         </div>
