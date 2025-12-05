@@ -7,7 +7,9 @@ export const DatabaseSetupModal: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const setupSQL = `
--- 1. Create profiles table (for User/Admin roles)
+-- ==========================================
+-- 1. جدول الملفات الشخصية (Profiles)
+-- ==========================================
 create table if not exists profiles (
   id uuid references auth.users on delete cascade,
   username text,
@@ -17,54 +19,39 @@ create table if not exists profiles (
   permissions jsonb default '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb,
   governorate text,
   center text,
-  last_seen bigint, 
+  last_seen bigint,
   lat float8,
   lng float8,
   primary key (id)
 );
 
--- Update existing table
-alter table profiles add column if not exists last_seen bigint;
-alter table profiles add column if not exists lat float8;
-alter table profiles add column if not exists lng float8;
-
--- 2. Enable Security on Profiles
+-- Security: RLS Policies for Profiles
 alter table profiles enable row level security;
-drop policy if exists "Public profiles" on profiles;
-create policy "Public profiles" on profiles for select using (true);
 
+-- Allow read access to approved users
+drop policy if exists "Public profiles" on profiles;
+create policy "Public profiles" on profiles for select using (
+  auth.role() = 'authenticated'
+);
+
+-- Allow users to insert their own profile
 drop policy if exists "Self insert" on profiles;
 create policy "Self insert" on profiles for insert with check (auth.uid() = id);
 
-drop policy if exists "Admin update" on profiles;
-create policy "Admin update" on profiles for update using (
+-- Strict Update Policy: Users update self, Admins update according to hierarchy
+drop policy if exists "Strict update" on profiles;
+create policy "Strict update" on profiles for update using (
   auth.uid() = id OR 
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin'))
+  exists (
+     select 1 from profiles editor 
+     where editor.id = auth.uid() 
+     and editor.role in ('super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer')
+  )
 );
 
--- 3. Auto-create profile on signup
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, username, role, is_approved, email, permissions)
-  values (
-    new.id, 
-    new.raw_user_meta_data->>'username', 
-    'user', 
-    false, 
-    new.email,
-    '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- 4. Secure the Notes Table
+-- ==========================================
+-- 2. جدول الملاحظات والمواقع (Notes) - تحديث أمني
+-- ==========================================
 create table if not exists notes (
   id text primary key,
   lat float8,
@@ -78,35 +65,54 @@ create table if not exists notes (
   governorate text,
   center text,
   created_by uuid references auth.users(id),
-  access_code text -- New field for Source Logic
+  access_code text,
+  visibility text default 'private' -- 'public' or 'private'
 );
 
--- Update existing notes table if exists
-alter table notes add column if not exists created_by uuid references auth.users(id);
-alter table notes add column if not exists access_code text;
+-- إضافة العمود إذا لم يكن موجوداً
+alter table notes add column if not exists visibility text default 'private';
 
 alter table notes enable row level security;
 
-drop policy if exists "Public Access" on notes;
-drop policy if exists "Auth read" on notes;
+-- STRICT READ POLICY:
+-- 1. Everyone sees 'public' notes.
+-- 2. Users see their own 'private' notes.
+-- 3. Admins/Officers see 'private' notes based on hierarchy logic.
+drop policy if exists "Secure Read Notes" on notes;
+create policy "Secure Read Notes" on notes for select using (
+  visibility = 'public' 
+  OR auth.uid() = created_by 
+  OR access_code IS NOT NULL
+  OR exists (
+    select 1 from profiles viewer 
+    where viewer.id = auth.uid() 
+    and (
+       viewer.role in ('super_admin', 'admin') -- Super admins see all
+       OR (viewer.role = 'governorate_admin' AND viewer.governorate = notes.governorate)
+       OR (viewer.role in ('center_admin', 'officer') AND viewer.center = notes.center)
+    )
+  )
+);
+
+-- Insert Policy
 drop policy if exists "Auth insert" on notes;
-drop policy if exists "Auth update" on notes;
-drop policy if exists "Admin delete" on notes;
-
--- Allow authenticated users to read everything (subject to hierarchy filter in client, but RLS allows read)
--- Update: Allow read if auth OR if access_code matches (handled in function or simplified policy)
-create policy "Auth read" on notes for select using (
-  auth.role() = 'authenticated' OR access_code IS NOT NULL
-);
-
 create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
+
+-- Update Policy
+drop policy if exists "Auth update" on notes;
 create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
--- Admin Delete Policy: Includes Super, Gov, Center admins
+
+-- Delete Policy: Restricted to admins/officers
+drop policy if exists "Admin delete" on notes;
 create policy "Admin delete" on notes for delete using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin'))
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'admin'))
 );
 
--- 5. Create Assignments Table
+-- ==========================================
+-- 3. باقي الجداول (Assignments, Logs, Access Codes)
+-- ==========================================
+
+-- Assignments
 create table if not exists assignments (
   id uuid default gen_random_uuid() primary key,
   target_user_id uuid not null references auth.users(id),
@@ -119,24 +125,13 @@ create table if not exists assignments (
   created_by uuid references auth.users(id),
   created_at bigint
 );
-
 alter table assignments enable row level security;
-drop policy if exists "Read assignments" on assignments;
-create policy "Read assignments" on assignments for select using (
-  auth.uid() = target_user_id OR auth.uid() = created_by
-);
+drop policy if exists "Assign Read" on assignments;
+create policy "Assign Read" on assignments for select using (auth.uid() = target_user_id OR auth.uid() = created_by);
+drop policy if exists "Assign Write" on assignments;
+create policy "Assign Write" on assignments for all using (auth.role() = 'authenticated');
 
-drop policy if exists "Create assignments" on assignments;
-create policy "Create assignments" on assignments for insert with check (
-  auth.role() = 'authenticated'
-);
-
-drop policy if exists "Update assignments" on assignments;
-create policy "Update assignments" on assignments for update using (
-  auth.uid() = target_user_id OR auth.uid() = created_by
-);
-
--- 6. Create Logs Table
+-- Logs
 create table if not exists logs (
   id uuid default gen_random_uuid() primary key,
   message text not null,
@@ -146,20 +141,13 @@ create table if not exists logs (
   governorate text,
   center text
 );
-
 alter table logs enable row level security;
-drop policy if exists "Read logs" on logs;
-create policy "Read logs" on logs for select using (true);
+drop policy if exists "Log Read" on logs;
+create policy "Log Read" on logs for select using (true);
+drop policy if exists "Log Write" on logs;
+create policy "Log Write" on logs for insert with check (auth.role() = 'authenticated');
 
-drop policy if exists "Create logs" on logs;
-create policy "Create logs" on logs for insert with check (auth.role() = 'authenticated');
-
-drop policy if exists "Admin delete logs" on logs;
-create policy "Admin delete logs" on logs for delete using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'admin'))
-);
-
--- 7. NEW: Access Codes Table (For Sources)
+-- Access Codes
 create table if not exists access_codes (
   code text primary key,
   created_by uuid references auth.users(id),
@@ -168,23 +156,19 @@ create table if not exists access_codes (
   label text,
   is_active boolean default true
 );
-
 alter table access_codes enable row level security;
-
--- Allow officers+ to view/create codes
-drop policy if exists "Officer manage codes" on access_codes;
-create policy "Officer manage codes" on access_codes for all using (
+drop policy if exists "Code Manage" on access_codes;
+create policy "Code Manage" on access_codes for all using (
   exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'admin'))
 );
+drop policy if exists "Code Read Public" on access_codes;
+create policy "Code Read Public" on access_codes for select using (true);
 
--- Allow public read (needed for login check) - We can restrict this by only allowing SELECT via exact ID match but Supabase doesn't support "Select by PK only" easily in policies.
--- Ideally we use a Remote Procedure Call (RPC) for login to keep table private.
--- For now, allow public select to check validity.
-drop policy if exists "Public check code" on access_codes;
-create policy "Public check code" on access_codes for select using (true);
+-- ==========================================
+-- 4. الدوال (Functions)
+-- ==========================================
 
-
--- 8. RPC: Create Note as Source (Bypasses Auth)
+-- Source Note RPC (Updated for visibility)
 create or replace function create_source_note(
   p_code text,
   p_note_data jsonb
@@ -194,26 +178,16 @@ declare
   v_expires bigint;
   v_active boolean;
 begin
-  -- Check if code exists and is valid
   select expires_at, is_active into v_expires, v_active 
   from access_codes where code = p_code;
 
-  if v_expires is null then
-    raise exception 'Invalid Code';
+  if v_expires is null OR not v_active OR (extract(epoch from now()) * 1000)::bigint > v_expires then
+    raise exception 'Invalid or Expired Code';
   end if;
 
-  if not v_active then
-     raise exception 'Code Deactivated';
-  end if;
-
-  if (extract(epoch from now()) * 1000)::bigint > v_expires then
-     raise exception 'Code Expired';
-  end if;
-
-  -- Insert Note
   insert into notes (
     id, lat, lng, user_note, location_name, ai_analysis, 
-    created_at, status, sources, access_code
+    created_at, status, sources, access_code, visibility
   ) values (
     p_note_data->>'id',
     (p_note_data->>'lat')::float8,
@@ -224,8 +198,20 @@ begin
     (p_note_data->>'createdAt')::bigint,
     p_note_data->>'status',
     p_note_data->'sources',
-    p_code
+    p_code,
+    coalesce(p_note_data->>'visibility', 'private')
   );
+end;
+$$ language plpgsql security definer;
+
+-- Auto Profile Trigger
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, username, role, is_approved, email, permissions)
+  values (new.id, new.raw_user_meta_data->>'username', 'user', false, new.email,
+  '{"can_create": true, "can_see_others": true, "can_navigate": true, "can_edit_users": false, "can_dispatch": false, "can_view_logs": true}'::jsonb);
+  return new;
 end;
 $$ language plpgsql security definer;
 `;
@@ -250,13 +236,13 @@ $$ language plpgsql security definer;
     <div className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-6 border-b border-slate-800 bg-slate-900 flex items-start gap-4">
-          <div className="p-3 bg-purple-900/20 rounded-xl border border-purple-900/50">
-            <Database className="text-purple-500 w-8 h-8" />
+          <div className="p-3 bg-red-900/20 rounded-xl border border-red-900/50">
+            <ShieldAlert className="text-red-500 w-8 h-8 animate-pulse" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
+            <h1 className="text-xl font-bold text-white mb-1">تحديث أمني عالي الأهمية</h1>
             <p className="text-slate-400 text-sm">
-              تم إضافة نظام "المصادر" (Access Codes). يرجى تحديث قاعدة البيانات لإضافة جدول <span className="text-yellow-400 font-bold mx-1">access_codes</span>.
+              تم إضافة سياسات أمان صارمة (RLS) وتصنيف المواقع (عام/خاص). يجب تنفيذ هذا الكود في قاعدة البيانات لضمان سرية المعلومات.
             </p>
           </div>
         </div>

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession } from './types';
 import { db } from './services/db';
-import { Timer, LogOut } from 'lucide-react';
+import { Timer, LogOut, X } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -35,8 +35,14 @@ export default function App() {
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
-    handleMapClick, handleEditNote, handleSaveNote, closeModal
+    handleMapClick, handleEditNote, handleSaveNote, closeModal,
+    targetUserFilter, setTargetUserFilter
   } = useAppLogic();
+
+  // --- Filter Logic ---
+  const displayedNotes = targetUserFilter 
+    ? notes.filter(n => n.createdBy === targetUserFilter.id)
+    : notes;
 
   // --- Source Logic ---
   const handleSourceLogin = (session: SourceSession) => {
@@ -65,19 +71,23 @@ export default function App() {
   }, [sourceSession]);
 
   // Inject source code into new notes if in source mode
-  const handleSourceSaveNote = async () => {
+  const handleSourceSaveNote = async (visibility: 'public' | 'private') => {
       if (!sourceSession || !tempCoords) return;
+      
+      const locationName = visibility === 'public' ? 'موقع عام' : 'موقع خاص (مصدر)';
+
       const newNote = {
           id: crypto.randomUUID(),
           lat: tempCoords.lat,
           lng: tempCoords.lng,
           userNote: userNoteInput,
-          locationName: "موقع محدد (مصدر)",
+          locationName: locationName,
           aiAnalysis: "",
           sources: [],
           createdAt: Date.now(),
           status: 'not_caught' as const,
-          accessCode: sourceSession.code
+          accessCode: sourceSession.code,
+          visibility: visibility
       };
       
       try {
@@ -134,10 +144,25 @@ export default function App() {
           </div>
       )}
 
+      {/* Admin Filter Active Banner */}
+      {targetUserFilter && (
+         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1000] bg-purple-900/90 border border-purple-500 rounded-full pl-2 pr-6 py-2 shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10">
+             <span className="text-white text-sm font-bold">
+                 تصفية المواقع للمستخدم: <span className="text-yellow-300">{targetUserFilter.name}</span>
+             </span>
+             <button 
+                 onClick={() => setTargetUserFilter(null)}
+                 className="p-1 bg-purple-800 hover:bg-purple-700 rounded-full text-white"
+             >
+                 <X size={16} />
+             </button>
+         </div>
+      )}
+
       <Sidebar 
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
-        notes={notes}
+        notes={displayedNotes} // Pass filtered notes
         selectedNote={selectedNote}
         setSelectedNote={setSelectedNote}
         searchQuery={searchQuery}
@@ -165,7 +190,7 @@ export default function App() {
         canCreate={!!sourceSession || permissions.can_create} 
         myStatus={myStatus}
         setMyStatus={setMyStatus}
-        onlineUsers={sourceSession ? [] : onlineUsers} // Hide users from source
+        onlineUsers={sourceSession ? [] : onlineUsers} 
         currentUserId={session?.user?.id || ''}
       />
 
@@ -184,7 +209,7 @@ export default function App() {
         <LeafletMap 
           isSatellite={isSatellite}
           mapProvider={mapProvider}
-          notes={notes}
+          notes={displayedNotes} // Pass filtered notes
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
           onMapClick={(lat, lng) => {
@@ -197,7 +222,7 @@ export default function App() {
           userLocation={userLocation}
           currentRoute={currentRoute}
           secondaryRoute={secondaryRoute}
-          otherUsers={sourceSession ? [] : onlineUsers} // Hide users from source
+          otherUsers={sourceSession ? [] : onlineUsers}
           onUserClick={onUserClick}
           canSeeOthers={!sourceSession && permissions.can_see_others}
           onNavigate={(note) => {
@@ -215,7 +240,7 @@ export default function App() {
           setIsSatellite={setIsSatellite}
           onLocateUser={locateUser}
           isLocating={isLocating}
-          assignments={sourceSession ? [] : assignments} // No assignments for source
+          assignments={sourceSession ? [] : assignments} 
           onAcceptAssignment={handleAcceptAssignment}
           hasActiveRoute={!!currentRoute || !!secondaryRoute}
           onClearRoute={() => {
@@ -263,6 +288,11 @@ export default function App() {
 
             showFullLogs={showFullLogs}
             closeFullLogs={() => setShowFullLogs(false)}
+
+            onFilterByUser={(uid, name) => {
+                setTargetUserFilter({ id: uid, name });
+                setShowDashboard(false);
+            }}
         />
       </div>
     </div>

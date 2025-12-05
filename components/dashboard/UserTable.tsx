@@ -1,9 +1,7 @@
 
-
-
 import React from 'react';
 import { UserProfile } from '../../types';
-import { Wifi, WifiOff, MapPin, Building2, CheckCircle2, Settings, Ban } from 'lucide-react';
+import { Wifi, WifiOff, MapPin, Building2, CheckCircle2, Settings, Ban, Eye } from 'lucide-react';
 
 interface UserTableProps {
   users: UserProfile[];
@@ -12,6 +10,7 @@ interface UserTableProps {
   onToggleApproval: (user: UserProfile) => void;
   onOpenEdit: (user: UserProfile) => void;
   onBanUser: (user: UserProfile) => void;
+  onFilterByUser: (userId: string, userName: string) => void;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -20,7 +19,8 @@ export const UserTable: React.FC<UserTableProps> = ({
   onlineUsers,
   onToggleApproval,
   onOpenEdit,
-  onBanUser
+  onBanUser,
+  onFilterByUser
 }) => {
   return (
     <table className="w-full text-right border-collapse">
@@ -60,6 +60,15 @@ export const UserTable: React.FC<UserTableProps> = ({
                      <div className="text-slate-500 text-xs">{user.email || 'No email'}</div>
                    </div>
                  </div>
+                 
+                 {/* Audit Button */}
+                 <button 
+                    onClick={() => onFilterByUser(user.id, user.username)}
+                    className="mt-2 text-[10px] flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors"
+                 >
+                    <Eye size={12} />
+                    عرض النشاط والخرائط
+                 </button>
                </td>
                <td className="p-4">
                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${isOnline ? 'bg-green-900/20 text-green-400 border border-green-900/30' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>

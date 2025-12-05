@@ -16,7 +16,7 @@ interface ModalContainerProps {
   tempCoords: { lat: number; lng: number } | null;
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
-  onSaveNote: () => void;
+  onSaveNote: (visibility: 'public' | 'private') => void;
   isAnalyzing: boolean;
   isEditingNote: boolean;
 
@@ -55,6 +55,9 @@ interface ModalContainerProps {
   // Logs Props
   showFullLogs: boolean;
   closeFullLogs: () => void;
+
+  // Filter
+  onFilterByUser: (userId: string, userName: string) => void;
 }
 
 export const ModalContainer: React.FC<ModalContainerProps> = ({
@@ -89,7 +92,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeDispatchModal,
   onSendDispatch,
   showFullLogs,
-  closeFullLogs
+  closeFullLogs,
+  onFilterByUser
 }) => {
   return (
     <>
@@ -109,6 +113,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         onClose={closeDashboard} 
         currentUserId={currentUserId}
         currentUserProfile={currentUserProfile}
+        onFilterByUser={onFilterByUser}
       />
 
       <SettingsModal 

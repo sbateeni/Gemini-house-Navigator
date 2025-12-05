@@ -137,11 +137,10 @@ export const db = {
 
       // CASE 1: Source Login (Guest)
       if (sourceCode) {
-          // Sources ONLY see notes created by their own code
           const { data, error } = await supabase
              .from('notes')
              .select('*')
-             .eq('access_code', sourceCode);
+             .or(`access_code.eq.${sourceCode},visibility.eq.public`); // See own notes OR public notes
           
           if (error) throw error;
           
@@ -155,11 +154,13 @@ export const db = {
              createdAt: row.created_at,
              status: row.status,
              sources: row.sources,
-             accessCode: row.access_code
+             accessCode: row.access_code,
+             visibility: row.visibility
           }));
       }
 
-      // CASE 2: Authenticated User (Standard Hierarchy)
+      // CASE 2: Authenticated User
+      // Note: RLS handles the heavy lifting, but we can optimize client-side fetching too
       let query = supabase
         .from('notes')
         .select(`
@@ -168,20 +169,21 @@ export const db = {
         `)
         .order('created_at', { ascending: false });
 
-      // Apply Hierarchical Filters (Scope-based)
+      // Apply Hierarchical Filters (Scope-based) ONLY for PRIVATE notes? 
+      // Actually, let's fetch everything the RLS allows, and client side filtering can be minimal.
+      // However, to reduce bandwidth, we still apply basic filters.
+      
       if (currentUserProfile) {
         const role = currentUserProfile.role;
-        // Super Admin (and legacy admin) sees ALL scopes
-        if (role === 'super_admin' || role === 'admin') {
-           // No scope filter
-        } 
-        // Governorate Admin sees ONLY their governorate
-        else if (role === 'governorate_admin' && currentUserProfile.governorate) {
-           query = query.eq('governorate', currentUserProfile.governorate);
-        }
-        // Center Admin/User sees ONLY their center notes (or Governorates if policy allows)
-        else if ((role === 'center_admin' || role === 'user' || role === 'officer') && currentUserProfile.center) {
-           query = query.eq('center', currentUserProfile.center);
+        // Super Admin sees all (RLS allows it)
+        
+        // If not super admin, we typically want to filter by region unless it's PUBLIC
+        if (role !== 'super_admin' && role !== 'admin') {
+             // Logic: (governorate match OR center match OR public)
+             // Building complex OR query in Supabase JS client can be tricky combined with joins.
+             // We will rely on RLS for security, and just fetch. 
+             // If the dataset is huge, we'd need a RPC function `get_visible_notes`.
+             // For now, simple fetch is fine as RLS filters the result set.
         }
       }
 
@@ -189,21 +191,23 @@ export const db = {
 
       if (error) throw error;
 
-      // 2. Apply Rank-Based Filtering (Visibility Logic)
+      // 2. Client-side Rank Logic (Optional secondary filter)
       const currentRank = getRankValue(currentUserProfile?.role);
       const currentUserId = currentUserProfile?.id;
 
       const filteredData = (data || []).filter((row: any) => {
+          // Public is always visible
+          if (row.visibility === 'public') return true;
+
           // Always see my own notes
           if (row.created_by === currentUserId) return true;
 
-          // If note is from a "Source" (has access_code), check if I am authorized to see it
-          // Generally, officers+ should see source notes.
+          // If note is from a "Source"
           if (row.access_code) {
-             return currentRank >= getRankValue('user'); // Basic users and up see source notes
+             return currentRank >= getRankValue('user');
           }
 
-          // If no creator info (legacy notes), assume visible (or treat as lowest rank)
+          // If no creator info, assume visible
           if (!row.creator_profile) return true;
 
           const creatorRank = getRankValue(row.creator_profile.role);
@@ -225,7 +229,8 @@ export const db = {
         governorate: row.governorate,
         center: row.center,
         createdBy: row.created_by,
-        accessCode: row.access_code
+        accessCode: row.access_code,
+        visibility: row.visibility
       })) as MapNote[];
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
@@ -254,9 +259,8 @@ export const db = {
   },
 
   async addNote(note: MapNote, forceOnline = false): Promise<void> {
-    // Check if this is a "Source" note (has accessCode but no user session usually)
+    // Check if this is a "Source" note
     if (note.accessCode) {
-        // Use RPC to bypass auth check
         const { error } = await supabase.rpc('create_source_note', {
             p_code: note.accessCode,
             p_note_data: note
@@ -278,7 +282,6 @@ export const db = {
     }
 
     try {
-      // Get current user ID to stamp the note
       const { data: { user } } = await supabase.auth.getUser();
 
       const dbRow = {
@@ -293,7 +296,8 @@ export const db = {
         sources: note.sources || [],
         governorate: note.governorate, 
         center: note.center,
-        created_by: user?.id
+        created_by: user?.id,
+        visibility: note.visibility || 'private' // Default to private
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
@@ -361,26 +365,20 @@ export const db = {
         .select('*')
         .order('role', { ascending: true });
 
-      // Apply Filters
       if (currentUserProfile) {
         const role = currentUserProfile.role;
-        
-        // Super Admin (and legacy admin) sees all
         if (role === 'super_admin' || role === 'admin') {
            // No filter
         }
-        // Governorate Admin sees users in their gov OR unassigned users
         else if (role === 'governorate_admin' && currentUserProfile.governorate) {
            query = query.or(`governorate.eq.${currentUserProfile.governorate},governorate.is.null`);
         } 
-        // Center Admin sees users in their center
         else if (role === 'center_admin' && currentUserProfile.center) {
            query = query.eq('center', currentUserProfile.center);
         }
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
 
       return (data || []).map((row: any) => ({

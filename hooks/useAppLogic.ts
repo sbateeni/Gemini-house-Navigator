@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
@@ -21,7 +22,7 @@ export function useAppLogic() {
   } = useAuth();
   
   const isBanned = userRole === 'banned';
-  const isAnyAdmin = ['admin', 'super_admin', 'governorate_admin', 'center_admin'].includes(userRole || '');
+  const isAnyAdmin = ['admin', 'super_admin', 'governorate_admin', 'center_admin', 'officer'].includes(userRole || '');
   const hasAccess = !isAccountDeleted && !isBanned && (isApproved || isAnyAdmin);
 
   // --- 2. Tactical State ---
@@ -72,6 +73,9 @@ export function useAppLogic() {
   const [commandUser, setCommandUser] = useState<MapUser | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dispatchTargetLocation, setDispatchTargetLocation] = useState<MapNote | null>(null);
+
+  // ADMIN FILTER STATE
+  const [targetUserFilter, setTargetUserFilter] = useState<{id: string, name: string} | null>(null);
 
   // Find Distressed User (Someone else who triggered SOS)
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
@@ -356,6 +360,8 @@ export function useAppLogic() {
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     // Forms
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
-    handleMapClick, handleEditNote, handleSaveNote, closeModal
+    handleMapClick, handleEditNote, handleSaveNote, closeModal,
+    // Admin Filters
+    targetUserFilter, setTargetUserFilter
   };
 }

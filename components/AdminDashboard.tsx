@@ -12,6 +12,7 @@ interface AdminDashboardProps {
   onClose: () => void;
   currentUserId: string;
   currentUserProfile: UserProfile | null;
+  onFilterByUser: (userId: string, userName: string) => void;
 }
 
 const PALESTINE_GOVERNORATES = [
@@ -20,7 +21,9 @@ const PALESTINE_GOVERNORATES = [
   'شمال غزة', 'غزة', 'دير البلح', 'خان يونس', 'رفح'
 ];
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, currentUserId, currentUserProfile }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+    isOpen, onClose, currentUserId, currentUserProfile, onFilterByUser 
+}) => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,6 +336,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose,
                 onToggleApproval={toggleApproval}
                 onOpenEdit={setSelectedUserForPerms}
                 onBanUser={handleBanUser}
+                onFilterByUser={onFilterByUser}
              />
            )}
         </div>

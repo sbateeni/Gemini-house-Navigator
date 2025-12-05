@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { MapPin, X, Plus, Edit3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, X, Plus, Edit3, Globe, Lock } from 'lucide-react';
 
 interface CreateNoteModalProps {
   isOpen: boolean;
@@ -8,7 +8,7 @@ interface CreateNoteModalProps {
   tempCoords: { lat: number; lng: number } | null;
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
-  onSave: () => void;
+  onSave: (visibility: 'public' | 'private') => void;
   isAnalyzing: boolean;
   mode?: 'create' | 'edit';
 }
@@ -23,6 +23,8 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   isAnalyzing,
   mode = 'create'
 }) => {
+  const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+
   if (!isOpen) return null;
 
   return (
@@ -45,6 +47,24 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
           </button>
         </div>
         
+        {/* Visibility Selector */}
+        <div className="flex gap-2 mb-4 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+                onClick={() => setVisibility('private')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${visibility === 'private' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+                <Lock size={14} />
+                خاص (سرّي)
+            </button>
+            <button
+                onClick={() => setVisibility('public')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${visibility === 'public' ? 'bg-green-900/30 text-green-400 shadow border border-green-900/50' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+                <Globe size={14} />
+                عام (مدرسة/نادي)
+            </button>
+        </div>
+
         <textarea
           autoFocus
           value={userNoteInput}
@@ -54,7 +74,7 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
         />
         
         <button 
-          onClick={onSave}
+          onClick={() => onSave(visibility)}
           disabled={!userNoteInput.trim()}
           className={`w-full text-white py-4 rounded-xl text-base font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 mb-2 disabled:opacity-50 disabled:cursor-not-allowed
             ${mode === 'edit' 

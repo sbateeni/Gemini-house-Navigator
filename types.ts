@@ -14,6 +14,8 @@ export interface MapNote {
   center?: string;
   createdBy?: string; // UUID of the creator (Normal Users)
   accessCode?: string; // For Source/Guest Users
+  // New Security Field
+  visibility?: 'public' | 'private';
 }
 
 export interface GroundingSource {

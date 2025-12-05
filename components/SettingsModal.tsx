@@ -66,14 +66,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const providers = [
-      { id: 'google', name: 'Google Hybrid', desc: 'أفضل دقة زوم (22x) - هجين', icon: Globe, color: 'blue' },
-      { id: 'esri_clarity', name: 'Esri Clarity (الأحدث)', desc: 'أحدث صور جوية (قديمة أقل، زوم 19x)', icon: Satellite, color: 'purple' },
-      { id: 'google_streets', name: 'Google Streets', desc: 'شوارع وتفاصيل مدنية (دقة عالية)', icon: Map, color: 'blue' },
-      { id: 'carto_voyager', name: 'Voyager HD', desc: 'خريطة شوارع ملونة وعالية الوضوح', icon: Map, color: 'emerald' },
-      { id: 'google_terrain', name: 'Google Terrain', desc: 'تضاريس وجبال (طبيعة)', icon: Mountain, color: 'emerald' },
-      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (قياسية)', icon: Globe, color: 'cyan' },
-      { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي (منخفض التوهج)', icon: Layers, color: 'slate' },
+      { id: 'google', name: 'Google Hybrid', desc: 'أفضل دقة زوم (22x) - هجين', icon: Globe, iconColor: 'text-blue-400' },
+      { id: 'esri_clarity', name: 'Esri Clarity (الأحدث)', desc: 'أحدث صور جوية (قديمة أقل، زوم 19x)', icon: Satellite, iconColor: 'text-purple-400' },
+      { id: 'google_streets', name: 'Google Streets', desc: 'شوارع وتفاصيل مدنية (دقة عالية)', icon: Map, iconColor: 'text-blue-400' },
+      { id: 'carto_voyager', name: 'Voyager HD', desc: 'خريطة شوارع ملونة وعالية الوضوح', icon: Map, iconColor: 'text-emerald-400' },
+      { id: 'google_terrain', name: 'Google Terrain', desc: 'تضاريس وجبال (طبيعة)', icon: Mountain, iconColor: 'text-emerald-400' },
+      { id: 'esri', name: 'Esri Satellite', desc: 'أقمار صناعية (قياسية)', icon: Globe, iconColor: 'text-cyan-400' },
+      { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي (منخفض التوهج)', icon: Layers, iconColor: 'text-slate-400' },
   ];
+
+  // Safely extract string values to prevent object rendering errors
+  const username = user?.user_metadata?.username || 'مستخدم';
+  const email = user?.email || '';
+  const initialChar = typeof username === 'string' && username.length > 0 ? username.charAt(0).toUpperCase() : 'U';
 
   return (
     <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
@@ -92,10 +97,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="bg-slate-800/50 rounded-xl p-4 space-y-4 border border-slate-700/50">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-blue-900/20">
-                  {user?.user_metadata?.username?.charAt(0).toUpperCase() || <User />}
+                  {initialChar}
                 </div>
                 <div>
-                  <div className="text-white font-bold text-lg">{user?.user_metadata?.username || 'مستخدم'}</div>
+                  <div className="text-white font-bold text-lg">{username}</div>
                   <div className="text-slate-400 text-sm flex items-center gap-1.5">
                     <Shield size={12} className={isAdmin ? 'text-purple-400' : 'text-slate-500'} />
                     <span className="capitalize">{isAdmin ? 'مدير النظام' : 'عنصر'}</span>
@@ -106,7 +111,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-2 pt-2 border-t border-slate-700/50">
                 <div className="flex items-center gap-3 text-sm text-slate-300">
                   <Mail size={16} className="text-slate-500" />
-                  {user?.email}
+                  {email}
                 </div>
               </div>
             </div>
@@ -122,7 +127,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onClick={() => setMapProvider(p.id)}
                         className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
                     >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 text-${p.color}-400`}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 ${p.iconColor}`}`}>
                             <p.icon size={20} />
                         </div>
                         <div className="text-right flex-1 min-w-0">

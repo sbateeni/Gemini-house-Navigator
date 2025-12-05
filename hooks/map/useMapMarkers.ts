@@ -1,6 +1,4 @@
 
-
-
 import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
 import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';
@@ -34,7 +32,6 @@ export function useMapMarkers(
   }, [notes, onNavigate, onDispatch]);
 
   // 1. Setup Global Event Listeners for Popup Buttons
-  // This replaces the fragile Leaflet 'popupopen' DOM traversal
   useEffect(() => {
       const handleNavigate = (e: any) => {
           const noteId = e.detail;
@@ -61,7 +58,7 @@ export function useMapMarkers(
           window.removeEventListener('map-navigate', handleNavigate);
           window.removeEventListener('map-dispatch', handleDispatch);
       };
-  }, []); // Run once to attach global listeners
+  }, []);
 
   // 2. Render Note Markers
   useEffect(() => {
@@ -82,12 +79,34 @@ export function useMapMarkers(
     notes.forEach(note => {
       if (markersRef.current[note.id]) return; // Already exists
 
-      const html = createNoteIconHtml(isSatellite);
+      // Distinct visual for Public vs Private
+      const isPublic = note.visibility === 'public';
+      
+      const html = `
+        <div style="
+          width: ${isPublic ? '24px' : '32px'}; 
+          height: ${isPublic ? '24px' : '32px'}; 
+          background-color: ${isPublic ? '#10b981' : (isSatellite ? '#ef4444' : '#3b82f6')}; 
+          border: 3px solid white; 
+          border-radius: 50%; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+        ">
+          ${isPublic 
+            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>'
+            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>'
+          }
+        </div>
+      `;
+
       const icon = window.L.divIcon({
         className: 'custom-div-icon',
         html: html,
         iconSize: [32, 32],
-        iconAnchor: [16, 30]
+        iconAnchor: [16, 16] // Centered for round icons
       });
 
       const canCommand = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
@@ -96,6 +115,15 @@ export function useMapMarkers(
       const marker = window.L.marker([note.lat, note.lng], { icon })
         .addTo(map)
         .bindPopup(popupContent);
+
+      // ALWAYS show label for PUBLIC notes
+      if (isPublic) {
+          marker.bindTooltip(note.locationName, { 
+              permanent: true, 
+              direction: 'bottom',
+              className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
+          });
+      }
 
       marker.on('popupopen', () => setSelectedNote(note));
       markersRef.current[note.id] = marker;
