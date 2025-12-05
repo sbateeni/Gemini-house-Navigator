@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send, CheckSquare, Square, KeyRound } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send, CheckSquare, Square, KeyRound, LogOut } from 'lucide-react';
 import { SourceSession } from '../types';
 
 interface AuthPageProps {
@@ -102,6 +102,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
     }
   };
 
+  const handleForceLogout = async () => {
+      if(confirm("هل أنت متأكد من تسجيل الخروج ومسح جميع البيانات المحلية؟")) {
+          localStorage.clear();
+          await auth.signOut();
+          window.location.reload();
+      }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       {/* Background Decor */}
@@ -111,7 +119,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
       </div>
 
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl relative z-10">
-        <div className="text-center mb-8">
+        
+        {/* Force Logout Button (Top Left) */}
+        <button 
+            onClick={handleForceLogout}
+            className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors rounded-full hover:bg-slate-800"
+            title="تسجيل خروج إجباري / مسح البيانات"
+        >
+            <LogOut size={18} />
+        </button>
+
+        <div className="text-center mb-8 mt-2">
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transition-colors duration-500
               ${authMode === 'source' ? 'bg-gradient-to-br from-emerald-600 to-green-600 shadow-green-500/20' : 'bg-gradient-to-br from-blue-600 to-indigo-600 shadow-blue-500/20'}
           `}>
@@ -129,17 +147,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
           </p>
         </div>
 
-        {/* Auth Mode Tabs */}
-        <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-950 p-1 rounded-xl border border-slate-800">
+        {/* Auth Mode Tabs - Using Flexbox for better spacing */}
+        <div className="flex gap-2 mb-6 bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full">
            <button 
              onClick={() => { setAuthMode('login'); setMessage(null); }}
-             className={`py-2 text-sm font-bold rounded-lg transition-all ${authMode !== 'source' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
+             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all text-center whitespace-nowrap ${authMode !== 'source' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
            >
              طاقم العمليات
            </button>
            <button 
              onClick={() => { setAuthMode('source'); setMessage(null); }}
-             className={`py-2 text-sm font-bold rounded-lg transition-all ${authMode === 'source' ? 'bg-green-900/40 text-green-400 shadow border border-green-900/50' : 'text-slate-500 hover:text-slate-300'}`}
+             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all text-center whitespace-nowrap ${authMode === 'source' ? 'bg-green-900/40 text-green-400 shadow border border-green-900/50' : 'text-slate-500 hover:text-slate-300'}`}
            >
              مصدر (مؤقت)
            </button>
