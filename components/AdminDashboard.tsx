@@ -2,8 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCcw, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
-import { UserProfile, UserPermissions, UserRole, AccessCode } from '../types';
-import { supabase } from '../services/supabase';
+import { UserProfile, UserPermissions, UserRole, AccessCode, MapUser } from '../types';
 import { UserTable } from './dashboard/UserTable';
 import { EditUserModal } from './dashboard/EditUserModal';
 
@@ -13,6 +12,7 @@ interface AdminDashboardProps {
   currentUserId: string;
   currentUserProfile: UserProfile | null;
   onFilterByUser: (userId: string, userName: string) => void;
+  onlineUsersList: MapUser[]; // Receive the live list from App.tsx
 }
 
 const PALESTINE_GOVERNORATES = [
@@ -22,17 +22,19 @@ const PALESTINE_GOVERNORATES = [
 ];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-    isOpen, onClose, currentUserId, currentUserProfile, onFilterByUser 
+    isOpen, onClose, currentUserId, currentUserProfile, onFilterByUser, onlineUsersList
 }) => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [selectedUserForPerms, setSelectedUserForPerms] = useState<UserProfile | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'sources'>('all');
   const [generatingCode, setGeneratingCode] = useState(false);
   const [newCodeLabel, setNewCodeLabel] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Convert Array to Set for fast lookup in the table
+  const onlineUserIds = new Set(onlineUsersList.map(u => u.id));
 
   const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(currentUserProfile?.role || '');
   const isSuperAdmin = currentUserProfile?.role === 'super_admin';
@@ -56,26 +58,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (isOpen) {
       fetchData();
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    // FIX: Listen to the SAME channel as usePresence ('online-users')
-    const channel = supabase.channel('online-users');
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const newState = channel.presenceState();
-        const onlineIds = new Set<string>();
-        Object.values(newState).forEach((presences: any) => {
-          presences.forEach((p: any) => {
-             if (p.user_id) onlineIds.add(p.user_id);
-          });
-        });
-        setOnlineUsers(onlineIds);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [isOpen]);
 
   const toggleApproval = async (user: UserProfile) => {
@@ -164,15 +146,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleRevokeCode = async (codeStr: string) => {
-      // Confirmed hard delete from both DB and UI
       if (confirm("هل أنت متأكد من حذف هذا الكود نهائياً من السجلات؟")) {
           try {
-              // Optimistically update UI
               setAccessCodes(prev => prev.filter(c => c.code !== codeStr));
               await db.revokeAccessCode(codeStr);
           } catch (e) {
               alert("فشل الحذف. يرجى المحاولة مرة أخرى.");
-              fetchData(); // Revert if failed
+              fetchData();
           }
       }
   };
@@ -346,7 +326,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                        </div>
                                        
                                        <div className="flex items-center gap-2">
-                                            {/* Renew button if expired */}
                                             {isExpired && (
                                                 <button 
                                                     onClick={() => handleRenewCode(ac.code)}
@@ -357,7 +336,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                 </button>
                                             )}
 
-                                            {/* Delete Button - Always available to clear inactive items */}
                                             <button 
                                                 onClick={() => handleRevokeCode(ac.code)}
                                                 className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
@@ -376,7 +354,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              <UserTable 
                 users={filteredProfiles}
                 currentUserId={currentUserId}
-                onlineUsers={onlineUsers}
+                onlineUsers={onlineUserIds}
                 onToggleApproval={toggleApproval}
                 onOpenEdit={setSelectedUserForPerms}
                 onBanUser={handleBanUser}

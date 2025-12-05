@@ -343,6 +343,9 @@ export default function App() {
             currentUserId={activeUserProfile?.id || ''}
             currentUserProfile={activeUserProfile}
             
+            // PASS ONLINE USERS FROM ROOT TO DASHBOARD
+            onlineUsers={onlineUsers}
+
             showSettings={showSettings}
             closeSettings={() => setShowSettings(false)}
             user={sourceSession ? { email: 'source@secure', user_metadata: { username: sourceSession.label } } : session?.user}

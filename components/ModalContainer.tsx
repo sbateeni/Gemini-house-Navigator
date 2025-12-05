@@ -26,6 +26,7 @@ interface ModalContainerProps {
   closeDashboard: () => void;
   currentUserId: string;
   currentUserProfile: UserProfile | null;
+  onlineUsers: MapUser[]; // Pass the live list
 
   // Settings Props
   showSettings: boolean;
@@ -82,6 +83,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeDashboard,
   currentUserId,
   currentUserProfile,
+  onlineUsers,
   showSettings,
   closeSettings,
   user,
@@ -127,6 +129,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         currentUserId={currentUserId}
         currentUserProfile={currentUserProfile}
         onFilterByUser={onFilterByUser}
+        onlineUsersList={onlineUsers}
       />
 
       <SettingsModal 
