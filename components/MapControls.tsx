@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Menu, Navigation, Layers, Globe, Loader2, X, Plane } from 'lucide-react';
+import { Menu, Navigation, Layers, Globe, Loader2, X } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Assignment } from '../types';
 
@@ -15,8 +15,6 @@ interface MapControlsProps {
   onAcceptAssignment: (a: Assignment) => void;
   hasActiveRoute: boolean;
   onClearRoute: () => void;
-  isFlightMode?: boolean;
-  setIsFlightMode?: (v: boolean) => void;
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -29,9 +27,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
   assignments,
   onAcceptAssignment,
   hasActiveRoute,
-  onClearRoute,
-  isFlightMode,
-  setIsFlightMode
+  onClearRoute
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
@@ -45,17 +41,6 @@ export const MapControls: React.FC<MapControlsProps> = ({
        >
          <Menu size={24} />
        </button>
-
-       {/* Flight Mode Toggle */}
-       {setIsFlightMode && (
-           <button 
-             onClick={() => setIsFlightMode(!isFlightMode)}
-             className={`w-12 h-12 rounded-full shadow-xl border flex items-center justify-center transition-all active:scale-95 ${isFlightMode ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/30' : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'}`}
-             title="وضع الطيران"
-           >
-             <Plane size={24} className={isFlightMode ? 'animate-pulse' : ''} />
-           </button>
-       )}
 
        {/* Clear Route Button - Only shows when routing */}
        {hasActiveRoute && (

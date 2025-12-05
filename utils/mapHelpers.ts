@@ -81,26 +81,6 @@ export const createSelfIconHtml = () => `
   </div>
 `;
 
-export const createPlaneIconHtml = (heading: number) => `
-  <div style="
-    transform: rotate(${heading}deg); 
-    transition: transform 0.1s linear; 
-    width: 48px; 
-    height: 48px; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    filter: drop-shadow(0px 5px 10px rgba(0,0,0,0.5));
-  ">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2 12h20"></path>
-      <path d="M13 2l9 10-9 10"></path> 
-      <path d="M16 12l-5-5"></path>
-      <path d="M16 12l-5 5"></path>
-    </svg>
-  </div>
-`;
-
 export const createTempMarkerIconHtml = () => `
   <div class="w-4 h-4 bg-white border-2 border-slate-900 rounded-full animate-bounce shadow-xl"></div>
 `;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession, UserPermissions, UserProfile } from './types';
@@ -39,9 +40,7 @@ export default function App() {
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    targetUserFilter, setTargetUserFilter,
-    // Flight Props
-    isFlightMode, setIsFlightMode, flightHeading
+    targetUserFilter, setTargetUserFilter
   } = useAppLogic(!!sourceSession);
 
   // --- 3. SOURCE MODE LOGIC ---
@@ -305,8 +304,6 @@ export default function App() {
           onDispatch={handleOpenDispatchModal}
           userRole={activeUserRole}
           currentUserId={activeUserProfile?.id}
-          isFlightMode={isFlightMode}
-          flightHeading={flightHeading}
         />
         
         <MapControls 
@@ -323,8 +320,6 @@ export default function App() {
               handleStopNavigation();
               clearSecondaryRoute();
           }}
-          isFlightMode={isFlightMode}
-          setIsFlightMode={setIsFlightMode}
         />
 
         {/* Modal Container with Source-Aware Props */}

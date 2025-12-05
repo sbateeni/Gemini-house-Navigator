@@ -36,73 +36,10 @@ export function useAppLogic(isSourceMode: boolean = false) {
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
   // Enable Geolocation if Access Granted OR Source Mode
-  const { userLocation: gpsLocation } = useGeolocation(hasAccess || isSourceMode);
+  const { userLocation } = useGeolocation(hasAccess || isSourceMode);
   
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
-  // --- FLIGHT MODE LOGIC ---
-  const [isFlightMode, setIsFlightMode] = useState(false);
-  const [flightState, setFlightState] = useState({ lat: 0, lng: 0, heading: 0, speed: 0 });
-  const flightRef = useRef({ lat: 0, lng: 0, heading: 0, speed: 0, active: false });
-
-  // Sync Flight Start Position
-  useEffect(() => {
-    if (isFlightMode && gpsLocation) {
-        flightRef.current = {
-            lat: gpsLocation.lat,
-            lng: gpsLocation.lng,
-            heading: 0,
-            speed: 0, // Start hovering
-            active: true
-        };
-        setFlightState({ ...flightRef.current });
-    }
-  }, [isFlightMode]); 
-
-  // Flight Controls
-  useEffect(() => {
-    if (!isFlightMode) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'ArrowUp') flightRef.current.speed = Math.min(flightRef.current.speed + 0.00005, 0.002);
-        if (e.key === 'ArrowDown') flightRef.current.speed = Math.max(flightRef.current.speed - 0.00005, 0);
-        if (e.key === 'ArrowLeft') flightRef.current.heading = (flightRef.current.heading - 5) % 360;
-        if (e.key === 'ArrowRight') flightRef.current.heading = (flightRef.current.heading + 5) % 360;
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFlightMode]);
-
-  // Flight Game Loop
-  useEffect(() => {
-    if (!isFlightMode) return;
-    
-    let frameId: number;
-    const loop = () => {
-        const { lat, heading, speed } = flightRef.current;
-        
-        if (speed > 0) {
-            const dLat = speed * Math.cos(heading * Math.PI / 180);
-            const dLng = speed * Math.sin(heading * Math.PI / 180) / Math.cos(lat * Math.PI / 180);
-            
-            flightRef.current.lat += dLat;
-            flightRef.current.lng += dLng;
-            
-            setFlightState({ ...flightRef.current });
-        }
-        frameId = requestAnimationFrame(loop);
-    };
-    
-    loop();
-    return () => cancelAnimationFrame(frameId);
-  }, [isFlightMode]);
-
-  // Determine which location to show and use
-  const userLocation = isFlightMode && flightRef.current.active
-     ? { lat: flightState.lat, lng: flightState.lng } 
-     : gpsLocation;
-
   // --- 4. Feature Hooks ---
   const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
@@ -189,12 +126,6 @@ export function useAppLogic(isSourceMode: boolean = false) {
   }, [isSOS, distressedUser, playSiren, stopSiren]);
 
   const locateUser = () => {
-    // If in flight mode, just center on plane
-    if (isFlightMode && userLocation) {
-         setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 16, timestamp: Date.now() });
-         return;
-    }
-
     setIsLocating(true);
     if (!navigator.geolocation) {
         alert("المتصفح لا يدعم تحديد الموقع.");
@@ -418,8 +349,6 @@ export function useAppLogic(isSourceMode: boolean = false) {
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
     // Admin Filters
-    targetUserFilter, setTargetUserFilter,
-    // Flight Mode
-    isFlightMode, setIsFlightMode, flightHeading: flightState.heading
+    targetUserFilter, setTargetUserFilter
   };
 }

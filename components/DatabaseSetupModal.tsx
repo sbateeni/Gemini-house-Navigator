@@ -11,10 +11,10 @@ export const DatabaseSetupModal: React.FC<DatabaseSetupModalProps> = ({ onClose 
 
   const setupSQL = `
 -- ==========================================
--- إصلاح خطأ 42501 (RLS Policy Violation)
+-- إصلاح شامل لقاعدة البيانات (تحديث الأعمدة)
 -- ==========================================
 
--- 1. التأكد من وجود الجداول
+-- 1. التأكد من وجود الجداول الأساسية
 create table if not exists profiles (
   id uuid references auth.users on delete cascade primary key,
   username text,
@@ -45,6 +45,14 @@ create table if not exists notes (
   access_code text,
   visibility text default 'private'
 );
+
+-- *** إصلاح مشكلة الحفظ: التأكد من وجود عمود visibility ***
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notes' AND column_name='visibility') THEN
+        ALTER TABLE notes ADD COLUMN visibility text default 'private';
+    END IF;
+END $$;
 
 create table if not exists access_codes (
   code text primary key,
@@ -86,28 +94,22 @@ alter table access_codes enable row level security;
 alter table logs enable row level security;
 alter table assignments enable row level security;
 
--- 3. إصلاح السياسات (Policies) - هذا الجزء هو الأهم لحل 42501
+-- 3. تحديث السياسات (Fix 42501 Error)
 
--- سياسات Notes (أهم جدول يسبب المشكلة)
+-- سياسات Notes
 DROP POLICY IF EXISTS "Enable Read for Users and Sources" ON notes;
-CREATE POLICY "Enable Read for Users and Sources" ON notes FOR SELECT USING (
-  true -- التبسيط للقراءة حالياً، يمكن تقييده لاحقاً
-);
+CREATE POLICY "Enable Read for Users and Sources" ON notes FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Enable Insert for Users" ON notes;
 CREATE POLICY "Enable Insert for Users" ON notes FOR INSERT WITH CHECK (
-  auth.role() = 'authenticated' OR auth.role() = 'anon' -- السماح للـ anon للإدخال عبر RPC
+  auth.role() = 'authenticated' OR auth.role() = 'anon'
 );
 
 DROP POLICY IF EXISTS "Enable Update for Users" ON notes;
-CREATE POLICY "Enable Update for Users" ON notes FOR UPDATE USING (
-  auth.role() = 'authenticated'
-);
+CREATE POLICY "Enable Update for Users" ON notes FOR UPDATE USING (auth.role() = 'authenticated');
 
 DROP POLICY IF EXISTS "Enable Delete for Users" ON notes;
-CREATE POLICY "Enable Delete for Users" ON notes FOR DELETE USING (
-  auth.role() = 'authenticated'
-);
+CREATE POLICY "Enable Delete for Users" ON notes FOR DELETE USING (auth.role() = 'authenticated');
 
 -- سياسات Profiles
 DROP POLICY IF EXISTS "Public profiles" ON profiles;
@@ -126,8 +128,7 @@ CREATE POLICY "Read Codes" on access_codes for select using (true);
 DROP POLICY IF EXISTS "Manage Codes" ON access_codes;
 CREATE POLICY "Manage Codes" on access_codes for all using (auth.role() = 'authenticated');
 
--- 4. إصلاح الدالة create_source_note لتستخدم SECURITY DEFINER
--- هذا يضمن أن الدالة تتجاوز قيود RLS عند استدعائها
+-- 4. إصلاح دالة المصادر (تجاوز RLS)
 create or replace function create_source_note(p_code text, p_note_data jsonb)
 returns void as $$
 begin
@@ -174,10 +175,9 @@ NOTIFY pgrst, 'reload schema';
                 <ShieldAlert className="text-red-500 w-8 h-8" />
             </div>
             <div>
-                <h1 className="text-xl font-bold text-white mb-1">إصلاح أذونات قاعدة البيانات (RLS)</h1>
+                <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات</h1>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                هذا الإجراء يحل مشاكل اختفاء البيانات أو خطأ 42501. <br/>
-                الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase.
+                لحل مشكلة "Failed to save/update note"، يجب تشغيل هذا الكود في Supabase لإضافة العمود الناقص (visibility).
                 </p>
             </div>
           </div>

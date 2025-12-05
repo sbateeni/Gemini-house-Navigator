@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
-import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml, createPlaneIconHtml } from '../../utils/mapHelpers';
+import { createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';
 
 export function useMapMarkers(
     mapInstanceRef: React.MutableRefObject<any>,
@@ -14,9 +14,7 @@ export function useMapMarkers(
     onNavigate: ((note: MapNote) => void) | undefined,
     onDispatch: ((note: MapNote) => void) | undefined,
     userRole: string | null,
-    isSatellite: boolean,
-    isFlightMode?: boolean,
-    flightHeading?: number
+    isSatellite: boolean
 ) {
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkerRef = useRef<any>(null);
@@ -115,8 +113,6 @@ export function useMapMarkers(
       if (markersRef.current[note.id]) {
         // UPDATE Existing Marker
         const marker = markersRef.current[note.id];
-        const currentLatLng = marker.getLatLng();
-        
         // Only update if position changed significantly to avoid jitter, 
         // OR if we want to force icon/popup updates (which we do for status changes)
         marker.setLatLng([note.lat, note.lng]);
@@ -192,41 +188,28 @@ export function useMapMarkers(
     }
   }, [tempMarkerCoords]);
 
-  // 5. Self Location Marker (Or Flight Plane)
+  // 5. Self Location Marker
   useEffect(() => {
     if (!mapInstanceRef.current || !userLocation) return;
     
     if (userMarkerRef.current) mapInstanceRef.current.removeLayer(userMarkerRef.current);
 
-    let userIcon;
-
-    if (isFlightMode) {
-         userIcon = window.L.divIcon({
-            className: 'custom-div-icon',
-            html: createPlaneIconHtml(flightHeading || 0),
-            iconSize: [48, 48],
-            iconAnchor: [24, 24]
-        });
-        // Pan map continuously in flight mode
-        mapInstanceRef.current.panTo([userLocation.lat, userLocation.lng], { animate: false });
-    } else {
-         userIcon = window.L.divIcon({
-            className: 'custom-div-icon',
-            html: createSelfIconHtml(),
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-        });
-    }
+    const userIcon = window.L.divIcon({
+        className: 'custom-div-icon',
+        html: createSelfIconHtml(),
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
 
     userMarkerRef.current = window.L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(mapInstanceRef.current);
 
-    // Initial FlyTo (only if not flight mode to prevent jumps)
-    if (!hasInitialFlownToUserRef.current && !isFlightMode) {
+    // Initial FlyTo
+    if (!hasInitialFlownToUserRef.current) {
       mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, {
         duration: 2,
         easeLinearity: 0.25
       });
       hasInitialFlownToUserRef.current = true;
     }
-  }, [userLocation, isFlightMode, flightHeading]);
+  }, [userLocation]);
 }
