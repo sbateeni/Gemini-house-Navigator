@@ -112,4 +112,5 @@ export interface AccessCode {
 export interface SourceSession {
   code: string;
   expiresAt: number;
+  label?: string; // Operation Name
 }

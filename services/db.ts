@@ -81,7 +81,7 @@ export const db = {
   // --- SOURCE ACCESS LOGIC ---
   
   // Verify access code using secure RPC with Device Binding
-  async verifyAccessCode(code: string): Promise<{ valid: boolean, error?: string, expiresAt?: number }> {
+  async verifyAccessCode(code: string): Promise<{ valid: boolean, error?: string, expiresAt?: number, label?: string }> {
      try {
          const deviceId = getDeviceId();
          
@@ -93,7 +93,6 @@ export const db = {
 
          if (error) {
              console.error("RPC Error (claim_access_code)", error);
-             // Return specific error to trigger database setup modal if RPC is missing
              if (error.code === 'PGRST202' || error.message?.includes('function claim_access_code') || error.code === '42883') { 
                  const e: any = new Error("Database Schema Missing");
                  e.code = 'TABLE_MISSING';
@@ -102,9 +101,9 @@ export const db = {
              return { valid: false, error: 'خطأ في الاتصال بقاعدة البيانات' };
          }
 
-         // RPC returns: { success: boolean, message?: string, expires_at?: number }
+         // RPC returns: { success: boolean, message?: string, expires_at?: number, label?: string }
          if (data && data.success) {
-             return { valid: true, expiresAt: data.expires_at };
+             return { valid: true, expiresAt: data.expires_at, label: data.label };
          } else {
              return { valid: false, error: data?.message || 'كود غير صالح أو مستخدم على جهاز آخر' };
          }
@@ -181,10 +180,12 @@ export const db = {
 
       // CASE 1: Source Login (Guest)
       if (sourceCode) {
+          // Fetch notes created by this code OR public notes
+          // We use 'or' filter
           const { data, error } = await supabase
              .from('notes')
              .select('*')
-             .or(`access_code.eq.${sourceCode},visibility.eq.public`); // See own notes OR public notes
+             .or(`access_code.eq.${sourceCode},visibility.eq.public`); 
           
           if (error) throw error;
           
@@ -214,25 +215,18 @@ export const db = {
 
       if (error) throw error;
 
-      // 2. Client-side Rank Logic (Simplified as we don't have creator_profile)
       const currentRank = getRankValue(currentUserProfile?.role);
       const currentUserId = currentUserProfile?.id;
 
       const filteredData = (data || []).filter((row: any) => {
           // Public is always visible
           if (row.visibility === 'public') return true;
-
           // Always see my own notes
           if (row.created_by === currentUserId) return true;
-
-          // If note is from a "Source"
+          // If note is from a "Source", Officers+ can see it
           if (row.access_code) {
              return currentRank >= getRankValue('user');
           }
-
-          // Fallback: If we assume RLS handles visibility, we can just return true here.
-          // Or we can add strict checks if we had the profile data.
-          // Since RLS is active, if the user received the data, they can see it.
           return true;
       });
 
@@ -254,30 +248,23 @@ export const db = {
       })) as MapNote[];
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
-      
       return notes;
 
     } catch (error: any) {
-      console.warn("Fetching failed or offline, checking for cache or schema error...", error);
-
-      // CRITICAL FIX: Prioritize Schema Errors (Missing Column/Table) over Cache
+      console.warn("Fetching failed or offline", error);
       if (error.code === 'PGRST205' || error.code === '42P01' || error.code === '42703' || error.code === 'TABLE_MISSING') {
         const missingError: any = new Error('Table/Column Missing');
         missingError.code = 'TABLE_MISSING';
         throw missingError;
       }
       
-      // If NOT a schema error, try loading from cache (Offline support)
       const cached = localStorage.getItem(CACHE_KEY_NOTES);
-      
       if (cached) {
         const localNotes = JSON.parse(cached);
         const pending = JSON.parse(localStorage.getItem(CACHE_KEY_PENDING_NOTES) || '[]');
         return [...pending, ...localNotes];
       }
-
       if (error.message === "Offline") throw error;
-      
       throw error;
     }
   },

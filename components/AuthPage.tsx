@@ -203,7 +203,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
          
          const res = await db.verifyAccessCode(cleanCode);
          if (res.valid && res.expiresAt) {
-             if (onSourceLogin) onSourceLogin({ code: cleanCode, expiresAt: res.expiresAt });
+             if (onSourceLogin) onSourceLogin({ code: cleanCode, expiresAt: res.expiresAt, label: res.label });
          } else {
              throw new Error(res.error || 'كود غير صالح');
          }

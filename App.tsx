@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
-import { SourceSession } from './types';
+import { SourceSession, UserPermissions, UserProfile } from './types';
 import { db } from './services/db';
-import { Timer, LogOut, X, ShieldAlert } from 'lucide-react';
+import { Timer, LogOut, X, ShieldAlert, KeyRound } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -17,11 +17,14 @@ import { LoadingScreen } from './components/layout/LoadingScreen';
 import { TacticalOverlay } from './components/layout/TacticalOverlay';
 
 export default function App() {
-  // SOURCE MODE STATE
+  // --- 1. CORE STATE ---
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
   const [sourceTimeLeft, setSourceTimeLeft] = useState<number>(0);
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
 
+  // --- 2. AUTH & LOGIC HOOKS ---
+  // Note: We access app logic, but some parts depend on authentication which Source users lack.
+  // We will handle this by mocking necessary profile/permission data for the Source user.
   const {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
     notes, isConnected, tableMissing, updateStatus, setNotes,
@@ -43,51 +46,78 @@ export default function App() {
     isFlightMode, setIsFlightMode, flightHeading
   } = useAppLogic();
 
-  // --- Filter Logic ---
+  // --- 3. SOURCE MODE LOGIC ---
+  
+  // Specific permissions for Source Users
+  const sourcePermissions: UserPermissions = {
+      can_create: true,       // They can mark locations
+      can_see_others: false,  // Hidden for security
+      can_navigate: true,     // Can navigate to points
+      can_edit_users: false,
+      can_dispatch: false,
+      can_view_logs: false
+  };
+
+  // Mock Profile for Source Users so components don't crash
+  const sourceProfile: UserProfile | null = sourceSession ? {
+      id: 'source-guest',
+      username: sourceSession.label || 'مصدر سري',
+      role: 'source',
+      isApproved: true,
+      permissions: sourcePermissions,
+      email: 'source@secure-link'
+  } : null;
+
+  // Effective Data for Rendering
+  const activeUserProfile = sourceSession ? sourceProfile : userProfile;
+  const activePermissions = sourceSession ? sourcePermissions : permissions;
+  const activeUserRole = sourceSession ? 'source' : userRole;
+  
+  // Filter Logic
   const displayedNotes = targetUserFilter 
     ? notes.filter(n => n.createdBy === targetUserFilter.id)
     : notes;
 
-  // --- Source Logic ---
-  const handleSourceLogin = (session: SourceSession) => {
+  const handleSourceLogin = async (session: SourceSession) => {
       setSourceSession(session);
-      // Fetch Source notes
-      db.getAllNotes(undefined, session.code)
-        .then(setNotes)
-        .catch(err => {
-            console.error("Source login data fetch error:", err);
-            // If table/column missing, alert user (Sources can't fix it, but should know)
-            if (err.code === 'TABLE_MISSING') {
-                alert("نظام غير محدث: يرجى التواصل مع المسؤول لتحديث قاعدة البيانات (Missing Columns).");
-            }
-        });
+      // Fetch notes immediately for this source code
+      try {
+          const fetchedNotes = await db.getAllNotes(undefined, session.code);
+          setNotes(fetchedNotes);
+      } catch (err: any) {
+          console.error("Source fetch error:", err);
+          if (err.code === 'TABLE_MISSING') alert("خطأ في قاعدة البيانات (Missing Columns).");
+      }
   };
 
   const handleSourceLogout = () => {
       setSourceSession(null);
       setNotes([]);
+      window.location.reload(); // Hard reload to clear any residual state
   };
 
-  // Source Timer
+  // Source Timer Logic
   useEffect(() => {
       if (!sourceSession) return;
+      
       const interval = setInterval(() => {
           const left = Math.max(0, Math.ceil((sourceSession.expiresAt - Date.now()) / 1000));
           setSourceTimeLeft(left);
+          
           if (left <= 0) {
-              alert("انتهت صلاحية الجلسة.");
+              alert("انتهت صلاحية الكود. سيتم تسجيل الخروج.");
               handleSourceLogout();
           }
       }, 1000);
+      
       return () => clearInterval(interval);
   }, [sourceSession]);
 
-  // Inject source code into new notes if in source mode
+  // Handle Note Save for Sources (Bypassing standard auth check in hooks)
   const handleSourceSaveNote = async (visibility: 'public' | 'private', title?: string) => {
       if (!sourceSession || !tempCoords) return;
       
       const defaultName = visibility === 'public' ? 'موقع عام' : 'موقع خاص (مصدر)';
-      // Use the provided title or the default
       const locationName = title?.trim() ? title : defaultName;
 
       const newNote = {
@@ -105,24 +135,24 @@ export default function App() {
       };
       
       try {
-          await db.addNote(newNote); // Will use RPC
+          await db.addNote(newNote);
           setNotes(prev => [newNote, ...prev]);
           closeModal();
           setUserNoteInput("");
       } catch(e) {
           alert("فشل الحفظ. ربما انتهت الصلاحية.");
-          handleSourceLogout();
       }
   };
 
 
-  // --- Render Guards ---
+  // --- 4. RENDER GUARDS ---
+  
   if (authLoading && !sourceSession) return <LoadingScreen />;
 
-  // Auth Page if no session AND no source session
+  // Auth Page Entry
   if (!session && !sourceSession) return <AuthPage onSourceLogin={handleSourceLogin} />;
 
-  // Pending Approval (Only if not source)
+  // Pending Approval (Standard Users Only)
   if (!sourceSession && !hasAccess && session) {
       return (
         <PendingApproval 
@@ -134,48 +164,55 @@ export default function App() {
       );
   }
 
-  // Auto-show DB Setup if critical tables missing
+  // Database Error Modal
   if (tableMissing) return <DatabaseSetupModal />;
 
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden" dir="rtl">
       
-      {/* Manual DB Fix Modal */}
       {showDatabaseFix && <DatabaseSetupModal onClose={() => setShowDatabaseFix(false)} />}
 
-      {/* Source Mode Timer Overlay - REDESIGNED TO LOOK LIKE OPS CREW UI */}
+      {/* --- SOURCE MODE TACTICAL HUD --- */}
       {sourceSession && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex flex-col items-center gap-2">
-              <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl px-5 py-2 shadow-2xl flex items-center gap-6">
-                  <div className="flex items-center gap-3">
-                      <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20">
-                        <ShieldAlert className="text-blue-400 w-5 h-5 animate-pulse" />
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex flex-col items-center gap-2 animate-in slide-in-from-top-5">
+              <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl p-1 shadow-2xl flex items-center gap-4 pr-6 pl-2">
+                  
+                  {/* Operation Info */}
+                  <div className="flex items-center gap-3 py-2">
+                      <div className="bg-blue-600/20 p-2 rounded-lg border border-blue-500/30">
+                        <KeyRound className="text-blue-400 w-5 h-5" />
                       </div>
                       <div className="flex flex-col">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">الزمن المتبقي للمهمة</span>
-                          <div className="flex items-center gap-2 font-mono text-xl font-bold text-white leading-none">
-                              <span>
-                                  {Math.floor(sourceTimeLeft / 60)}:{(sourceTimeLeft % 60).toString().padStart(2, '0')}
-                              </span>
-                          </div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">العملية النشطة</span>
+                          <span className="text-sm font-bold text-white">{sourceSession.label || 'مهمة سرية'}</span>
                       </div>
                   </div>
 
-                  <div className="h-8 w-px bg-slate-700"></div>
+                  <div className="h-8 w-px bg-slate-800"></div>
 
+                  {/* Timer */}
+                  <div className="flex flex-col items-center min-w-[80px]">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase">المتبقي</span>
+                      <div className={`font-mono text-xl font-bold leading-none ${sourceTimeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-blue-400'}`}>
+                          {Math.floor(sourceTimeLeft / 60)}:{(sourceTimeLeft % 60).toString().padStart(2, '0')}
+                      </div>
+                  </div>
+
+                  <div className="h-8 w-px bg-slate-800"></div>
+
+                  {/* Exit */}
                   <button 
                       onClick={handleSourceLogout}
-                      className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold"
-                      title="إنهاء المهمة"
+                      className="bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/30 p-2 rounded-lg transition-colors flex items-center justify-center"
+                      title="إنهاء المهمة والخروج"
                   >
-                      <LogOut size={16} />
-                      <span>خروج</span>
+                      <LogOut size={18} />
                   </button>
               </div>
           </div>
       )}
 
-      {/* Admin Filter Active Banner */}
+      {/* Admin Filter Banner */}
       {targetUserFilter && (
          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1000] bg-purple-900/90 border border-purple-500 rounded-full pl-2 pr-6 py-2 shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10">
              <span className="text-white text-sm font-bold">
@@ -190,7 +227,7 @@ export default function App() {
          </div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Pass Source Props if needed */}
       <Sidebar 
           isOpen={sidebarOpen}
           setIsOpen={setSidebarOpen}
@@ -201,12 +238,12 @@ export default function App() {
           setSearchQuery={setSearchQuery}
           isSearching={isSearching}
           onSearch={handleSearch}
-          onFlyToNote={flyToTarget ? () => {} : flyToNote} // Fix flight override
+          onFlyToNote={flyToTarget ? () => {} : flyToNote} 
           onDeleteNote={handleDeleteNote}
           onEditNote={handleEditNote} 
           onNavigateToNote={(note) => {
-              if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
-              else alert("ليس لديك صلاحية الملاحة.");
+              if (activePermissions.can_navigate) handleNavigateToNote(note, locateUser);
+              else alert("غير مصرح بالملاحة.");
           }}
           onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
           routeData={currentRoute}
@@ -215,20 +252,20 @@ export default function App() {
           isAnalyzing={isAnalyzing}
           onUpdateStatus={updateStatus}
           isConnected={isConnected}
-          userRole={sourceSession ? 'source' : userRole}
+          userRole={activeUserRole}
           onLogout={sourceSession ? handleSourceLogout : handleLogout}
           onOpenDashboard={() => setShowDashboard(true)} 
           onOpenSettings={() => setShowSettings(true)}
           onOpenCampaigns={() => setShowCampaigns(true)}
-          canCreate={!!sourceSession || permissions.can_create} 
+          canCreate={activePermissions.can_create} 
           myStatus={myStatus}
           setMyStatus={setMyStatus}
           onlineUsers={sourceSession ? [] : onlineUsers} 
-          currentUserId={session?.user?.id || ''}
+          currentUserId={activeUserProfile?.id || ''}
       />
 
       <div className="flex-1 relative w-full h-full">
-        {/* Tactical Overlay */}
+        {/* Tactical Overlay (Hidden for Source) */}
         {!sourceSession && (
             <TacticalOverlay 
                 isSOS={isSOS}
@@ -239,13 +276,9 @@ export default function App() {
             />
         )}
         
-        {/* Source Mode Overlay (Simplified) */}
+        {/* Simplified Overlay for Source (To hold Logs/Alerts if we wanted, but currently empty) */}
         {sourceSession && (
-            <div className="absolute inset-0 z-10 pointer-events-none">
-                 <TacticalOverlay 
-                    isSOS={false} onToggleSOS={() => {}} onExpandLogs={() => {}}
-                 />
-            </div>
+            <div className="absolute inset-0 z-10 pointer-events-none"></div>
         )}
 
         <LeafletMap 
@@ -255,7 +288,7 @@ export default function App() {
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
           onMapClick={(lat, lng) => {
-              if (sourceSession || permissions.can_create) {
+              if (activePermissions.can_create) {
                  handleMapClick(lat, lng, handleStopNavigation);
               }
           }}
@@ -264,21 +297,19 @@ export default function App() {
           userLocation={userLocation}
           currentRoute={currentRoute}
           secondaryRoute={secondaryRoute}
-          otherUsers={sourceSession ? [] : onlineUsers}
+          otherUsers={sourceSession ? [] : onlineUsers} // Hide others from source
           onUserClick={onUserClick}
-          canSeeOthers={!sourceSession && permissions.can_see_others}
+          canSeeOthers={activePermissions.can_see_others}
           onNavigate={(note) => {
-             if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
-             else alert("صلاحية الملاحة مرفوضة.");
+             if (activePermissions.can_navigate) handleNavigateToNote(note, locateUser);
           }}
           onDispatch={handleOpenDispatchModal}
-          userRole={sourceSession ? 'source' : userRole}
-          currentUserId={session?.user?.id}
+          userRole={activeUserRole}
+          currentUserId={activeUserProfile?.id}
           isFlightMode={isFlightMode}
           flightHeading={flightHeading}
         />
         
-        {/* Controls layer */}
         <MapControls 
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
@@ -297,6 +328,7 @@ export default function App() {
           setIsFlightMode={setIsFlightMode}
         />
 
+        {/* Modal Container with Source-Aware Props */}
         <ModalContainer
             showCreateModal={showModal}
             closeCreateModal={closeModal}
@@ -309,13 +341,13 @@ export default function App() {
             
             showDashboard={showDashboard}
             closeDashboard={() => setShowDashboard(false)}
-            currentUserId={session?.user?.id || ''}
-            currentUserProfile={userProfile}
+            currentUserId={activeUserProfile?.id || ''}
+            currentUserProfile={activeUserProfile}
             
             showSettings={showSettings}
             closeSettings={() => setShowSettings(false)}
-            user={session?.user}
-            userRole={sourceSession ? 'source' : userRole}
+            user={sourceSession ? { email: 'source@secure', user_metadata: { username: sourceSession.label } } : session?.user}
+            userRole={activeUserRole}
             mapProvider={mapProvider}
             setMapProvider={setMapProvider}
             onOpenDatabaseFix={() => { setShowSettings(false); setShowDatabaseFix(true); }}
