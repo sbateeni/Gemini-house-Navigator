@@ -21,7 +21,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
   const [username, setUsername] = useState('');
   const [accessCode, setAccessCode] = useState('');
 
-  // Load saved email on mount
   useEffect(() => {
     const savedEmail = localStorage.getItem('gemini_saved_email');
     if (savedEmail) {
@@ -38,7 +37,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
 
     try {
       if (authMode === 'source') {
-         // Source Login Logic
          const res = await db.verifyAccessCode(accessCode.replace(/\s/g, ''));
          if (res.valid && res.expiresAt) {
              const session: SourceSession = {
@@ -120,7 +118,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
 
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl relative z-10">
         
-        {/* Force Logout Button (Top Left) */}
+        {/* Force Logout Button (Top Left inside card) */}
         <button 
             onClick={handleForceLogout}
             className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors rounded-full hover:bg-slate-800"
@@ -147,7 +145,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
           </p>
         </div>
 
-        {/* Auth Mode Tabs - Using Flexbox for better spacing */}
+        {/* Auth Mode Tabs - Flexbox for smoother look */}
         <div className="flex gap-2 mb-6 bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full">
            <button 
              onClick={() => { setAuthMode('login'); setMessage(null); }}
@@ -194,7 +192,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
                         placeholder="أدخل رمز الوصول (16 خانة)"
                         value={accessCode}
                         onChange={(e) => {
-                            // Only numbers
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             if (val.length <= 16) setAccessCode(val);
                         }}
