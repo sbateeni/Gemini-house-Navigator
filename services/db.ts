@@ -14,6 +14,20 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
 const CACHE_KEY_NOTES = 'gemini_offline_notes';
 const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
 
+// Define Numeric Ranks for visibility comparison
+// Higher number = Higher Rank
+const ROLE_RANKS: Record<string, number> = {
+  super_admin: 100,
+  admin: 90,
+  governorate_admin: 80,
+  center_admin: 70,
+  officer: 60,
+  user: 50,
+  banned: 0
+};
+
+const getRankValue = (role?: string) => ROLE_RANKS[role || 'user'] || 10;
+
 export const db = {
   // --- OFFLINE SYNC LOGIC ---
   async syncPendingNotes() {
@@ -53,26 +67,28 @@ export const db = {
     try {
       if (!navigator.onLine) throw new Error("Offline");
 
-      // Build Query based on Hierarchy
+      // 1. Start with basic hierarchy filtering (Governorate/Center)
       let query = supabase
         .from('notes')
-        .select('*')
+        .select(`
+            *,
+            creator_profile:created_by ( role )
+        `)
         .order('created_at', { ascending: false });
 
-      // Apply Hierarchical Filters
+      // Apply Hierarchical Filters (Scope-based)
       if (currentUserProfile) {
         const role = currentUserProfile.role;
-        // Super Admin (and legacy admin) sees ALL
+        // Super Admin (and legacy admin) sees ALL scopes
         if (role === 'super_admin' || role === 'admin') {
-           // No filter - see everything
+           // No scope filter
         } 
         // Governorate Admin sees ONLY their governorate
         else if (role === 'governorate_admin' && currentUserProfile.governorate) {
            query = query.eq('governorate', currentUserProfile.governorate);
         }
-        // Center Admin/User sees ONLY their center notes (or Governorates if policy allows, but usually stricter)
-        // Here we restrict center admins and users to their center for strict compartmentalization
-        else if ((role === 'center_admin' || role === 'user') && currentUserProfile.center) {
+        // Center Admin/User sees ONLY their center notes (or Governorates if policy allows)
+        else if ((role === 'center_admin' || role === 'user' || role === 'officer') && currentUserProfile.center) {
            query = query.eq('center', currentUserProfile.center);
         }
       }
@@ -81,7 +97,26 @@ export const db = {
 
       if (error) throw error;
 
-      const notes = (data || []).map((row: any) => ({
+      // 2. Apply Rank-Based Filtering (Visibility Logic)
+      // Rule: Viewer Rank >= Creator Rank
+      // "Higher rank sees lower. Lower rank DOES NOT see higher."
+      const currentRank = getRankValue(currentUserProfile?.role);
+      const currentUserId = currentUserProfile?.id;
+
+      const filteredData = (data || []).filter((row: any) => {
+          // Always see my own notes
+          if (row.created_by === currentUserId) return true;
+
+          // If no creator info (legacy notes), assume visible (or treat as lowest rank)
+          if (!row.creator_profile) return true;
+
+          const creatorRank = getRankValue(row.creator_profile.role);
+          
+          // I see notes if my rank is EQUAL or HIGHER than the creator's rank.
+          return currentRank >= creatorRank;
+      });
+
+      const notes = filteredData.map((row: any) => ({
         id: row.id,
         lat: row.lat,
         lng: row.lng,
@@ -92,7 +127,8 @@ export const db = {
         status: row.status,
         sources: row.sources,
         governorate: row.governorate,
-        center: row.center
+        center: row.center,
+        createdBy: row.created_by
       })) as MapNote[];
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
@@ -130,6 +166,9 @@ export const db = {
     }
 
     try {
+      // Get current user ID to stamp the note
+      const { data: { user } } = await supabase.auth.getUser();
+
       const dbRow = {
         id: note.id,
         lat: note.lat,
@@ -141,7 +180,8 @@ export const db = {
         status: note.status || null,
         sources: note.sources || [],
         governorate: note.governorate, // Add Hierarchy Tags
-        center: note.center
+        center: note.center,
+        created_by: user?.id // SAVE OWNER
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
@@ -156,7 +196,7 @@ export const db = {
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
       if (error.message === "DATABASE_SCHEMA_MISMATCH") {
-          alert("خطأ: قاعدة البيانات تحتاج لتحديث. الأعمدة (governorate, center) مفقودة.");
+          alert("خطأ: قاعدة البيانات تحتاج لتحديث. الأعمدة (governorate, center, created_by) مفقودة.");
           throw error;
       }
 

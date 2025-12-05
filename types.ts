@@ -1,5 +1,4 @@
 
-
 export interface MapNote {
   id: string;
   lat: number;
@@ -13,6 +12,7 @@ export interface MapNote {
   // Hierarchy Fields
   governorate?: string;
   center?: string;
+  createdBy?: string; // UUID of the creator
 }
 
 export interface GroundingSource {

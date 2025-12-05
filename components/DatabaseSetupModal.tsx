@@ -18,8 +18,8 @@ create table if not exists profiles (
   governorate text,
   center text,
   last_seen bigint, 
-  lat float8, -- New: Store last known latitude
-  lng float8, -- New: Store last known longitude
+  lat float8,
+  lng float8,
   primary key (id)
 );
 
@@ -76,8 +76,12 @@ create table if not exists notes (
   status text,
   sources jsonb,
   governorate text,
-  center text
+  center text,
+  created_by uuid references auth.users(id) -- New: Track creator for Rank Logic
 );
+
+-- Update existing notes table if exists
+alter table notes add column if not exists created_by uuid references auth.users(id);
 
 alter table notes enable row level security;
 
@@ -175,7 +179,7 @@ create policy "Admin delete logs" on logs for delete using (
           <div>
             <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
             <p className="text-slate-400 text-sm">
-              تم إضافة ميزات جديدة (حفظ الموقع الأخير). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">profiles</span>.
+              تم تفعيل نظام الرتب (Rank System). يرجى تحديث جدول <span className="text-blue-400 font-bold mx-1">notes</span> لإضافة عمود `created_by`.
             </p>
           </div>
         </div>
