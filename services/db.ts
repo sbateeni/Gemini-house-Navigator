@@ -162,6 +162,19 @@ export const db = {
       }));
   },
 
+  // SUPER ADMIN: Get ALL codes
+  async getAllAccessCodes(): Promise<AccessCode[]> {
+      const { data } = await supabase
+        .from('access_codes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      return (data || []).map((row: any) => ({
+          ...row,
+          label: safeString(row.label)
+      }));
+  },
+
   // Revoke code (HARD DELETE)
   async revokeAccessCode(code: string): Promise<void> {
       const { error } = await supabase

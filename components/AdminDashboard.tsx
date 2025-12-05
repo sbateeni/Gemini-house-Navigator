@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCcw } from 'lucide-react';
+import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCcw, Wifi, WifiOff } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole, AccessCode } from '../types';
 import { supabase } from '../services/supabase';
@@ -35,6 +35,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(currentUserProfile?.role || '');
+  const isSuperAdmin = currentUserProfile?.role === 'super_admin';
 
   const fetchData = async () => {
     setLoading(true);
@@ -42,7 +43,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setProfiles(users);
     
     if (isOfficerOrAbove) {
-        const codes = await db.getMyAccessCodes();
+        // If Super Admin, get ALL active codes. If Officer, get MY codes.
+        const codes = isSuperAdmin 
+            ? await db.getAllAccessCodes() 
+            : await db.getMyAccessCodes();
         setAccessCodes(codes);
     }
     setLoading(false);
@@ -56,7 +60,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    const channel = supabase.channel('online-users-dashboard');
+    
+    // FIX: Listen to the SAME channel as usePresence ('online-users')
+    const channel = supabase.channel('online-users');
     channel
       .on('presence', { event: 'sync' }, () => {
         const newState = channel.presenceState();
@@ -200,6 +206,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return Array.from(centers);
   };
 
+  const getCreatorName = (id: string) => {
+      if (id === currentUserId) return 'أنت';
+      return profiles.find(p => p.id === id)?.username || 'مستخدم';
+  };
+
   const pendingCount = profiles.filter(p => !p.isApproved && p.role !== 'banned').length;
   const activeCodesCount = accessCodes.filter(c => c.is_active && c.expires_at > Date.now()).length;
 
@@ -297,11 +308,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                    {/* Codes List */}
                    <div className="space-y-3">
-                       {accessCodes.length === 0 && <p className="text-center text-slate-500 py-8">لم تقم بإنشاء أي أكواد مصادر بعد.</p>}
+                       {accessCodes.length === 0 && <p className="text-center text-slate-500 py-8">لم يتم العثور على أكواد مصادر نشطة.</p>}
                        {accessCodes.map(ac => {
                            const isExpired = Date.now() > ac.expires_at;
                            const timeLeft = Math.max(0, Math.ceil((ac.expires_at - Date.now()) / 60000));
                            const isActive = ac.is_active && !isExpired;
+                           const creatorName = getCreatorName(ac.created_by);
                            
                            return (
                                <div key={ac.code} className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-800 opacity-80'}`}>
@@ -311,6 +323,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                        </div>
                                        <div>
                                            <div className="text-white font-bold">{ac.label || 'بدون اسم'}</div>
+                                           <div className="text-xs text-slate-500 mt-1">
+                                               بواسطة: <span className="text-blue-400">{creatorName}</span>
+                                           </div>
                                            <div className="text-xs font-mono text-slate-400 mt-1 flex items-center gap-2">
                                                {ac.code.match(/.{1,4}/g)?.join(' ')}
                                                <button onClick={() => copyCode(ac.code)} className="hover:text-white">

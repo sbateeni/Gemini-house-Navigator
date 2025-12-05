@@ -143,20 +143,30 @@ export function usePresence(
     };
   }, [session?.user?.id, hasAccess]);
 
-  // 4. Update Presence Track when location changes
+  // 4. Update Presence Track when location changes OR Periodic Heartbeat
   useEffect(() => {
-      if (channelRef.current && userLocation) {
-          channelRef.current.track({
-              user_id: session?.user?.id,
-              username: getSafeUsername(session?.user),
-              color: getUserColor(session?.user?.id || ''),
-              online_at: Date.now(),
-              lat: userLocation.lat,
-              lng: userLocation.lng,
-              status: myStatus,
-              isSOS: isSOS
-          });
-      }
+      const trackPresence = () => {
+          if (channelRef.current && userLocation) {
+              channelRef.current.track({
+                  user_id: session?.user?.id,
+                  username: getSafeUsername(session?.user),
+                  color: getUserColor(session?.user?.id || ''),
+                  online_at: Date.now(),
+                  lat: userLocation.lat,
+                  lng: userLocation.lng,
+                  status: myStatus,
+                  isSOS: isSOS
+              });
+          }
+      };
+
+      trackPresence(); // Immediate update on state change
+
+      // Periodic heartbeat to keep presence alive even if location doesn't change
+      const interval = setInterval(trackPresence, 20000); // 20s
+
+      return () => clearInterval(interval);
+
   }, [userLocation, myStatus, isSOS]);
 
   // 5. Merge Strategy: Presence (Realtime) > Database (Recent History)
