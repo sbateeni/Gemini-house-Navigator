@@ -15,13 +15,11 @@ import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { TacticalOverlay } from './components/layout/TacticalOverlay';
-import { FlightHUD } from './components/FlightHUD';
 
 export default function App() {
   // SOURCE MODE STATE
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
   const [sourceTimeLeft, setSourceTimeLeft] = useState<number>(0);
-  const [isFlying, setIsFlying] = useState(false);
 
   const {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
@@ -156,11 +154,8 @@ export default function App() {
           </div>
       )}
 
-      {/* Flight HUD - Only when flying */}
-      {isFlying && <FlightHUD onClose={() => setIsFlying(false)} />}
-
       {/* Admin Filter Active Banner */}
-      {targetUserFilter && !isFlying && (
+      {targetUserFilter && (
          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1000] bg-purple-900/90 border border-purple-500 rounded-full pl-2 pr-6 py-2 shadow-2xl flex items-center gap-4 animate-in slide-in-from-top-10">
              <span className="text-white text-sm font-bold">
                  تصفية المواقع للمستخدم: <span className="text-yellow-300">{targetUserFilter.name}</span>
@@ -174,47 +169,43 @@ export default function App() {
          </div>
       )}
 
-      {/* Hide Sidebar when flying to maximize view */}
-      {!isFlying && (
-        <Sidebar 
-            isOpen={sidebarOpen}
-            setIsOpen={setSidebarOpen}
-            notes={displayedNotes} 
-            selectedNote={selectedNote}
-            setSelectedNote={setSelectedNote}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            isSearching={isSearching}
-            onSearch={handleSearch}
-            onFlyToNote={flyToNote}
-            onDeleteNote={handleDeleteNote}
-            onEditNote={handleEditNote} 
-            onNavigateToNote={(note) => {
-                if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
-                else alert("ليس لديك صلاحية الملاحة.");
-            }}
-            onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
-            routeData={currentRoute}
-            isRouting={isRouting}
-            onAnalyzeNote={handleAnalyzeNote}
-            isAnalyzing={isAnalyzing}
-            onUpdateStatus={updateStatus}
-            isConnected={isConnected}
-            userRole={sourceSession ? 'source' : userRole}
-            onLogout={sourceSession ? handleSourceLogout : handleLogout}
-            onOpenDashboard={() => setShowDashboard(true)} 
-            onOpenSettings={() => setShowSettings(true)}
-            canCreate={!!sourceSession || permissions.can_create} 
-            myStatus={myStatus}
-            setMyStatus={setMyStatus}
-            onlineUsers={sourceSession ? [] : onlineUsers} 
-            currentUserId={session?.user?.id || ''}
-        />
-      )}
+      <Sidebar 
+          isOpen={sidebarOpen}
+          setIsOpen={setSidebarOpen}
+          notes={displayedNotes} 
+          selectedNote={selectedNote}
+          setSelectedNote={setSelectedNote}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          isSearching={isSearching}
+          onSearch={handleSearch}
+          onFlyToNote={flyToNote}
+          onDeleteNote={handleDeleteNote}
+          onEditNote={handleEditNote} 
+          onNavigateToNote={(note) => {
+              if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
+              else alert("ليس لديك صلاحية الملاحة.");
+          }}
+          onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
+          routeData={currentRoute}
+          isRouting={isRouting}
+          onAnalyzeNote={handleAnalyzeNote}
+          isAnalyzing={isAnalyzing}
+          onUpdateStatus={updateStatus}
+          isConnected={isConnected}
+          userRole={sourceSession ? 'source' : userRole}
+          onLogout={sourceSession ? handleSourceLogout : handleLogout}
+          onOpenDashboard={() => setShowDashboard(true)} 
+          onOpenSettings={() => setShowSettings(true)}
+          canCreate={!!sourceSession || permissions.can_create} 
+          myStatus={myStatus}
+          setMyStatus={setMyStatus}
+          onlineUsers={sourceSession ? [] : onlineUsers} 
+          currentUserId={session?.user?.id || ''}
+      />
 
       <div className="flex-1 relative w-full h-full">
-        {/* Tactical Overlay: Controls PlaneView + HUD */}
-        {/* If flying, pass minimal=true to hide HUD but keep Plane */}
+        {/* Tactical Overlay: Controls & HUD */}
         {!sourceSession && (
             <TacticalOverlay 
                 isSOS={isSOS}
@@ -222,20 +213,9 @@ export default function App() {
                 onExpandLogs={() => setShowFullLogs(true)}
                 distressedUser={distressedUser}
                 onLocateSOS={handleLocateSOSUser}
-                minimal={isFlying} 
             />
         )}
         
-        {/* If source session (guest), still show plane but no tactical HUD */}
-        {sourceSession && (
-            <div className="absolute inset-0 z-10 pointer-events-none">
-                 {/* Re-using TacticalOverlay in minimal mode to just show plane */}
-                 <TacticalOverlay 
-                    isSOS={false} onToggleSOS={() => {}} onExpandLogs={() => {}} minimal={true}
-                 />
-            </div>
-        )}
-
         <LeafletMap 
           isSatellite={isSatellite}
           mapProvider={mapProvider}
@@ -261,7 +241,6 @@ export default function App() {
           }}
           onDispatch={handleOpenDispatchModal}
           userRole={sourceSession ? 'source' : userRole}
-          isFlying={isFlying} // Pass flight state
         />
         
         {/* Controls layer */}
@@ -278,10 +257,6 @@ export default function App() {
           onClearRoute={() => {
               handleStopNavigation();
               clearSecondaryRoute();
-          }}
-          onToggleFlightMode={() => {
-              setIsFlying(!isFlying);
-              if (!isFlying) setSidebarOpen(false); // Close sidebar when entering flight mode
           }}
         />
 
