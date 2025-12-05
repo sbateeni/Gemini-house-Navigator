@@ -63,6 +63,9 @@ interface ModalContainerProps {
 
   // Filter
   onFilterByUser: (userId: string, userName: string) => void;
+
+  // Logout
+  onLogout: () => void;
 }
 
 export const ModalContainer: React.FC<ModalContainerProps> = ({
@@ -100,7 +103,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeFullLogs,
   showCampaigns,
   closeCampaigns,
-  onFilterByUser
+  onFilterByUser,
+  onLogout
 }) => {
   return (
     <>
@@ -130,6 +134,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         userRole={userRole}
         mapProvider={mapProvider}
         setMapProvider={setMapProvider}
+        onLogout={onLogout}
       />
 
       <UserCommandModal 

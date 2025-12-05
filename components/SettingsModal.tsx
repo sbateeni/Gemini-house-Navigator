@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye } from 'lucide-react';
+import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye, LogOut } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -11,6 +11,7 @@ interface SettingsModalProps {
   userRole: UserRole | null;
   mapProvider: string;
   setMapProvider: (provider: string) => void;
+  onLogout: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -19,7 +20,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   user,
   userRole,
   mapProvider,
-  setMapProvider
+  setMapProvider,
+  onLogout
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -118,6 +120,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {email}
                 </div>
               </div>
+
+              <button 
+                  onClick={onLogout}
+                  className="w-full flex items-center justify-center gap-2 mt-3 bg-red-900/10 hover:bg-red-900/20 text-red-400 border border-red-900/30 py-2.5 rounded-lg text-sm font-bold transition-all"
+              >
+                  <LogOut size={16} /> تسجيل الخروج
+              </button>
             </div>
           </section>
 

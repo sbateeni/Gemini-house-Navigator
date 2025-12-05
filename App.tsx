@@ -319,6 +319,8 @@ export default function App() {
                 setTargetUserFilter({ id: uid, name });
                 setShowDashboard(false);
             }}
+
+            onLogout={sourceSession ? handleSourceLogout : handleLogout}
         />
       </div>
     </div>
