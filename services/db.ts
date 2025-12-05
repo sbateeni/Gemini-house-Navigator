@@ -15,11 +15,13 @@ const CACHE_KEY_NOTES = 'gemini_offline_notes';
 const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
 
 // Define Numeric Ranks for visibility comparison
+// Judiciary is placed between Officer and Center Admin, but has special logic
 const ROLE_RANKS: Record<string, number> = {
   super_admin: 100,
   admin: 90,
   governorate_admin: 80,
   center_admin: 70,
+  judiciary: 65, // Higher than officer, can see officer/user
   officer: 60,
   user: 50,
   source: 0, // Sources have lowest rank
@@ -154,11 +156,38 @@ export const db = {
       }));
   },
 
-  // Revoke code
+  // Revoke/Deactivate code (Logout)
   async revokeAccessCode(code: string): Promise<void> {
       const { error } = await supabase
         .from('access_codes')
         .update({ is_active: false })
+        .eq('code', code);
+      if (error) throw error;
+  },
+  
+  // Extend code
+  async extendAccessCode(code: string, minutes: number): Promise<void> {
+      // Fetch current expiry first
+      const { data } = await supabase.from('access_codes').select('expires_at').eq('code', code).single();
+      if (!data) return;
+      
+      // If already expired, start from now. If active, add to current expiry.
+      const currentExpiry = data.expires_at;
+      const baseTime = currentExpiry > Date.now() ? currentExpiry : Date.now();
+      const newExpiry = baseTime + (minutes * 60 * 1000);
+
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ expires_at: newExpiry, is_active: true })
+        .eq('code', code);
+      if (error) throw error;
+  },
+
+  // Permanently Delete code
+  async deleteAccessCode(code: string): Promise<void> {
+      const { error } = await supabase
+        .from('access_codes')
+        .delete()
         .eq('code', code);
       if (error) throw error;
   },
@@ -190,7 +219,9 @@ export const db = {
              status: row.status,
              sources: row.sources,
              accessCode: row.access_code,
-             visibility: row.visibility
+             visibility: row.visibility,
+             campaignId: row.campaign_id,
+             sharedWith: row.shared_with
           }));
       }
 
@@ -208,7 +239,7 @@ export const db = {
 
       if (error) throw error;
 
-      // 2. Client-side Rank Logic (Optional secondary filter)
+      // 2. Client-side Visibility Logic
       const currentRank = getRankValue(currentUserProfile?.role);
       const currentUserId = currentUserProfile?.id;
 
@@ -218,13 +249,18 @@ export const db = {
 
           // Always see my own notes
           if (row.created_by === currentUserId) return true;
+          
+          // SHARED WITH ME (Judiciary Feature)
+          if (row.shared_with && Array.isArray(row.shared_with) && row.shared_with.includes(currentUserId)) {
+              return true;
+          }
 
           // If note is from a "Source"
           if (row.access_code) {
              return currentRank >= getRankValue('user');
           }
 
-          // If no creator info, assume visible
+          // Hierarchy Visibility Logic
           if (!row.creator_profile) return true;
 
           const creatorRank = getRankValue(row.creator_profile.role);
@@ -247,7 +283,9 @@ export const db = {
         center: safeString(row.center, undefined),
         createdBy: row.created_by,
         accessCode: row.access_code,
-        visibility: row.visibility
+        visibility: row.visibility,
+        campaignId: row.campaign_id,
+        sharedWith: row.shared_with
       })) as MapNote[];
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
@@ -257,14 +295,12 @@ export const db = {
     } catch (error: any) {
       console.warn("Fetching failed or offline, checking for cache or schema error...", error);
 
-      // CRITICAL FIX: Prioritize Schema Errors (Missing Column/Table) over Cache
       if (error.code === 'PGRST205' || error.code === '42P01' || error.code === '42703' || error.code === 'TABLE_MISSING') {
         const missingError: any = new Error('Table/Column Missing');
         missingError.code = 'TABLE_MISSING';
         throw missingError;
       }
       
-      // If NOT a schema error, try loading from cache (Offline support)
       const cached = localStorage.getItem(CACHE_KEY_NOTES);
       
       if (cached) {
@@ -286,10 +322,7 @@ export const db = {
             p_code: note.accessCode,
             p_note_data: note
         });
-        if (error) {
-             console.error("RPC Error", error);
-             throw error;
-        }
+        if (error) throw error;
         return;
     }
 
@@ -318,7 +351,9 @@ export const db = {
         governorate: note.governorate, 
         center: note.center,
         created_by: user?.id,
-        visibility: note.visibility || 'private'
+        visibility: note.visibility || 'private',
+        campaign_id: note.campaignId || null,
+        shared_with: note.sharedWith || null
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
@@ -330,7 +365,6 @@ export const db = {
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
       if (error.message === "DATABASE_SCHEMA_MISMATCH" || error.code === '42703') {
-          alert("خطأ: قاعدة البيانات تحتاج لتحديث (Missing Column).");
           const schemaError: any = new Error('Database Schema Mismatch');
           schemaError.code = 'TABLE_MISSING';
           throw schemaError;

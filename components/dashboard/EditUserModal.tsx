@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Shield, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react';
 import { UserProfile, UserPermissions, UserRole } from '../../types';
@@ -87,6 +85,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         >
                             <option value="user">عنصر</option>
                             <option value="officer">ضابط</option>
+                            <option value="judiciary">دائرة قضائية (جديد)</option>
                             <option value="center_admin">مدير مركز</option>
                             {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
                                 <>
