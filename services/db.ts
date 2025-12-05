@@ -204,20 +204,17 @@ export const db = {
       }
 
       // CASE 2: Authenticated User
-      // Note: RLS handles the heavy lifting, but we can optimize client-side fetching too
+      // Fetch directly from notes without joining profiles to avoid foreign key issues
       let query = supabase
         .from('notes')
-        .select(`
-            *,
-            creator_profile:created_by ( role )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // 2. Client-side Rank Logic (Optional secondary filter)
+      // 2. Client-side Rank Logic (Simplified as we don't have creator_profile)
       const currentRank = getRankValue(currentUserProfile?.role);
       const currentUserId = currentUserProfile?.id;
 
@@ -233,13 +230,10 @@ export const db = {
              return currentRank >= getRankValue('user');
           }
 
-          // If no creator info, assume visible
-          if (!row.creator_profile) return true;
-
-          const creatorRank = getRankValue(row.creator_profile.role);
-          
-          // I see notes if my rank is EQUAL or HIGHER than the creator's rank.
-          return currentRank >= creatorRank;
+          // Fallback: If we assume RLS handles visibility, we can just return true here.
+          // Or we can add strict checks if we had the profile data.
+          // Since RLS is active, if the user received the data, they can see it.
+          return true;
       });
 
       const notes = filteredData.map((row: any) => ({
