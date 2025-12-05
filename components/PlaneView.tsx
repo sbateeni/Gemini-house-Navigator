@@ -1,10 +1,35 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export const PlaneView: React.FC = () => {
+  const planeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleFlightUpdate = (e: any) => {
+        if (!planeRef.current) return;
+        const { bank } = e.detail; 
+        
+        // Apply smooth roll (bank) and a slight pitch up/down based on speed or random noise
+        // For simple turning: bank > 0 is right turn, < 0 is left turn
+        
+        const roll = bank * 1.5; // Amplify bank for visual effect
+        // Slight pitch up when banking hard (pulling up)
+        const pitch = Math.abs(bank) * 0.2; 
+
+        // Apply transform directly to avoid React re-renders
+        const svg = planeRef.current.querySelector('svg');
+        if (svg) {
+            svg.style.transform = `rotateZ(${roll}deg) rotateX(${20 + pitch}deg)`;
+        }
+    };
+
+    window.addEventListener('flight-update', handleFlightUpdate);
+    return () => window.removeEventListener('flight-update', handleFlightUpdate);
+  }, []);
+
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-      <div className="relative animate-float">
+    <div ref={planeRef} className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+      <div className="relative animate-float-gentle">
         {/* Jet Fighter SVG */}
         <svg
           width="320"
@@ -13,10 +38,11 @@ export const PlaneView: React.FC = () => {
           fill="none"
           stroke="currentColor"
           strokeWidth="0.5"
-          className="text-white drop-shadow-2xl transition-transform duration-1000"
+          className="text-white drop-shadow-2xl transition-transform duration-[50ms]"
           style={{ 
             filter: 'drop-shadow(0px 20px 20px rgba(0,0,0,0.6))',
-            transform: 'rotateX(20deg)'
+            transform: 'rotateX(20deg)',
+            transitionTimingFunction: 'ease-out'
           }}
         >
           {/* Main Body */}
@@ -46,12 +72,12 @@ export const PlaneView: React.FC = () => {
       </div>
       
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-10px) rotate(1deg); }
+        @keyframes float-gentle {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
         }
-        .animate-float {
-          animation: float 4s ease-in-out infinite;
+        .animate-float-gentle {
+          animation: float-gentle 4s ease-in-out infinite;
         }
       `}</style>
     </div>

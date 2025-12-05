@@ -76,9 +76,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ];
 
   // Safely extract string values to prevent object rendering errors
-  const username = user?.user_metadata?.username || 'مستخدم';
+  let username = user?.user_metadata?.username;
+  if (typeof username !== 'string') {
+      username = user?.email?.split('@')[0] || 'مستخدم';
+  }
+  
   const email = user?.email || '';
-  const initialChar = typeof username === 'string' && username.length > 0 ? username.charAt(0).toUpperCase() : 'U';
+  const initialChar = username.charAt(0).toUpperCase();
 
   return (
     <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">

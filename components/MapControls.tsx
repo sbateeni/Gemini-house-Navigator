@@ -11,10 +11,8 @@ interface MapControlsProps {
   setIsSatellite: (s: boolean) => void;
   onLocateUser: () => void;
   isLocating?: boolean;
-  // New props for Notifications
   assignments: Assignment[];
   onAcceptAssignment: (a: Assignment) => void;
-  // New props for Routing
   hasActiveRoute: boolean;
   onClearRoute: () => void;
 }

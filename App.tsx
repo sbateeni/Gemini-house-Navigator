@@ -48,7 +48,15 @@ export default function App() {
   const handleSourceLogin = (session: SourceSession) => {
       setSourceSession(session);
       // Fetch Source notes
-      db.getAllNotes(undefined, session.code).then(setNotes);
+      db.getAllNotes(undefined, session.code)
+        .then(setNotes)
+        .catch(err => {
+            console.error("Source login data fetch error:", err);
+            // If table/column missing, alert user (Sources can't fix it, but should know)
+            if (err.code === 'TABLE_MISSING') {
+                alert("نظام غير محدث: يرجى التواصل مع المسؤول لتحديث قاعدة البيانات (Missing Columns).");
+            }
+        });
   };
 
   const handleSourceLogout = () => {
@@ -160,56 +168,65 @@ export default function App() {
       )}
 
       <Sidebar 
-        isOpen={sidebarOpen}
-        setIsOpen={setSidebarOpen}
-        notes={displayedNotes} // Pass filtered notes
-        selectedNote={selectedNote}
-        setSelectedNote={setSelectedNote}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        isSearching={isSearching}
-        onSearch={handleSearch}
-        onFlyToNote={flyToNote}
-        onDeleteNote={handleDeleteNote}
-        onEditNote={handleEditNote} 
-        onNavigateToNote={(note) => {
-            if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
-            else alert("ليس لديك صلاحية الملاحة.");
-        }}
-        onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
-        routeData={currentRoute}
-        isRouting={isRouting}
-        onAnalyzeNote={handleAnalyzeNote}
-        isAnalyzing={isAnalyzing}
-        onUpdateStatus={updateStatus}
-        isConnected={isConnected}
-        userRole={sourceSession ? 'source' : userRole}
-        onLogout={sourceSession ? handleSourceLogout : handleLogout}
-        onOpenDashboard={() => setShowDashboard(true)} 
-        onOpenSettings={() => setShowSettings(true)}
-        canCreate={!!sourceSession || permissions.can_create} 
-        myStatus={myStatus}
-        setMyStatus={setMyStatus}
-        onlineUsers={sourceSession ? [] : onlineUsers} 
-        currentUserId={session?.user?.id || ''}
+          isOpen={sidebarOpen}
+          setIsOpen={setSidebarOpen}
+          notes={displayedNotes} 
+          selectedNote={selectedNote}
+          setSelectedNote={setSelectedNote}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          isSearching={isSearching}
+          onSearch={handleSearch}
+          onFlyToNote={flyToNote}
+          onDeleteNote={handleDeleteNote}
+          onEditNote={handleEditNote} 
+          onNavigateToNote={(note) => {
+              if (sourceSession || permissions.can_navigate) handleNavigateToNote(note, locateUser);
+              else alert("ليس لديك صلاحية الملاحة.");
+          }}
+          onStopNavigation={() => { handleStopNavigation(); clearSecondaryRoute(); }}
+          routeData={currentRoute}
+          isRouting={isRouting}
+          onAnalyzeNote={handleAnalyzeNote}
+          isAnalyzing={isAnalyzing}
+          onUpdateStatus={updateStatus}
+          isConnected={isConnected}
+          userRole={sourceSession ? 'source' : userRole}
+          onLogout={sourceSession ? handleSourceLogout : handleLogout}
+          onOpenDashboard={() => setShowDashboard(true)} 
+          onOpenSettings={() => setShowSettings(true)}
+          canCreate={!!sourceSession || permissions.can_create} 
+          myStatus={myStatus}
+          setMyStatus={setMyStatus}
+          onlineUsers={sourceSession ? [] : onlineUsers} 
+          currentUserId={session?.user?.id || ''}
       />
 
       <div className="flex-1 relative w-full h-full">
-        {/* Hide Tactical Overlay for Source */}
+        {/* Tactical Overlay: Controls PlaneView + HUD */}
         {!sourceSession && (
             <TacticalOverlay 
-            isSOS={isSOS}
-            onToggleSOS={handleToggleSOS}
-            onExpandLogs={() => setShowFullLogs(true)}
-            distressedUser={distressedUser}
-            onLocateSOS={handleLocateSOSUser}
+                isSOS={isSOS}
+                onToggleSOS={handleToggleSOS}
+                onExpandLogs={() => setShowFullLogs(true)}
+                distressedUser={distressedUser}
+                onLocateSOS={handleLocateSOSUser}
             />
+        )}
+        
+        {/* If source session (guest), minimal view */}
+        {sourceSession && (
+            <div className="absolute inset-0 z-10 pointer-events-none">
+                 <TacticalOverlay 
+                    isSOS={false} onToggleSOS={() => {}} onExpandLogs={() => {}} minimal={true}
+                 />
+            </div>
         )}
 
         <LeafletMap 
           isSatellite={isSatellite}
           mapProvider={mapProvider}
-          notes={displayedNotes} // Pass filtered notes
+          notes={displayedNotes} 
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
           onMapClick={(lat, lng) => {
@@ -233,6 +250,7 @@ export default function App() {
           userRole={sourceSession ? 'source' : userRole}
         />
         
+        {/* Controls layer */}
         <MapControls 
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}

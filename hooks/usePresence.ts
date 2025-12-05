@@ -26,6 +26,15 @@ export function usePresence(
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Helper to safely get username string
+  const getSafeUsername = (user: any): string => {
+      let name = user?.user_metadata?.username;
+      if (typeof name !== 'string') {
+          name = user?.email?.split('@')[0] || 'Unknown';
+      }
+      return name;
+  };
+
   // 1. Heartbeat: Update "Last Seen" AND "Location" in DB every 1 minute
   // This persistence allows users to appear "Active recently" even if WS disconnects
   useEffect(() => {
@@ -56,7 +65,7 @@ export function usePresence(
           const recentData = await db.getRecentlyActiveUsers(20); // 20 minutes buffer
           const mappedUsers: MapUser[] = recentData.map((u: any) => ({
               id: u.id,
-              username: u.username || 'User',
+              username: typeof u.username === 'string' ? u.username : 'User',
               lat: u.lat,
               lng: u.lng,
               color: getUserColor(u.id),
@@ -78,7 +87,7 @@ export function usePresence(
     if (!session?.user?.id || !hasAccess) return;
 
     const userId = session.user.id;
-    const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Unknown';
+    const username = getSafeUsername(session.user);
     const userColor = getUserColor(userId);
 
     const channel = supabase.channel('online-users', {
@@ -100,7 +109,7 @@ export function usePresence(
                 if (p.lat && p.lng) {
                     users.push({
                         id: p.user_id,
-                        username: p.username,
+                        username: typeof p.username === 'string' ? p.username : 'Unknown',
                         lat: p.lat,
                         lng: p.lng,
                         color: p.color,
@@ -139,7 +148,7 @@ export function usePresence(
       if (channelRef.current && userLocation) {
           channelRef.current.track({
               user_id: session?.user?.id,
-              username: session?.user?.user_metadata?.username || 'User',
+              username: getSafeUsername(session?.user),
               color: getUserColor(session?.user?.id || ''),
               online_at: Date.now(),
               lat: userLocation.lat,

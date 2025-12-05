@@ -28,6 +28,13 @@ const ROLE_RANKS: Record<string, number> = {
 
 const getRankValue = (role?: string) => ROLE_RANKS[role || 'user'] || 10;
 
+// Helper to ensure string type
+const safeString = (val: any, fallback: string = ''): string => {
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number') return String(val);
+  return fallback;
+};
+
 export const db = {
   // --- OFFLINE SYNC LOGIC ---
   async syncPendingNotes() {
@@ -97,7 +104,7 @@ export const db = {
           created_at: createdAt,
           expires_at: expiresAt,
           is_active: true,
-          label
+          label: safeString(label)
       };
 
       const { error } = await supabase.from('access_codes').insert(newCode);
@@ -116,7 +123,10 @@ export const db = {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false });
         
-      return data || [];
+      return (data || []).map((row: any) => ({
+          ...row,
+          label: safeString(row.label)
+      }));
   },
 
   // Revoke code
@@ -148,9 +158,9 @@ export const db = {
              id: row.id,
              lat: row.lat,
              lng: row.lng,
-             userNote: row.user_note,
-             locationName: row.location_name,
-             aiAnalysis: row.ai_analysis,
+             userNote: safeString(row.user_note),
+             locationName: safeString(row.location_name, 'Unknown'),
+             aiAnalysis: safeString(row.ai_analysis),
              createdAt: row.created_at,
              status: row.status,
              sources: row.sources,
@@ -168,24 +178,6 @@ export const db = {
             creator_profile:created_by ( role )
         `)
         .order('created_at', { ascending: false });
-
-      // Apply Hierarchical Filters (Scope-based) ONLY for PRIVATE notes? 
-      // Actually, let's fetch everything the RLS allows, and client side filtering can be minimal.
-      // However, to reduce bandwidth, we still apply basic filters.
-      
-      if (currentUserProfile) {
-        const role = currentUserProfile.role;
-        // Super Admin sees all (RLS allows it)
-        
-        // If not super admin, we typically want to filter by region unless it's PUBLIC
-        if (role !== 'super_admin' && role !== 'admin') {
-             // Logic: (governorate match OR center match OR public)
-             // Building complex OR query in Supabase JS client can be tricky combined with joins.
-             // We will rely on RLS for security, and just fetch. 
-             // If the dataset is huge, we'd need a RPC function `get_visible_notes`.
-             // For now, simple fetch is fine as RLS filters the result set.
-        }
-      }
 
       const { data, error } = await query;
 
@@ -220,14 +212,14 @@ export const db = {
         id: row.id,
         lat: row.lat,
         lng: row.lng,
-        userNote: row.user_note,
-        locationName: row.location_name,
-        aiAnalysis: row.ai_analysis,
+        userNote: safeString(row.user_note),
+        locationName: safeString(row.location_name, 'Unknown Location'),
+        aiAnalysis: safeString(row.ai_analysis),
         createdAt: row.created_at,
         status: row.status,
         sources: row.sources,
-        governorate: row.governorate,
-        center: row.center,
+        governorate: safeString(row.governorate, undefined),
+        center: safeString(row.center, undefined),
         createdBy: row.created_by,
         accessCode: row.access_code,
         visibility: row.visibility
@@ -238,7 +230,18 @@ export const db = {
       return notes;
 
     } catch (error: any) {
-      console.warn("Fetching failed or offline, loading from cache...", error);
+      console.warn("Fetching failed or offline, checking for cache or schema error...", error);
+
+      // CRITICAL FIX: Prioritize Schema Errors (Missing Column/Table) over Cache
+      // Code 42703 = undefined_column
+      // Code 42P01 = undefined_table
+      if (error.code === 'PGRST205' || error.code === '42P01' || error.code === '42703') {
+        const missingError: any = new Error('Table/Column Missing');
+        missingError.code = 'TABLE_MISSING';
+        throw missingError;
+      }
+      
+      // If NOT a schema error, try loading from cache (Offline support)
       const cached = localStorage.getItem(CACHE_KEY_NOTES);
       
       if (cached) {
@@ -249,11 +252,6 @@ export const db = {
 
       if (error.message === "Offline") throw error;
       
-      if (error.code === 'PGRST205' || error.code === '42P01') {
-        const missingError: any = new Error('Table Missing');
-        missingError.code = 'TABLE_MISSING';
-        throw missingError;
-      }
       throw error;
     }
   },
@@ -297,7 +295,7 @@ export const db = {
         governorate: note.governorate, 
         center: note.center,
         created_by: user?.id,
-        visibility: note.visibility || 'private' // Default to private
+        visibility: note.visibility || 'private'
       };
 
       const { error } = await supabase.from('notes').upsert(dbRow);
@@ -308,9 +306,11 @@ export const db = {
       
     } catch (error: any) {
       console.error("Error saving note:", JSON.stringify(error, null, 2));
-      if (error.message === "DATABASE_SCHEMA_MISMATCH") {
-          alert("خطأ: قاعدة البيانات تحتاج لتحديث.");
-          throw error;
+      if (error.message === "DATABASE_SCHEMA_MISMATCH" || error.code === '42703') {
+          alert("خطأ: قاعدة البيانات تحتاج لتحديث (Missing Column).");
+          const schemaError: any = new Error('Database Schema Mismatch');
+          schemaError.code = 'TABLE_MISSING';
+          throw schemaError;
       }
 
       if (!navigator.onLine || error.message?.includes('fetch')) {
@@ -343,13 +343,13 @@ export const db = {
       
       return {
         id: data.id,
-        username: data.username,
+        username: safeString(data.username, 'User'),
         role: data.role,
         isApproved: data.is_approved === true,
-        email: data.email,
+        email: safeString(data.email),
         permissions: { ...DEFAULT_PERMISSIONS, ...(data.permissions || {}) },
-        governorate: data.governorate,
-        center: data.center,
+        governorate: safeString(data.governorate, undefined),
+        center: safeString(data.center, undefined),
         last_seen: data.last_seen
       };
     } catch (error) {
@@ -383,13 +383,13 @@ export const db = {
 
       return (data || []).map((row: any) => ({
         id: row.id,
-        username: row.username,
+        username: safeString(row.username, 'User'),
         role: row.role,
         isApproved: row.is_approved === true,
-        email: row.email,
+        email: safeString(row.email),
         permissions: { ...DEFAULT_PERMISSIONS, ...(row.permissions || {}) },
-        governorate: row.governorate,
-        center: row.center,
+        governorate: safeString(row.governorate, undefined),
+        center: safeString(row.center, undefined),
         last_seen: row.last_seen
       }));
     } catch (error) {
@@ -408,7 +408,11 @@ export const db = {
         .not('lng', 'is', null);
 
       if (error) return [];
-      return data || [];
+      
+      return (data || []).map((row: any) => ({
+          ...row,
+          username: safeString(row.username, 'User')
+      }));
     } catch {
       return [];
     }
@@ -468,10 +472,10 @@ export const db = {
         id: row.id,
         targetUserId: row.target_user_id,
         locationId: row.location_id,
-        locationName: row.location_name,
+        locationName: safeString(row.location_name, 'Assignment'),
         lat: row.lat,
         lng: row.lng,
-        instructions: row.instructions,
+        instructions: safeString(row.instructions),
         status: row.status,
         createdBy: row.created_by,
         createdAt: row.created_at
@@ -518,12 +522,12 @@ export const db = {
       
       return (data || []).map((row: any) => ({
         id: row.id,
-        message: row.message,
+        message: safeString(row.message, 'Log'),
         type: row.type,
         userId: row.user_id,
         timestamp: row.timestamp,
-        governorate: row.governorate,
-        center: row.center
+        governorate: safeString(row.governorate, undefined),
+        center: safeString(row.center, undefined)
       }));
     } catch {
       return [];

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapNote, RouteData, MapUser } from '../types';
 import { useMapInstance } from '../hooks/map/useMapInstance';
 import { useMapTiles } from '../hooks/map/useMapTiles';
@@ -15,7 +15,7 @@ declare global {
 
 interface LeafletMapProps {
   isSatellite: boolean;
-  mapProvider: string; // New Prop
+  mapProvider: string;
   notes: MapNote[];
   selectedNote: MapNote | null;
   setSelectedNote: (note: MapNote | null) => void;
@@ -31,12 +31,12 @@ interface LeafletMapProps {
   onNavigate?: (note: MapNote) => void;
   onDispatch?: (note: MapNote) => void;
   userRole?: string | null;
-  currentUserId?: string; 
+  currentUserId?: string;
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
   isSatellite,
-  mapProvider, // Used here
+  mapProvider,
   notes,
   selectedNote,
   setSelectedNote,
@@ -57,10 +57,10 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   // 1. Initialize Map
   const { mapContainerRef, mapInstanceRef } = useMapInstance(onMapClick);
 
-  // 2. Manage Tile Layers (Google/Esri/OSM/Dark)
+  // 2. Manage Tile Layers
   useMapTiles(mapInstanceRef, mapProvider);
 
-  // 3. Manage Markers (Notes, Temp, Self)
+  // 3. Manage Markers
   useMapMarkers(
     mapInstanceRef, 
     notes, 
@@ -72,10 +72,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     onNavigate, 
     onDispatch, 
     userRole, 
-    isSatellite // Keep logic for marker colors based on general type
+    isSatellite
   );
 
-  // Filter out self from otherUsers if currentUserId is provided to avoid duplicate markers
   const filteredOtherUsers = currentUserId 
     ? otherUsers.filter(u => u.id !== currentUserId) 
     : otherUsers;
@@ -83,7 +82,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   // 4. Manage Other Users Markers
   useMapUsers(mapInstanceRef, filteredOtherUsers, onUserClick, canSeeOthers);
 
-  // 5. Manage Routes (Blue/Purple lines)
+  // 5. Manage Routes
   useMapRoutes(mapInstanceRef, currentRoute, secondaryRoute);
 
   return <div ref={mapContainerRef} className="w-full h-full bg-slate-900 outline-none" />;
