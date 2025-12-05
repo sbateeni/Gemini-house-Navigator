@@ -158,12 +158,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleRevokeCode = async (codeStr: string) => {
-      if (confirm("هل أنت متأكد من إيقاف/حذف هذا الكود؟ لن يتمكن المصدر من الدخول.")) {
+      if (confirm("هل أنت متأكد من حذف هذا الكود نهائياً؟")) {
           try {
               await db.revokeAccessCode(codeStr);
-              setAccessCodes(prev => prev.map(c => c.code === codeStr ? { ...c, is_active: false } : c));
+              setAccessCodes(prev => prev.filter(c => c.code !== codeStr));
           } catch (e) {
-              alert("فشل إيقاف الكود");
+              alert("فشل الحذف");
           }
       }
   };
@@ -342,7 +342,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                             <button 
                                                 onClick={() => handleRevokeCode(ac.code)}
                                                 className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
-                                                title={isActive ? "إيقاف الكود" : "حذف نهائي"}
+                                                title="حذف نهائي"
                                             >
                                                 <Trash2 size={16} />
                                             </button>

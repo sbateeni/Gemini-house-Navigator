@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser } from '../types';
-import { Wifi, WifiOff, XCircle, ShieldCheck, X } from 'lucide-react';
+import { Wifi, WifiOff, XCircle, ShieldCheck, X, Eye } from 'lucide-react';
 import { db } from '../services/db';
 
 import { SidebarHeader } from './sidebar/SidebarHeader';
@@ -124,9 +124,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       {isSource && (
-          <div className="mx-2 mt-2 p-2 bg-green-900/20 border border-green-500/30 rounded-lg flex items-center justify-center gap-2">
-               <ShieldCheck size={16} className="text-green-500 animate-pulse" />
-               <span className="text-green-400 text-xs font-bold">وضع المصدر الآمن (مشفر)</span>
+          <div className="mx-2 mt-2 p-3 bg-slate-800/50 border border-slate-700 rounded-xl flex items-center justify-center gap-3">
+               <div className="bg-blue-500/10 p-1.5 rounded-lg border border-blue-500/20">
+                   <ShieldCheck size={18} className="text-blue-400" />
+               </div>
+               <div className="flex flex-col items-start">
+                   <span className="text-slate-200 text-xs font-bold">وضع المصدر الآمن</span>
+                   <span className="text-slate-500 text-[10px]">اتصال مشفر ومؤقت</span>
+               </div>
           </div>
       )}
 
@@ -150,8 +155,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
         </div>
 
-        {/* Hide Units for Source */}
-        {!isSource && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />}
+        {/* Hide Units for Source, but maybe show a placeholder so it looks populated? */}
+        {!isSource ? (
+            <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />
+        ) : (
+            <div className="px-2 py-4 text-center border-b border-slate-800/50 mb-2">
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-800 mb-2 text-slate-500">
+                    <Eye size={20} />
+                </div>
+                <p className="text-xs text-slate-500">
+                    تم إخفاء بيانات الوحدات الأخرى<br/>لأسباب أمنية
+                </p>
+            </div>
+        )}
 
         <SidebarNotes 
             notes={notes}

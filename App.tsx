@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession } from './types';
 import { db } from './services/db';
-import { Timer, LogOut, X } from 'lucide-react';
+import { Timer, LogOut, X, ShieldAlert } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -143,22 +143,35 @@ export default function App() {
       {/* Manual DB Fix Modal */}
       {showDatabaseFix && <DatabaseSetupModal onClose={() => setShowDatabaseFix(false)} />}
 
-      {/* Source Mode Timer Overlay */}
+      {/* Source Mode Timer Overlay - REDESIGNED TO LOOK LIKE OPS CREW UI */}
       {sourceSession && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] bg-green-900/90 border border-green-500 rounded-full px-6 py-2 shadow-2xl flex items-center gap-4">
-              <div className="flex items-center gap-2 text-green-200 font-mono font-bold text-lg">
-                  <Timer className="animate-pulse" />
-                  <span>
-                      {Math.floor(sourceTimeLeft / 60)}:{(sourceTimeLeft % 60).toString().padStart(2, '0')}
-                  </span>
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] flex flex-col items-center gap-2">
+              <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl px-5 py-2 shadow-2xl flex items-center gap-6">
+                  <div className="flex items-center gap-3">
+                      <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20">
+                        <ShieldAlert className="text-blue-400 w-5 h-5 animate-pulse" />
+                      </div>
+                      <div className="flex flex-col">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">الزمن المتبقي للمهمة</span>
+                          <div className="flex items-center gap-2 font-mono text-xl font-bold text-white leading-none">
+                              <span>
+                                  {Math.floor(sourceTimeLeft / 60)}:{(sourceTimeLeft % 60).toString().padStart(2, '0')}
+                              </span>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="h-8 w-px bg-slate-700"></div>
+
+                  <button 
+                      onClick={handleSourceLogout}
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-2 rounded-lg transition-colors flex items-center gap-2 text-xs font-bold"
+                      title="إنهاء المهمة"
+                  >
+                      <LogOut size={16} />
+                      <span>خروج</span>
+                  </button>
               </div>
-              <button 
-                  onClick={handleSourceLogout}
-                  className="bg-red-600 hover:bg-red-500 text-white p-1 rounded-full"
-                  title="خروج"
-              >
-                  <LogOut size={16} />
-              </button>
           </div>
       )}
 
@@ -188,7 +201,7 @@ export default function App() {
           setSearchQuery={setSearchQuery}
           isSearching={isSearching}
           onSearch={handleSearch}
-          onFlyToNote={flyToNote}
+          onFlyToNote={flyToTarget ? () => {} : flyToNote} // Fix flight override
           onDeleteNote={handleDeleteNote}
           onEditNote={handleEditNote} 
           onNavigateToNote={(note) => {

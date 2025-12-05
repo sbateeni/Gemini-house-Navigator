@@ -163,11 +163,11 @@ export const db = {
       }));
   },
 
-  // Revoke code
+  // Revoke code (HARD DELETE)
   async revokeAccessCode(code: string): Promise<void> {
       const { error } = await supabase
         .from('access_codes')
-        .update({ is_active: false })
+        .delete()
         .eq('code', code);
       if (error) throw error;
   },
