@@ -138,6 +138,19 @@ export const db = {
       if (error) throw error;
   },
 
+  // Extend code (Reactivate + 30 mins from NOW)
+  async extendAccessCode(code: string): Promise<void> {
+      const newExpiry = Date.now() + (30 * 60 * 1000); // Add 30 mins from now
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ 
+            is_active: true, 
+            expires_at: newExpiry 
+        })
+        .eq('code', code);
+      if (error) throw error;
+  },
+
 
   // --- CORE FUNCTIONS ---
 

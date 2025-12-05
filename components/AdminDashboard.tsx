@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2 } from 'lucide-react';
+import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCw } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole, AccessCode } from '../types';
 import { supabase } from '../services/supabase';
@@ -168,6 +168,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
+  const handleExtendCode = async (codeStr: string) => {
+      if (confirm("سيتم تمديد صلاحية هذا الكود لمدة 30 دقيقة من الآن وإعادة تفعيله. هل تريد المتابعة؟")) {
+          try {
+              await db.extendAccessCode(codeStr);
+              // Update local state instantly
+              const newExpiry = Date.now() + 30 * 60 * 1000;
+              setAccessCodes(prev => prev.map(c => c.code === codeStr ? { ...c, is_active: true, expires_at: newExpiry } : c));
+              alert("تم تمديد صلاحية الكود بنجاح.");
+          } catch (e) {
+              alert("فشل تمديد الكود.");
+          }
+      }
+  };
+
   const copyCode = (code: string) => {
       navigator.clipboard.writeText(code);
       setCopiedCode(code);
@@ -313,15 +327,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                            )}
                                        </div>
                                        
-                                       {ac.is_active && !isExpired && (
-                                           <button 
-                                               onClick={() => handleRevokeCode(ac.code)}
-                                               className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
-                                               title="إيقاف الكود فوراً"
-                                           >
-                                               <Trash2 size={16} />
-                                           </button>
-                                       )}
+                                       <div className="flex items-center gap-2">
+                                            {/* Renew/Extend Button */}
+                                            <button 
+                                                onClick={() => handleExtendCode(ac.code)}
+                                                className="p-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-500 rounded-lg border border-blue-900/50 transition-colors"
+                                                title="تمديد الصلاحية 30 دقيقة"
+                                            >
+                                                <RefreshCw size={16} />
+                                            </button>
+
+                                            {/* Revoke/Stop Button */}
+                                            {ac.is_active && !isExpired && (
+                                                <button 
+                                                    onClick={() => handleRevokeCode(ac.code)}
+                                                    className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
+                                                    title="إيقاف الكود فوراً"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                       </div>
                                    </div>
                                </div>
                            );
