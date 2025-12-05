@@ -158,7 +158,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleRenewCode = async (codeStr: string) => {
-      if (confirm("إعادة تفعيل الكود لمدة 30 دقيقة إضافية؟")) {
+      if (confirm("تمديد/إعادة تفعيل الكود لمدة 30 دقيقة إضافية؟")) {
           try {
               await db.renewAccessCode(codeStr);
               const newExpires = Date.now() + 30 * 60 * 1000;
@@ -326,15 +326,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                        </div>
                                        
                                        <div className="flex items-center gap-2">
-                                            {isExpired && (
-                                                <button 
-                                                    onClick={() => handleRenewCode(ac.code)}
-                                                    className="p-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-500 rounded-lg border border-blue-900/50 transition-colors"
-                                                    title="إعادة تفعيل الوقت"
-                                                >
-                                                    <RefreshCcw size={16} />
-                                                </button>
-                                            )}
+                                            {/* Always allow renewal/extension */}
+                                            <button 
+                                                onClick={() => handleRenewCode(ac.code)}
+                                                className="p-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-500 rounded-lg border border-blue-900/50 transition-colors"
+                                                title="إعادة تفعيل / تمديد الوقت"
+                                            >
+                                                <RefreshCcw size={16} />
+                                            </button>
 
                                             <button 
                                                 onClick={() => handleRevokeCode(ac.code)}

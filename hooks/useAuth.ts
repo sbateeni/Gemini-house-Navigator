@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
@@ -11,7 +10,8 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   can_navigate: true,
   can_edit_users: false,
   can_dispatch: false,
-  can_view_logs: true
+  can_view_logs: true,
+  can_manage_content: false
 };
 
 export function useAuth() {

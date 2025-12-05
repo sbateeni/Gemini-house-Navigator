@@ -8,7 +8,8 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   can_navigate: true,
   can_edit_users: false,
   can_dispatch: false,
-  can_view_logs: true
+  can_view_logs: true,
+  can_manage_content: false 
 };
 
 const CACHE_KEY_NOTES = 'gemini_offline_notes';
@@ -423,7 +424,8 @@ export const db = {
     }
   },
 
-  async getRecentlyActiveUsers(minutes: number = 20): Promise<any[]> {
+  // UPDATED: Increase lookback to 30 minutes to handle spotty connections
+  async getRecentlyActiveUsers(minutes: number = 30): Promise<any[]> {
     try {
       const cutoff = Date.now() - (minutes * 60 * 1000);
       const { data, error } = await supabase

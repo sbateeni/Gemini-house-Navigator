@@ -36,7 +36,6 @@ export function usePresence(
   };
 
   // 1. Heartbeat: Update "Last Seen" AND "Location" in DB every 1 minute
-  // This persistence allows users to appear "Active recently" even if WS disconnects
   useEffect(() => {
       if (!session?.user?.id || !hasAccess) return;
       
@@ -57,12 +56,13 @@ export function usePresence(
   }, [session?.user?.id, hasAccess, userLocation?.lat, userLocation?.lng]);
 
   // 2. Poll Database for "Recently Active" users (Background/Disconnected but recent)
-  // Fetches users seen in last 20 minutes
+  // UPDATED: Fetches users seen in last 30 minutes (from db.ts change)
   useEffect(() => {
       if (!session?.user?.id || !hasAccess) return;
 
       const fetchRecentUsers = async () => {
-          const recentData = await db.getRecentlyActiveUsers(20); // 20 minutes buffer
+          // Get recently active users (default is now 30 minutes in db.ts)
+          const recentData = await db.getRecentlyActiveUsers(); 
           const mappedUsers: MapUser[] = recentData.map((u: any) => ({
               id: u.id,
               username: typeof u.username === 'string' ? u.username : 'User',
@@ -70,9 +70,11 @@ export function usePresence(
               lng: u.lng,
               color: getUserColor(u.id),
               lastUpdated: u.last_seen,
-              status: 'offline' as UnitStatus, // Default to offline for DB users, effectively "Last Seen"
-              isSOS: false
-          })).filter((u: MapUser) => u.id !== session.user.id); // Exclude self
+              // Treat background users as 'patrol' visually, but mark as !isOnline later
+              status: 'patrol' as UnitStatus, 
+              isSOS: false,
+              isOnline: false // Important: This marks them as "Last Known Location"
+          })).filter((u: MapUser) => u.id !== session.user.id); 
           
           setDbUsers(mappedUsers);
       };
@@ -115,7 +117,8 @@ export function usePresence(
                         color: p.color,
                         lastUpdated: p.online_at,
                         status: (p.status || 'patrol') as UnitStatus,
-                        isSOS: p.isSOS || false
+                        isSOS: p.isSOS || false,
+                        isOnline: true // Active WebSocket connection
                     });
                 }
             });
@@ -143,7 +146,7 @@ export function usePresence(
     };
   }, [session?.user?.id, hasAccess]);
 
-  // 4. Update Presence Track when location changes OR Periodic Heartbeat
+  // 4. Update Presence Track
   useEffect(() => {
       const trackPresence = () => {
           if (channelRef.current && userLocation) {
@@ -160,21 +163,17 @@ export function usePresence(
           }
       };
 
-      trackPresence(); // Immediate update on state change
-
-      // Periodic heartbeat to keep presence alive even if location doesn't change
-      const interval = setInterval(trackPresence, 20000); // 20s
-
+      trackPresence(); 
+      const interval = setInterval(trackPresence, 20000); 
       return () => clearInterval(interval);
 
   }, [userLocation, myStatus, isSOS]);
 
-  // 5. Merge Strategy: Presence (Realtime) > Database (Recent History)
+  // 5. Merge Strategy: Presence (Live) > Database (Background)
   useEffect(() => {
-      // Start with all realtime users
       const mergedMap = new Map<string, MapUser>();
       
-      // 1. Add DB users (Background/History)
+      // 1. Add DB users first (Background/History)
       dbUsers.forEach(u => {
           mergedMap.set(u.id, u);
       });

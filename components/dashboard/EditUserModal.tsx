@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Shield, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react';
 import { UserProfile, UserPermissions, UserRole } from '../../types';
@@ -56,7 +54,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       can_navigate: 'استخدام الملاحة',
       can_edit_users: 'إدارة المستخدمين',
       can_dispatch: 'إرسال التوجيهات',
-      can_view_logs: 'رؤية السجلات'
+      can_view_logs: 'رؤية السجلات',
+      can_manage_content: 'تعديل وإدارة المحتوى (المعلومات المدخلة)'
   };
 
   return (

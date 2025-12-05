@@ -42,22 +42,36 @@ export const createNotePopupHtml = (note: MapNote, canCommand: boolean) => `
   </div>
 `;
 
-export const createUserIconHtml = (user: MapUser) => `
-  <div style="position: relative; width: 34px; height: 34px; transition: all 0.5s ease;">
+export const createUserIconHtml = (user: MapUser) => {
+  const isOnline = user.isOnline !== false; // Default true if undefined
+  
+  return `
+  <div style="position: relative; width: 34px; height: 34px; transition: all 0.5s ease; opacity: ${isOnline ? '1' : '0.6'};">
       <div style="
           background-color: ${user.color || '#3b82f6'};
           width: 100%; height: 100%;
           border-radius: 50%;
-          border: 2px solid white;
+          border: 2px solid ${isOnline ? 'white' : '#94a3b8'}; /* Gray border if offline */
+          ${!isOnline ? 'border-style: dashed;' : ''}
           display: flex; align-items: center; justify-content: center;
           box-shadow: 0 4px 6px rgba(0,0,0,0.3);
       ">
           <span style="font-size: 12px; font-weight: bold; color: white;">${user.username.charAt(0).toUpperCase()}</span>
       </div>
       ${user.isSOS ? `<div style="position: absolute; inset: -10px; border-radius: 50%; border: 3px solid #ef4444; animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>` : ''}
-      <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(15, 23, 42, 0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; backdrop-filter: blur(4px);">${user.username}</div>
+      
+      <!-- Warning Icon for Signal Lost -->
+      ${!isOnline ? `
+        <div style="position: absolute; top: -5px; right: -5px; background: #f59e0b; color: white; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; border: 1px solid #1e293b;">
+           <span style="font-size: 8px;">!</span>
+        </div>
+      ` : ''}
+
+      <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: rgba(15, 23, 42, 0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; backdrop-filter: blur(4px);">
+        ${user.username}
+      </div>
   </div>
-`;
+`};
 
 export const createSelfIconHtml = () => `
   <div style="position: relative; width: 24px; height: 24px;">

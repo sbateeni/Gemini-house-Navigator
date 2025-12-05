@@ -43,6 +43,8 @@ export interface UserPermissions {
   can_edit_users: boolean;
   can_dispatch: boolean;
   can_view_logs: boolean;
+  // Requested: Edit entered information
+  can_manage_content: boolean;
 }
 
 // Added 'officer' between center_admin and user
@@ -73,6 +75,7 @@ export interface MapUser {
   // New Tactical Fields
   status: UnitStatus;
   isSOS: boolean;
+  isOnline?: boolean; // True = Realtime, False = Database/Last Known
 }
 
 export interface Assignment {

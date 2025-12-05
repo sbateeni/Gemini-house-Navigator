@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users, Clock, Shield, Award, User, Lock } from 'lucide-react';
+import { Users, Clock, Shield, Award, WifiOff } from 'lucide-react';
 import { MapUser, UserProfile } from '../../types';
 
 interface SidebarUnitsProps {
@@ -44,47 +44,73 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
 
   const onlineIds = new Set(onlineUsers.map(u => u.id));
   
-  // Sort users: Online > Background (30min) > Offline
+  // Sort users: Online > Background > Offline
   const sortedUsers = [...allProfiles].sort((a, b) => {
     const aOnline = onlineIds.has(a.id);
     const bOnline = onlineIds.has(b.id);
     if (aOnline && !bOnline) return -1;
     if (!aOnline && bOnline) return 1;
     
-    // If both offline, check last seen
     const aLastSeen = a.last_seen || 0;
     const bLastSeen = b.last_seen || 0;
     return bLastSeen - aLastSeen;
   });
 
   const now = Date.now();
-  const THIRTY_MINS = 30 * 60 * 1000;
+  const BACKGROUND_THRESHOLD = 30 * 60 * 1000; // 30 minutes
 
   return (
     <div className="mb-4 space-y-1">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1 flex items-center justify-between">
-            <span>حالة القوات ({onlineUsers.length} متصل)</span>
+            <span>حالة القوات ({onlineUsers.length} مرصود)</span>
             <Users size={12} />
         </h3>
         {sortedUsers.slice(0, 15).map(u => {
-            const isOnline = onlineIds.has(u.id);
-            const onlineUser = onlineUsers.find(ou => ou.id === u.id);
+            const mapUser = onlineUsers.find(ou => ou.id === u.id);
+            // Check if mapUser exists. If it exists, it means it's either LIVE or BACKGROUND (fetched via usePresence)
+            // usePresence filters DB users by 30 mins.
             
-            // Check if user is "In Background" (Not connected to WS, but last_seen < 30 mins ago)
+            const isVisibleOnMap = !!mapUser;
+            const isLive = mapUser?.isOnline === true;
+            
+            // Check true offline status (longer than 30 mins)
             const lastSeenDelta = now - (u.last_seen || 0);
-            const isBackground = !isOnline && lastSeenDelta < THIRTY_MINS;
+            const isTrulyOffline = !isVisibleOnMap;
+
+            let status = isVisibleOnMap ? (mapUser?.status || 'patrol') : 'offline';
             
-            let status = isOnline ? (onlineUser?.status || 'patrol') : 'offline';
-            let dotColor = isOnline ? statusColors[status] : isBackground ? 'bg-orange-500' : 'bg-red-500';
-            let textColor = isOnline ? 'text-slate-200' : isBackground ? 'text-orange-200' : 'text-slate-500';
-            let bgColor = isOnline ? 'bg-slate-800/40' : isBackground ? 'bg-orange-900/10' : 'bg-red-900/5';
-            let borderColor = isOnline ? 'border-slate-700/50' : isBackground ? 'border-orange-900/30' : 'border-red-900/20';
+            // UI States
+            let dotColor, textColor, bgColor, borderColor, statusText;
+
+            if (isLive) {
+                // Fully Online
+                dotColor = statusColors[status];
+                textColor = 'text-slate-200';
+                bgColor = 'bg-slate-800/40';
+                borderColor = 'border-slate-700/50';
+                statusText = statusLabels[status];
+            } else if (isVisibleOnMap) {
+                // Background / Signal Lost (Within 30 mins)
+                dotColor = 'bg-orange-500';
+                textColor = 'text-orange-200';
+                bgColor = 'bg-orange-900/10';
+                borderColor = 'border-orange-900/30';
+                const minsAgo = Math.floor(lastSeenDelta / 60000);
+                statusText = `فقدان إشارة (منذ ${minsAgo}د)`;
+            } else {
+                // Offline (> 30 mins)
+                dotColor = 'bg-red-900';
+                textColor = 'text-slate-500';
+                bgColor = 'bg-red-900/5';
+                borderColor = 'border-red-900/20';
+                statusText = 'غير متصل';
+            }
 
             return (
                 <div key={u.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${bgColor} ${borderColor}`}>
                         <div className="flex items-center gap-2 w-full">
                             {/* Status Dot */}
-                            <div className={`w-2 h-2 shrink-0 rounded-full ${dotColor} ${isOnline ? 'animate-pulse' : ''}`}></div>
+                            <div className={`w-2 h-2 shrink-0 rounded-full ${dotColor} ${isLive ? 'animate-pulse' : ''}`}></div>
                             
                             <div className="flex flex-col w-full min-w-0">
                                 <div className="flex items-center justify-between gap-2">
@@ -99,9 +125,10 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
                                 </div>
 
                                 <div className="flex items-center gap-1 mt-0.5">
-                                    {isOnline && <span className="text-[9px] text-slate-500">{statusLabels[status]}</span>}
-                                    {isBackground && <span className="text-[9px] text-orange-400 flex items-center gap-0.5"><Clock size={8} /> نشط مؤخراً</span>}
-                                    {!isOnline && !isBackground && <span className="text-[9px] text-red-900/50">غائب</span>}
+                                    {!isLive && isVisibleOnMap && <WifiOff size={8} className="text-orange-400" />}
+                                    <span className={`text-[9px] ${!isLive && isVisibleOnMap ? 'text-orange-400 font-bold' : 'text-slate-500'}`}>
+                                        {statusText}
+                                    </span>
                                     
                                     {/* Optional Location Text */}
                                     {u.governorate && (

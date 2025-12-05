@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession, UserPermissions, UserProfile } from './types';
@@ -54,7 +53,8 @@ export default function App() {
       can_navigate: true,     // Can navigate to points
       can_edit_users: false,
       can_dispatch: false,
-      can_view_logs: false
+      can_view_logs: false,
+      can_manage_content: false
   };
 
   // Mock Profile for Source Users so components don't crash
