@@ -2,6 +2,7 @@
 import React from 'react';
 import { SOSButton } from '../SOSButton';
 import { OperationsLog } from '../OperationsLog';
+import { PlaneView } from '../PlaneView';
 import { SOSAlertOverlay } from '../SOSAlertOverlay';
 import { MapUser } from '../../types';
 
@@ -11,6 +12,8 @@ interface TacticalOverlayProps {
   onExpandLogs: () => void;
   distressedUser?: MapUser;
   onLocateSOS?: () => void;
+  // New prop to hide UI elements
+  minimal?: boolean;
 }
 
 export const TacticalOverlay: React.FC<TacticalOverlayProps> = ({
@@ -18,22 +21,31 @@ export const TacticalOverlay: React.FC<TacticalOverlayProps> = ({
   onToggleSOS,
   onExpandLogs,
   distressedUser,
-  onLocateSOS
+  onLocateSOS,
+  minimal = false
 }) => {
   return (
     <>
-        {/* SOS Alert HUD (Top Center) */}
-        {distressedUser && onLocateSOS && (
-            <SOSAlertOverlay sosUser={distressedUser} onLocate={onLocateSOS} />
-        )}
+      {/* 3D Plane Visual - Always visible */}
+      <PlaneView />
 
-        {/* HUD Elements */}
-        <SOSButton 
-            isActive={isSOS}
-            onToggle={onToggleSOS}
-        />
-        
-        <OperationsLog onExpand={onExpandLogs} />
+      {/* Hide HUD elements if minimal mode (Flight Sim) is active */}
+      {!minimal && (
+        <>
+            {/* SOS Alert HUD (Top Center) */}
+            {distressedUser && onLocateSOS && (
+                <SOSAlertOverlay sosUser={distressedUser} onLocate={onLocateSOS} />
+            )}
+
+            {/* HUD Elements */}
+            <SOSButton 
+                isActive={isSOS}
+                onToggle={onToggleSOS}
+            />
+            
+            <OperationsLog onExpand={onExpandLogs} />
+        </>
+      )}
     </>
   );
 };

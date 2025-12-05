@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, StopCircle, Clock, Siren } from 'lucide-react';
+import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2 } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole, AccessCode } from '../types';
 import { supabase } from '../services/supabase';
@@ -34,7 +34,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newCodeLabel, setNewCodeLabel] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer', 'judiciary'].includes(currentUserProfile?.role || '');
+  const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(currentUserProfile?.role || '');
 
   const fetchData = async () => {
     setLoading(true);
@@ -158,36 +158,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleRevokeCode = async (codeStr: string) => {
-      if (confirm("هل تريد إيقاف جلسة المصدر فوراً؟ (تسجيل خروج إجباري)")) {
+      if (confirm("هل أنت متأكد من إيقاف هذا الكود؟ لن يتمكن المصدر من الدخول مرة أخرى.")) {
           try {
               await db.revokeAccessCode(codeStr);
               setAccessCodes(prev => prev.map(c => c.code === codeStr ? { ...c, is_active: false } : c));
           } catch (e) {
-              alert("فشل الإيقاف");
-          }
-      }
-  };
-  
-  const handleExtendCode = async (codeStr: string) => {
-      if (confirm("تمديد الجلسة لمدة 30 دقيقة إضافية؟")) {
-          try {
-              await db.extendAccessCode(codeStr, 30);
-              // Refresh full list to get new expiry
-              const codes = await db.getMyAccessCodes();
-              setAccessCodes(codes);
-          } catch (e) {
-              alert("فشل التمديد");
-          }
-      }
-  };
-
-  const handleDeleteCode = async (codeStr: string) => {
-      if (confirm("حذف المصدر وسجلاته نهائياً من القائمة؟")) {
-          try {
-              await db.deleteAccessCode(codeStr);
-              setAccessCodes(prev => prev.filter(c => c.code !== codeStr));
-          } catch (e) {
-              alert("فشل الحذف");
+              alert("فشل إيقاف الكود");
           }
       }
   };
@@ -215,10 +191,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (filter === 'pending') return !user.isApproved && user.role !== 'banned';
       return true;
   });
-  
-  const handleStartCampaign = () => {
-      alert("خاصية حملات الاعتقال ستكون متاحة في التحديث القادم بعد تهيئة قاعدة البيانات.");
-  };
 
   if (!isOpen) return null;
 
@@ -239,23 +211,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                </p>
              </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            {/* Campaign Trigger Button (Manager+) */}
-            {['super_admin', 'admin', 'governorate_admin'].includes(currentUserProfile?.role || '') && (
-                <button 
-                    onClick={handleStartCampaign}
-                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-900/20 animate-pulse"
-                >
-                    <Siren size={16} />
-                    حملة اعتقالات
-                </button>
-            )}
-            
-            <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                <X size={24} />
-            </button>
-          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
+            <X size={24} />
+          </button>
         </div>
 
         {/* Filters / Tabs */}
@@ -327,13 +285,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                        {accessCodes.map(ac => {
                            const isExpired = Date.now() > ac.expires_at;
                            const timeLeft = Math.max(0, Math.ceil((ac.expires_at - Date.now()) / 60000));
-                           const isActive = ac.is_active && !isExpired;
                            
                            return (
-                               <div key={ac.code} className={`flex items-center justify-between p-4 rounded-xl border ${isActive ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
+                               <div key={ac.code} className={`flex items-center justify-between p-4 rounded-xl border ${ac.is_active && !isExpired ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-800 opacity-60'}`}>
                                    <div className="flex items-center gap-4">
-                                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-lg bg-slate-950 border ${isActive ? 'border-green-500/30 text-green-400' : 'border-red-900/30 text-red-500'}`}>
-                                           {isActive ? <KeyRound size={20} /> : <X size={20} />}
+                                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono font-bold text-lg bg-slate-950 border ${ac.is_active && !isExpired ? 'border-green-500/30 text-green-400' : 'border-red-900/30 text-red-500'}`}>
+                                           {ac.is_active && !isExpired ? <KeyRound size={20} /> : <X size={20} />}
                                        </div>
                                        <div>
                                            <div className="text-white font-bold">{ac.label || 'بدون اسم'}</div>
@@ -348,46 +305,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                                    <div className="flex items-center gap-6">
                                        <div className="text-right">
-                                           <div className={`text-xs font-bold ${isActive ? 'text-green-400' : 'text-red-500'}`}>
-                                               {!ac.is_active ? 'تم الإيقاف' : isExpired ? 'منتهي' : 'نشط'}
+                                           <div className={`text-xs font-bold ${ac.is_active && !isExpired ? 'text-green-400' : 'text-red-500'}`}>
+                                               {!ac.is_active ? 'متوقف' : isExpired ? 'منتهي' : 'نشط'}
                                            </div>
-                                           {isActive && (
+                                           {ac.is_active && !isExpired && (
                                                <div className="text-[10px] text-slate-500">متبقي {timeLeft} دقيقة</div>
                                            )}
                                        </div>
                                        
-                                       <div className="flex items-center gap-2">
-                                           {/* Action Buttons */}
-                                           
-                                           {/* Extend Button */}
+                                       {ac.is_active && !isExpired && (
                                            <button 
-                                                onClick={() => handleExtendCode(ac.code)}
-                                                className="p-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-400 rounded-lg border border-blue-900/50 transition-colors"
-                                                title="تمديد 30 دقيقة"
-                                           >
-                                                <Clock size={16} />
-                                           </button>
-
-                                           {/* Force Logout / Stop Button (Only if Active) */}
-                                           {isActive && (
-                                               <button 
-                                                   onClick={() => handleRevokeCode(ac.code)}
-                                                   className="p-2 bg-orange-900/20 hover:bg-orange-900/40 text-orange-500 rounded-lg border border-orange-900/50 transition-colors"
-                                                   title="تسجيل خروج إجباري (إيقاف)"
-                                               >
-                                                   <StopCircle size={16} />
-                                               </button>
-                                           )}
-
-                                           {/* Delete Button (Always Visible) */}
-                                           <button 
-                                               onClick={() => handleDeleteCode(ac.code)}
+                                               onClick={() => handleRevokeCode(ac.code)}
                                                className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
-                                               title="حذف نهائي من القائمة"
+                                               title="إيقاف الكود فوراً"
                                            >
                                                <Trash2 size={16} />
                                            </button>
-                                       </div>
+                                       )}
                                    </div>
                                </div>
                            );

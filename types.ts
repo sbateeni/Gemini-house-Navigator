@@ -14,10 +14,8 @@ export interface MapNote {
   center?: string;
   createdBy?: string; // UUID of the creator (Normal Users)
   accessCode?: string; // For Source/Guest Users
-  // Security Fields
+  // New Security Field
   visibility?: 'public' | 'private';
-  campaignId?: string; // Link to a specific campaign
-  sharedWith?: string[]; // Array of User IDs who can see this specifically (for Judiciary)
 }
 
 export interface GroundingSource {
@@ -47,8 +45,8 @@ export interface UserPermissions {
   can_view_logs: boolean;
 }
 
-// Added 'judiciary' role
-export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'judiciary' | 'officer' | 'user' | 'banned' | 'source';
+// Added 'officer' between center_admin and user
+export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'officer' | 'user' | 'banned' | 'source';
 
 export interface UserProfile {
   id: string;
@@ -114,14 +112,4 @@ export interface AccessCode {
 export interface SourceSession {
   code: string;
   expiresAt: number;
-}
-
-// Campaign Interfaces
-export interface Campaign {
-  id: string;
-  name: string;
-  description?: string;
-  created_by: string;
-  is_active: boolean;
-  created_at: number;
 }

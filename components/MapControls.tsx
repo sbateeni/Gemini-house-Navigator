@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Menu, Navigation, Layers, Globe, Loader2, X } from 'lucide-react';
+import { Menu, Navigation, Layers, Globe, Loader2, X, Gamepad2 } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { Assignment } from '../types';
 
@@ -15,6 +15,7 @@ interface MapControlsProps {
   onAcceptAssignment: (a: Assignment) => void;
   hasActiveRoute: boolean;
   onClearRoute: () => void;
+  onToggleFlightMode: () => void; // New prop
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -27,7 +28,8 @@ export const MapControls: React.FC<MapControlsProps> = ({
   assignments,
   onAcceptAssignment,
   hasActiveRoute,
-  onClearRoute
+  onClearRoute,
+  onToggleFlightMode
 }) => {
   return (
     <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
@@ -40,6 +42,15 @@ export const MapControls: React.FC<MapControlsProps> = ({
          title={sidebarOpen ? "إغلاق القائمة" : "فتح القائمة"}
        >
          <Menu size={24} />
+       </button>
+
+       {/* Flight Mode Toggle */}
+       <button 
+         onClick={onToggleFlightMode}
+         className="w-12 h-12 bg-indigo-600 text-white rounded-full shadow-xl border border-indigo-500 flex items-center justify-center hover:bg-indigo-500 active:scale-95 transition-all"
+         title="وضع الطيران (Flight Simulator)"
+       >
+         <Gamepad2 size={24} />
        </button>
 
        {/* Clear Route Button - Only shows when routing */}

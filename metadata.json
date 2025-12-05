@@ -1,6 +1,6 @@
 {
   "name": "Gemini house Navigator",
-  "description": "A tactical dashboard powered by Gemini and Google Maps. Explore locations with AI-grounded insights and secure operations.",
+  "description": "A flight simulation dashboard powered by Gemini and Google Maps. Fly around the world, switch between cockpit and chase views, and explore locations with AI-grounded insights.",
   "requestFramePermissions": [
     "geolocation"
   ]

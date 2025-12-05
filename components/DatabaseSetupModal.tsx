@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
 import { Database, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
+import { supabase } from '../services/supabase';
 
 export const DatabaseSetupModal: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const setupSQL = `
 -- ==========================================
--- 1. تحديث جدول الملفات الشخصية (Profiles)
+-- 1. جدول الملفات الشخصية (Profiles)
 -- ==========================================
--- (في حال لم يكن الجدول موجوداً)
 create table if not exists profiles (
   id uuid references auth.users on delete cascade,
   username text,
@@ -25,31 +25,32 @@ create table if not exists profiles (
   primary key (id)
 );
 
--- تحديث CHECK constraint للرتب ليشمل judiciary
-alter table profiles drop constraint if exists profiles_role_check;
--- (لا نقوم بإضافة check constraint صارم لتجنب المشاكل، الرتبة يتم التحكم بها عبر التطبيق)
-
+-- Security: RLS Policies for Profiles
 alter table profiles enable row level security;
 
--- Policies
+-- Allow read access to approved users
 drop policy if exists "Public profiles" on profiles;
-create policy "Public profiles" on profiles for select using (auth.role() = 'authenticated');
+create policy "Public profiles" on profiles for select using (
+  auth.role() = 'authenticated'
+);
 
+-- Allow users to insert their own profile
 drop policy if exists "Self insert" on profiles;
 create policy "Self insert" on profiles for insert with check (auth.uid() = id);
 
+-- Strict Update Policy: Users update self, Admins update according to hierarchy
 drop policy if exists "Strict update" on profiles;
 create policy "Strict update" on profiles for update using (
   auth.uid() = id OR 
   exists (
      select 1 from profiles editor 
      where editor.id = auth.uid() 
-     and editor.role in ('super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer', 'judiciary')
+     and editor.role in ('super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer')
   )
 );
 
 -- ==========================================
--- 2. تحديث جدول الملاحظات (Notes) - إضافة دعم الحملات والمشاركة
+-- 2. جدول الملاحظات والمواقع (Notes) - تحديث أمني
 -- ==========================================
 create table if not exists notes (
   id text primary key,
@@ -65,80 +66,53 @@ create table if not exists notes (
   center text,
   created_by uuid references auth.users(id),
   access_code text,
-  visibility text default 'private'
+  visibility text default 'private' -- 'public' or 'private'
 );
 
--- إضافة الأعمدة الجديدة
+-- إضافة العمود إذا لم يكن موجوداً
 alter table notes add column if not exists visibility text default 'private';
-alter table notes add column if not exists campaign_id uuid; -- للحملات
-alter table notes add column if not exists shared_with jsonb; -- مصفوفة للمشاركة الخاصة (مثل القضائية يشاركون ضابط معين)
 
 alter table notes enable row level security;
 
--- STRICT READ POLICY UPDATED FOR JUDICIARY & CAMPAIGNS:
+-- STRICT READ POLICY:
+-- 1. Everyone sees 'public' notes.
+-- 2. Users see their own 'private' notes.
+-- 3. Admins/Officers see 'private' notes based on hierarchy logic.
 drop policy if exists "Secure Read Notes" on notes;
 create policy "Secure Read Notes" on notes for select using (
   visibility = 'public' 
   OR auth.uid() = created_by 
   OR access_code IS NOT NULL
-  OR (shared_with is not null AND shared_with ? auth.uid()::text) -- مشاركة خاصة
   OR exists (
     select 1 from profiles viewer 
     where viewer.id = auth.uid() 
     and (
        viewer.role in ('super_admin', 'admin') -- Super admins see all
-       OR (viewer.role = 'judiciary') -- Judiciary logic handled in client mostly, but here allow broad read for filtering
        OR (viewer.role = 'governorate_admin' AND viewer.governorate = notes.governorate)
        OR (viewer.role in ('center_admin', 'officer') AND viewer.center = notes.center)
     )
   )
 );
 
--- Insert/Update Policies
+-- Insert Policy
 drop policy if exists "Auth insert" on notes;
 create policy "Auth insert" on notes for insert with check (auth.role() = 'authenticated');
+
+-- Update Policy
 drop policy if exists "Auth update" on notes;
 create policy "Auth update" on notes for update using (auth.role() = 'authenticated');
+
+-- Delete Policy: Restricted to admins/officers
 drop policy if exists "Admin delete" on notes;
 create policy "Admin delete" on notes for delete using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'judiciary', 'admin'))
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'admin'))
 );
 
 -- ==========================================
--- 3. جداول الحملات (Campaigns) - ميزة جديدة
--- ==========================================
-create table if not exists campaigns (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  description text,
-  created_by uuid references auth.users(id),
-  is_active boolean default true,
-  created_at bigint
-);
-alter table campaigns enable row level security;
-create policy "Campaign Read" on campaigns for select using (auth.role() = 'authenticated');
-create policy "Campaign Write" on campaigns for all using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'admin'))
-);
-
-create table if not exists campaign_participants (
-  id uuid default gen_random_uuid() primary key,
-  campaign_id uuid references campaigns(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete cascade,
-  permissions jsonb, -- e.g. {"can_view_all": true}
-  added_by uuid references auth.users(id),
-  unique(campaign_id, user_id)
-);
-alter table campaign_participants enable row level security;
-create policy "Partic Read" on campaign_participants for select using (auth.role() = 'authenticated');
-create policy "Partic Write" on campaign_participants for all using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'admin'))
-);
-
--- ==========================================
--- 4. باقي الجداول (Assignments, Logs, Access Codes)
+-- 3. باقي الجداول (Assignments, Logs, Access Codes)
 -- ==========================================
 
+-- Assignments
 create table if not exists assignments (
   id uuid default gen_random_uuid() primary key,
   target_user_id uuid not null references auth.users(id),
@@ -157,6 +131,7 @@ create policy "Assign Read" on assignments for select using (auth.uid() = target
 drop policy if exists "Assign Write" on assignments;
 create policy "Assign Write" on assignments for all using (auth.role() = 'authenticated');
 
+-- Logs
 create table if not exists logs (
   id uuid default gen_random_uuid() primary key,
   message text not null,
@@ -172,6 +147,7 @@ create policy "Log Read" on logs for select using (true);
 drop policy if exists "Log Write" on logs;
 create policy "Log Write" on logs for insert with check (auth.role() = 'authenticated');
 
+-- Access Codes
 create table if not exists access_codes (
   code text primary key,
   created_by uuid references auth.users(id),
@@ -179,21 +155,25 @@ create table if not exists access_codes (
   expires_at bigint,
   label text,
   is_active boolean default true,
-  device_id text
+  device_id text -- New column for device binding
 );
+
+-- Ensure device_id column exists
 alter table access_codes add column if not exists device_id text;
+
 alter table access_codes enable row level security;
 drop policy if exists "Code Manage" on access_codes;
 create policy "Code Manage" on access_codes for all using (
-  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'judiciary', 'admin'))
+  exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'governorate_admin', 'center_admin', 'officer', 'admin'))
 );
 drop policy if exists "Code Read Public" on access_codes;
 create policy "Code Read Public" on access_codes for select using (true);
 
 -- ==========================================
--- 5. الدوال (Functions)
+-- 4. الدوال (Functions)
 -- ==========================================
 
+-- Function to securely claim an access code for a device
 create or replace function claim_access_code(
   p_code text,
   p_device_id text
@@ -202,24 +182,30 @@ returns jsonb as $$
 declare
   v_record record;
 begin
+  -- Find the code
   select * into v_record from access_codes where code = p_code;
   
+  -- Check existence
   if v_record is null then
     return jsonb_build_object('success', false, 'message', 'الكود غير صحيح');
   end if;
   
+  -- Check active status
   if v_record.is_active = false then
      return jsonb_build_object('success', false, 'message', 'تم تعطيل هذا الكود');
   end if;
 
+  -- Check expiry
   if (extract(epoch from now()) * 1000) > v_record.expires_at then
      return jsonb_build_object('success', false, 'message', 'انتهت صلاحية الكود');
   end if;
 
+  -- Check Device Binding (Security)
   if v_record.device_id is not null and v_record.device_id != p_device_id then
-     return jsonb_build_object('success', false, 'message', 'تم استخدام هذا الكود على جهاز آخر مسبقاً.');
+     return jsonb_build_object('success', false, 'message', 'تم استخدام هذا الكود على جهاز آخر مسبقاً. لا يمكن مشاركة الكود.');
   end if;
 
+  -- Bind Device if it's the first time
   if v_record.device_id is null then
      update access_codes set device_id = p_device_id where code = p_code;
   end if;
@@ -228,6 +214,7 @@ begin
 end;
 $$ language plpgsql security definer;
 
+-- RPC for Source Note Creation (Bypassing Auth for Guests)
 create or replace function create_source_note(
   p_code text,
   p_note_data jsonb
@@ -236,6 +223,7 @@ returns void as $$
 declare
   v_exists boolean;
 begin
+  -- Verify code validity
   select exists(
     select 1 from access_codes 
     where code = p_code 
@@ -247,9 +235,10 @@ begin
     raise exception 'Invalid or expired access code';
   end if;
 
+  -- Insert Note
   insert into notes (
     id, lat, lng, user_note, location_name, ai_analysis, 
-    created_at, status, sources, access_code, visibility, campaign_id
+    created_at, status, sources, access_code, visibility
   ) values (
     (p_note_data->>'id'),
     (p_note_data->>'lat')::float8,
@@ -261,8 +250,7 @@ begin
     (p_note_data->>'status'),
     (p_note_data->'sources'),
     p_code,
-    coalesce(p_note_data->>'visibility', 'private'),
-    (p_note_data->>'campaignId')::uuid
+    coalesce(p_note_data->>'visibility', 'private')
   );
 end;
 $$ language plpgsql security definer;
@@ -287,9 +275,10 @@ $$ language plpgsql security definer;
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات (مطلوب)</h1>
+            <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات مطلوب</h1>
             <p className="text-slate-400 text-sm leading-relaxed">
-              لإضافة ميزة "الحملات" و "الدائرة القضائية" وإصلاح صلاحيات المشاركة، يجب تشغيل الكود التالي.
+              تم اكتشاف نقص في جداول أو أعمدة قاعدة البيانات (مثل نظام الحماية للجهاز `device_id` أو `visibility`). <br/>
+              لضمان عمل النظام بشكل صحيح، يجب تشغيل الكود التالي في محرر SQL في Supabase.
             </p>
           </div>
         </div>
