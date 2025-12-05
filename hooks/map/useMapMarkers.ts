@@ -113,23 +113,20 @@ export function useMapMarkers(
       if (markersRef.current[note.id]) {
         // UPDATE Existing Marker
         const marker = markersRef.current[note.id];
-        // Only update if position changed significantly to avoid jitter, 
-        // OR if we want to force icon/popup updates (which we do for status changes)
         marker.setLatLng([note.lat, note.lng]);
         marker.setIcon(icon);
         marker.setPopupContent(popupContent);
         
-        // Update tooltip for public notes
+        // Update tooltip logic for ALL notes (if visible)
         if (isPublic) {
-             if (marker.getTooltip()) {
-                 marker.setTooltipContent(note.locationName);
-             } else {
-                 marker.bindTooltip(note.locationName, { 
-                    permanent: true, 
-                    direction: 'bottom',
-                    className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
-                });
-             }
+             // Re-bind to ensure new options (top direction) are applied if changed
+             marker.unbindTooltip();
+             marker.bindTooltip(note.locationName, { 
+                permanent: true, 
+                direction: 'top', // Show above the marker
+                offset: [0, -28], // Push up to clear the icon height (32px approx)
+                className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90 shadow-xl'
+            });
         }
       } else {
         // CREATE New Marker
@@ -141,8 +138,9 @@ export function useMapMarkers(
         if (isPublic) {
             marker.bindTooltip(note.locationName, { 
                 permanent: true, 
-                direction: 'bottom',
-                className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
+                direction: 'top', // Show above the marker
+                offset: [0, -28], // Push up to clear the icon height
+                className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90 shadow-xl'
             });
         }
 
