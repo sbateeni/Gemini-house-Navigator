@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users, Clock, Shield, Award, WifiOff } from 'lucide-react';
+import { Users, Clock, Shield, Award, WifiOff, Scale } from 'lucide-react';
 import { MapUser, UserProfile } from '../../types';
 
 interface SidebarUnitsProps {
@@ -27,6 +27,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
     super_admin: 'قائد عام',
     governorate_admin: 'مدير محافظة',
     center_admin: 'مدير مركز',
+    judicial: 'ضابط قضائية',
     officer: 'ضابط',
     user: 'عنصر',
     admin: 'مسؤول',
@@ -37,6 +38,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
     if (role === 'super_admin' || role === 'admin') return 'bg-purple-900/40 text-purple-300 border-purple-700/50';
     if (role === 'governorate_admin') return 'bg-indigo-900/40 text-indigo-300 border-indigo-700/50';
     if (role === 'center_admin') return 'bg-blue-900/40 text-blue-300 border-blue-700/50';
+    if (role === 'judicial') return 'bg-teal-900/40 text-teal-300 border-teal-700/50'; // New Style
     if (role === 'officer') return 'bg-sky-900/40 text-sky-300 border-sky-700/50';
     if (role === 'banned') return 'bg-red-900/40 text-red-300 border-red-700/50';
     return 'bg-slate-700/40 text-slate-400 border-slate-600/50';
@@ -119,6 +121,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
                                     {/* Rank Badge */}
                                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${getRoleStyle(u.role)} flex items-center gap-1 shrink-0`}>
                                         {u.role === 'super_admin' && <Shield size={8} />}
+                                        {u.role === 'judicial' && <Scale size={8} />}
                                         {u.role === 'officer' && <Award size={8} />}
                                         {roleLabels[u.role] || 'عنصر'}
                                     </span>

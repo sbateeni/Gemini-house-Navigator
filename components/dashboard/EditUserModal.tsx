@@ -86,6 +86,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
                         >
                             <option value="user">عنصر</option>
                             <option value="officer">ضابط</option>
+                            <option value="judicial">ضابط قضائية (حملات)</option>
                             <option value="center_admin">مدير مركز</option>
                             {(currentUserProfile?.role === 'super_admin' || currentUserProfile?.role === 'admin') && (
                                 <>

@@ -176,6 +176,9 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
       <CampaignsModal 
         isOpen={showCampaigns}
         onClose={closeCampaigns}
+        onlineUsers={onlineUsers}
+        notes={notes}
+        currentUserProfile={currentUserProfile}
       />
     </>
   );

@@ -47,8 +47,8 @@ export interface UserPermissions {
   can_manage_content: boolean;
 }
 
-// Added 'officer' between center_admin and user
-export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'officer' | 'user' | 'banned' | 'source';
+// Added 'officer' between center_admin and user, and 'judicial' between center_admin and officer
+export type UserRole = 'super_admin' | 'admin' | 'governorate_admin' | 'center_admin' | 'judicial' | 'officer' | 'user' | 'banned' | 'source';
 
 export interface UserProfile {
   id: string;

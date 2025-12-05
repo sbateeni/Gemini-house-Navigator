@@ -21,6 +21,7 @@ const ROLE_RANKS: Record<string, number> = {
   admin: 90,
   governorate_admin: 80,
   center_admin: 70,
+  judicial: 65, // Added Judicial rank
   officer: 60,
   user: 50,
   source: 0, // Sources have lowest rank
