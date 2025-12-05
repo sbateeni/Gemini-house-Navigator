@@ -32,6 +32,8 @@ interface LeafletMapProps {
   onDispatch?: (note: MapNote) => void;
   userRole?: string | null;
   currentUserId?: string;
+  isFlightMode?: boolean;
+  flightHeading?: number;
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -52,7 +54,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   onNavigate,
   onDispatch,
   userRole,
-  currentUserId
+  currentUserId,
+  isFlightMode,
+  flightHeading
 }) => {
   // 1. Initialize Map
   const { mapContainerRef, mapInstanceRef } = useMapInstance(onMapClick);
@@ -72,7 +76,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     onNavigate, 
     onDispatch, 
     userRole, 
-    isSatellite
+    isSatellite,
+    isFlightMode,
+    flightHeading
   );
 
   const filteredOtherUsers = currentUserId 

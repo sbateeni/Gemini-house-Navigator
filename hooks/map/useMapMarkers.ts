@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
-import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';
+import { createNoteIconHtml, createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml, createPlaneIconHtml } from '../../utils/mapHelpers';
 
 export function useMapMarkers(
     mapInstanceRef: React.MutableRefObject<any>,
@@ -14,7 +14,9 @@ export function useMapMarkers(
     onNavigate: ((note: MapNote) => void) | undefined,
     onDispatch: ((note: MapNote) => void) | undefined,
     userRole: string | null,
-    isSatellite: boolean
+    isSatellite: boolean,
+    isFlightMode?: boolean,
+    flightHeading?: number
 ) {
   const markersRef = useRef<{ [key: string]: any }>({});
   const userMarkerRef = useRef<any>(null);
@@ -166,28 +168,41 @@ export function useMapMarkers(
     }
   }, [tempMarkerCoords]);
 
-  // 5. Self Location Marker
+  // 5. Self Location Marker (Or Flight Plane)
   useEffect(() => {
     if (!mapInstanceRef.current || !userLocation) return;
     
     if (userMarkerRef.current) mapInstanceRef.current.removeLayer(userMarkerRef.current);
 
-    const userIcon = window.L.divIcon({
-        className: 'custom-div-icon',
-        html: createSelfIconHtml(),
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-    });
+    let userIcon;
+
+    if (isFlightMode) {
+         userIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: createPlaneIconHtml(flightHeading || 0),
+            iconSize: [48, 48],
+            iconAnchor: [24, 24]
+        });
+        // Pan map continuously in flight mode
+        mapInstanceRef.current.panTo([userLocation.lat, userLocation.lng], { animate: false });
+    } else {
+         userIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: createSelfIconHtml(),
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+    }
 
     userMarkerRef.current = window.L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(mapInstanceRef.current);
 
-    // Initial FlyTo
-    if (!hasInitialFlownToUserRef.current) {
+    // Initial FlyTo (only if not flight mode to prevent jumps)
+    if (!hasInitialFlownToUserRef.current && !isFlightMode) {
       mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, {
         duration: 2,
         easeLinearity: 0.25
       });
       hasInitialFlownToUserRef.current = true;
     }
-  }, [userLocation]);
+  }, [userLocation, isFlightMode, flightHeading]);
 }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment } from '../types';
 import { db } from '../services/db';
 import { searchPlace, identifyLocation } from '../services/gemini';
@@ -35,9 +35,77 @@ export function useAppLogic() {
     notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
-  const { userLocation } = useGeolocation(session, hasAccess);
+  const { userLocation: gpsLocation } = useGeolocation(session, hasAccess);
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
+  // --- FLIGHT MODE LOGIC ---
+  const [isFlightMode, setIsFlightMode] = useState(false);
+  const [flightState, setFlightState] = useState({ lat: 0, lng: 0, heading: 0, speed: 0 });
+  const flightRef = useRef({ lat: 0, lng: 0, heading: 0, speed: 0, active: false });
+
+  // Sync Flight Start Position
+  useEffect(() => {
+    if (isFlightMode && gpsLocation) {
+        flightRef.current = {
+            lat: gpsLocation.lat,
+            lng: gpsLocation.lng,
+            heading: 0,
+            speed: 0, // Start hovering
+            active: true
+        };
+        setFlightState({ ...flightRef.current });
+    }
+  }, [isFlightMode]); // gpsLocation dependency removed to prevent reset during flight
+
+  // Flight Controls
+  useEffect(() => {
+    if (!isFlightMode) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowUp') flightRef.current.speed = Math.min(flightRef.current.speed + 0.00005, 0.002);
+        if (e.key === 'ArrowDown') flightRef.current.speed = Math.max(flightRef.current.speed - 0.00005, 0);
+        if (e.key === 'ArrowLeft') flightRef.current.heading = (flightRef.current.heading - 5) % 360;
+        if (e.key === 'ArrowRight') flightRef.current.heading = (flightRef.current.heading + 5) % 360;
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFlightMode]);
+
+  // Flight Game Loop
+  useEffect(() => {
+    if (!isFlightMode) return;
+    
+    let frameId: number;
+    const loop = () => {
+        const { lat, heading, speed } = flightRef.current;
+        
+        if (speed > 0) {
+            // Simple Geo Calculation
+            // heading 0 = North (Up)
+            const rad = (heading - 90) * (Math.PI / 180); // Adjusting because standard trig 0 is East
+            // Actually, let's keep it simple: 0 deg = North
+            
+            const dLat = speed * Math.cos(heading * Math.PI / 180);
+            const dLng = speed * Math.sin(heading * Math.PI / 180) / Math.cos(lat * Math.PI / 180);
+            
+            flightRef.current.lat += dLat;
+            flightRef.current.lng += dLng;
+            
+            setFlightState({ ...flightRef.current });
+        }
+        frameId = requestAnimationFrame(loop);
+    };
+    
+    loop();
+    return () => cancelAnimationFrame(frameId);
+  }, [isFlightMode]);
+
+  // Determine which location to show and use
+  const userLocation = isFlightMode && flightRef.current.active
+     ? { lat: flightState.lat, lng: flightState.lng } 
+     : gpsLocation;
+
   // --- 4. Feature Hooks ---
   const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
@@ -124,6 +192,12 @@ export function useAppLogic() {
   }, [isSOS, distressedUser, playSiren, stopSiren]);
 
   const locateUser = () => {
+    // If in flight mode, just center on plane
+    if (isFlightMode && userLocation) {
+         setFlyToTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 16, timestamp: Date.now() });
+         return;
+    }
+
     setIsLocating(true);
     if (!navigator.geolocation) {
         alert("المتصفح لا يدعم تحديد الموقع.");
@@ -347,6 +421,8 @@ export function useAppLogic() {
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
     // Admin Filters
-    targetUserFilter, setTargetUserFilter
+    targetUserFilter, setTargetUserFilter,
+    // Flight Mode
+    isFlightMode, setIsFlightMode, flightHeading: flightState.heading
   };
 }

@@ -37,7 +37,9 @@ export default function App() {
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    targetUserFilter, setTargetUserFilter
+    targetUserFilter, setTargetUserFilter,
+    // Flight Props
+    isFlightMode, setIsFlightMode, flightHeading
   } = useAppLogic();
 
   // --- Filter Logic ---
@@ -253,6 +255,9 @@ export default function App() {
           }}
           onDispatch={handleOpenDispatchModal}
           userRole={sourceSession ? 'source' : userRole}
+          currentUserId={session?.user?.id}
+          isFlightMode={isFlightMode}
+          flightHeading={flightHeading}
         />
         
         {/* Controls layer */}
@@ -270,6 +275,8 @@ export default function App() {
               handleStopNavigation();
               clearSecondaryRoute();
           }}
+          isFlightMode={isFlightMode}
+          setIsFlightMode={setIsFlightMode}
         />
 
         <ModalContainer

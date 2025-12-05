@@ -1,6 +1,4 @@
 
-
-
 import { MapNote, MapUser } from '../types';
 
 export const createNoteIconHtml = (isSatellite: boolean) => `
@@ -66,6 +64,26 @@ export const createSelfIconHtml = () => `
       <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">أنا</div>
       <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #3b82f6; border: 2px solid white; border-radius: 50%; z-index: 2;"></div>
       <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: rgba(59, 130, 246, 0.4); border-radius: 50%; animation: pulse 2s infinite;"></div>
+  </div>
+`;
+
+export const createPlaneIconHtml = (heading: number) => `
+  <div style="
+    transform: rotate(${heading}deg); 
+    transition: transform 0.1s linear; 
+    width: 48px; 
+    height: 48px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    filter: drop-shadow(0px 5px 10px rgba(0,0,0,0.5));
+  ">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="#3b82f6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12h20"></path>
+      <path d="M13 2l9 10-9 10"></path> 
+      <path d="M16 12l-5-5"></path>
+      <path d="M16 12l-5 5"></path>
+    </svg>
   </div>
 `;
 

@@ -137,6 +137,15 @@ export const db = {
       return newCode;
   },
 
+  async renewAccessCode(code: string): Promise<void> {
+      const expiresAt = Date.now() + (30 * 60 * 1000); // +30 mins
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ is_active: true, expires_at: expiresAt })
+        .eq('code', code);
+      if (error) throw error;
+  },
+
   // Get active codes created by me
   async getMyAccessCodes(): Promise<AccessCode[]> {
       const { data: { user } } = await supabase.auth.getUser();
