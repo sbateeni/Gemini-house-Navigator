@@ -31,6 +31,7 @@ export default function App() {
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
     selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote, handleDeleteNote, isAnalyzing,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
+    showCampaigns, setShowCampaigns,
     commandUser, setCommandUser, onUserClick, handleIntercept, handleDispatch,
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
@@ -198,6 +199,7 @@ export default function App() {
           onLogout={sourceSession ? handleSourceLogout : handleLogout}
           onOpenDashboard={() => setShowDashboard(true)} 
           onOpenSettings={() => setShowSettings(true)}
+          onOpenCampaigns={() => setShowCampaigns(true)}
           canCreate={!!sourceSession || permissions.can_create} 
           myStatus={myStatus}
           setMyStatus={setMyStatus}
@@ -309,6 +311,9 @@ export default function App() {
 
             showFullLogs={showFullLogs}
             closeFullLogs={() => setShowFullLogs(false)}
+
+            showCampaigns={showCampaigns}
+            closeCampaigns={() => setShowCampaigns(false)}
 
             onFilterByUser={(uid, name) => {
                 setTargetUserFilter({ id: uid, name });

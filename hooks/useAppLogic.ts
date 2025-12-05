@@ -67,6 +67,7 @@ export function useAppLogic() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFullLogs, setShowFullLogs] = useState(false);
+  const [showCampaigns, setShowCampaigns] = useState(false); // New
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Tactical Command States
@@ -319,23 +320,6 @@ export function useAppLogic() {
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
   };
 
-  // Auto-Dispatch Logic for Users
-  const handleIncomingAssignment = (assignment: Assignment) => {
-      if (userRole === 'user' || userRole === 'officer') {
-          playSiren(); // Alert sound
-          setTimeout(() => stopSiren(), 2000);
-          
-          acceptAssignment(assignment.id);
-          handleNavigateToPoint(assignment.lat, assignment.lng);
-          setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
-          
-          alert("⚠️ أمر عمليات عاجل: تم بدء التوجيه للموقع المستهدف.");
-      } else {
-          // Admins just get a notification beep
-          playBeep();
-      }
-  };
-
   return {
     // Auth
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
@@ -354,6 +338,7 @@ export function useAppLogic() {
     selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote, handleDeleteNote, isAnalyzing,
     // Modals
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
+    showCampaigns, setShowCampaigns,
     // Tactical Command
     commandUser, setCommandUser, onUserClick, handleIntercept, handleDispatch,
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,

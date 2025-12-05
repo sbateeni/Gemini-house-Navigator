@@ -7,10 +7,10 @@ export const DatabaseSetupModal: React.FC = () => {
 
   const setupSQL = `
 -- ==========================================
--- إصلاح شامل لقاعدة البيانات والعلاقات
+-- إصلاح خطأ 42501 (RLS Policy Violation)
 -- ==========================================
 
--- 1. التأكد من وجود الجداول الأساسية
+-- 1. التأكد من وجود الجداول
 create table if not exists profiles (
   id uuid references auth.users on delete cascade primary key,
   username text,
@@ -75,65 +75,55 @@ create table if not exists assignments (
   created_at bigint
 );
 
--- 2. إصلاح العلاقات (Foreign Keys) بشكل صريح لحل خطأ PGRST200
--- هذا يضمن أن Supabase يتعرف على العلاقة بين الجداول
-
--- إصلاح علاقة الملاحظات بالمستخدمين
-ALTER TABLE public.notes DROP CONSTRAINT IF EXISTS notes_created_by_fkey;
-ALTER TABLE public.notes ADD CONSTRAINT notes_created_by_fkey 
-FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
--- إصلاح علاقة الملفات الشخصية
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_id_fkey 
-FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
--- 3. تفعيل الحماية (RLS)
+-- 2. تفعيل RLS
 alter table profiles enable row level security;
 alter table notes enable row level security;
 alter table access_codes enable row level security;
 alter table logs enable row level security;
 alter table assignments enable row level security;
 
--- 4. سياسات الوصول (Policies)
+-- 3. إصلاح السياسات (Policies) - هذا الجزء هو الأهم لحل 42501
 
--- Profiles
-create policy "Public profiles" on profiles for select using (auth.role() = 'authenticated');
-create policy "Self insert" on profiles for insert with check (auth.uid() = id);
-create policy "Self update" on profiles for update using (auth.uid() = id OR exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'admin')));
+-- سياسات Notes (أهم جدول يسبب المشكلة)
+DROP POLICY IF EXISTS "Enable Read for Users and Sources" ON notes;
+CREATE POLICY "Enable Read for Users and Sources" ON notes FOR SELECT USING (
+  true -- التبسيط للقراءة حالياً، يمكن تقييده لاحقاً
+);
 
--- Notes
-create policy "Read Notes" on notes for select using (true); 
-create policy "Insert Notes" on notes for insert with check (auth.role() = 'authenticated' OR access_code IS NOT NULL);
-create policy "Update Notes" on notes for update using (auth.role() = 'authenticated');
-create policy "Delete Notes" on notes for delete using (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Enable Insert for Users" ON notes;
+CREATE POLICY "Enable Insert for Users" ON notes FOR INSERT WITH CHECK (
+  auth.role() = 'authenticated' OR auth.role() = 'anon' -- السماح للـ anon للإدخال عبر RPC
+);
 
--- Access Codes
-create policy "Read Codes" on access_codes for select using (true);
-create policy "Manage Codes" on access_codes for all using (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Enable Update for Users" ON notes;
+CREATE POLICY "Enable Update for Users" ON notes FOR UPDATE USING (
+  auth.role() = 'authenticated'
+);
 
--- Logs & Assignments
-create policy "Read Logs" on logs for select using (true);
-create policy "Insert Logs" on logs for insert with check (auth.role() = 'authenticated');
-create policy "Manage Assignments" on assignments for all using (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Enable Delete for Users" ON notes;
+CREATE POLICY "Enable Delete for Users" ON notes FOR DELETE USING (
+  auth.role() = 'authenticated'
+);
 
--- 5. إصلاح الدالة المفقودة (claim_access_code)
-create or replace function claim_access_code(p_code text, p_device_id text)
-returns jsonb as $$
-declare
-  v_record record;
-begin
-  select * into v_record from access_codes where code = p_code;
-  if v_record is null then return jsonb_build_object('success', false, 'message', 'الكود غير صحيح'); end if;
-  if v_record.is_active = false then return jsonb_build_object('success', false, 'message', 'تم تعطيل هذا الكود'); end if;
-  if (extract(epoch from now()) * 1000) > v_record.expires_at then return jsonb_build_object('success', false, 'message', 'انتهت صلاحية الكود'); end if;
-  if v_record.device_id is not null and v_record.device_id != p_device_id then return jsonb_build_object('success', false, 'message', 'الكود مرتبط بجهاز آخر'); end if;
-  if v_record.device_id is null then update access_codes set device_id = p_device_id where code = p_code; end if;
-  return jsonb_build_object('success', true, 'expires_at', v_record.expires_at);
-end;
-$$ language plpgsql security definer;
+-- سياسات Profiles
+DROP POLICY IF EXISTS "Public profiles" ON profiles;
+CREATE POLICY "Public profiles" on profiles for select using (auth.role() = 'authenticated');
 
--- 6. إنشاء دالة المصدر (create_source_note)
+DROP POLICY IF EXISTS "Self insert" ON profiles;
+CREATE POLICY "Self insert" on profiles for insert with check (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Self update" ON profiles;
+CREATE POLICY "Self update" on profiles for update using (auth.uid() = id OR exists (select 1 from profiles where id = auth.uid() and role in ('super_admin', 'admin')));
+
+-- سياسات Access Codes
+DROP POLICY IF EXISTS "Read Codes" ON access_codes;
+CREATE POLICY "Read Codes" on access_codes for select using (true);
+
+DROP POLICY IF EXISTS "Manage Codes" ON access_codes;
+CREATE POLICY "Manage Codes" on access_codes for all using (auth.role() = 'authenticated');
+
+-- 4. إصلاح الدالة create_source_note لتستخدم SECURITY DEFINER
+-- هذا يضمن أن الدالة تتجاوز قيود RLS عند استدعائها
 create or replace function create_source_note(p_code text, p_note_data jsonb)
 returns void as $$
 begin
@@ -150,6 +140,11 @@ begin
   end if;
 end;
 $$ language plpgsql security definer;
+
+-- 5. إصلاح علاقات FK
+ALTER TABLE public.notes DROP CONSTRAINT IF EXISTS notes_created_by_fkey;
+ALTER TABLE public.notes ADD CONSTRAINT notes_created_by_fkey 
+FOREIGN KEY (created_by) REFERENCES auth.users(id);
 
 -- تحديث الكاش
 NOTIFY pgrst, 'reload schema';
@@ -174,10 +169,10 @@ NOTIFY pgrst, 'reload schema';
             <ShieldAlert className="text-red-500 w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white mb-1">إصلاح قاعدة البيانات (SQL Fix)</h1>
+            <h1 className="text-xl font-bold text-white mb-1">إصلاح أذونات قاعدة البيانات (Error 42501)</h1>
             <p className="text-slate-400 text-sm leading-relaxed">
-              تم اكتشاف أخطاء في العلاقات (PGRST200) أو دوال مفقودة. <br/>
-              الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase لإصلاح الهيكلية بالكامل.
+              حدث خطأ في صلاحيات الكتابة (RLS Policy). <br/>
+              الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase لإصلاح الصلاحيات.
             </p>
           </div>
         </div>

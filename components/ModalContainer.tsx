@@ -7,6 +7,7 @@ import { UserCommandModal } from './UserCommandModal';
 import { LocationPickerModal } from './LocationPickerModal';
 import { DispatchModal } from './DispatchModal';
 import { FullLogsModal } from './FullLogsModal';
+import { CampaignsModal } from './CampaignsModal';
 import { MapNote, UserProfile, UserRole, MapUser } from '../types';
 
 interface ModalContainerProps {
@@ -56,6 +57,10 @@ interface ModalContainerProps {
   showFullLogs: boolean;
   closeFullLogs: () => void;
 
+  // Campaigns Props
+  showCampaigns: boolean;
+  closeCampaigns: () => void;
+
   // Filter
   onFilterByUser: (userId: string, userName: string) => void;
 }
@@ -93,6 +98,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   onSendDispatch,
   showFullLogs,
   closeFullLogs,
+  showCampaigns,
+  closeCampaigns,
   onFilterByUser
 }) => {
   return (
@@ -153,6 +160,11 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         isOpen={showFullLogs}
         onClose={closeFullLogs}
         userRole={userRole}
+      />
+
+      <CampaignsModal 
+        isOpen={showCampaigns}
+        onClose={closeCampaigns}
       />
     </>
   );
