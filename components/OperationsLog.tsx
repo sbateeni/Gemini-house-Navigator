@@ -43,7 +43,7 @@ export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-[2000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden cursor-pointer hover:bg-slate-900 transition-colors group shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" 
+      className="absolute bottom-0 left-0 right-0 z-[1000] bg-slate-950/95 border-t border-slate-800 h-16 flex items-center px-4 font-mono text-xs overflow-hidden cursor-pointer hover:bg-slate-900 transition-colors group shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" 
       dir="rtl"
       onClick={onExpand}
       title="اضغط لعرض السجل الكامل"

@@ -39,7 +39,7 @@ interface SidebarProps {
   setMyStatus: (s: UnitStatus) => void;
   onlineUsers: MapUser[]; 
   currentUserId: string;
-  onOpenCampaigns: () => void; // New prop
+  onOpenCampaigns: () => void; 
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 shadow-2xl 
                 transform transition-transform duration-300 ease-in-out
                 flex flex-col text-right
-                pb-20 /* Padding bottom to ensure content is above the Operations Log bar */
+                pb-0 /* Removed padding bottom to align with flexbox footer */
                 ${isOpen ? 'translate-x-0' : 'translate-x-full'}
                 md:relative md:translate-x-0
                 ${!isOpen && 'md:!w-0 md:!border-0'}
@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         shadow-2xl 
         transform transition-transform duration-300 ease-in-out
         flex flex-col text-right
-        pb-20 /* Padding bottom to ensure footer is above the Operations Log bar */
+        pb-0
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         md:relative md:translate-x-0
         ${!isOpen && 'md:!w-0 md:!border-0'}

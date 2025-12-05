@@ -79,8 +79,6 @@ export function useMapMarkers(
 
     // Add/Update notes
     notes.forEach(note => {
-      if (markersRef.current[note.id]) return; // Already exists
-
       // Distinct visual for Public vs Private
       const isPublic = note.visibility === 'public';
       
@@ -114,21 +112,47 @@ export function useMapMarkers(
       const canCommand = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
       const popupContent = createNotePopupHtml(note, canCommand);
 
-      const marker = window.L.marker([note.lat, note.lng], { icon })
-        .addTo(map)
-        .bindPopup(popupContent);
+      if (markersRef.current[note.id]) {
+        // UPDATE Existing Marker
+        const marker = markersRef.current[note.id];
+        const currentLatLng = marker.getLatLng();
+        
+        // Only update if position changed significantly to avoid jitter, 
+        // OR if we want to force icon/popup updates (which we do for status changes)
+        marker.setLatLng([note.lat, note.lng]);
+        marker.setIcon(icon);
+        marker.setPopupContent(popupContent);
+        
+        // Update tooltip for public notes
+        if (isPublic) {
+             if (marker.getTooltip()) {
+                 marker.setTooltipContent(note.locationName);
+             } else {
+                 marker.bindTooltip(note.locationName, { 
+                    permanent: true, 
+                    direction: 'bottom',
+                    className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
+                });
+             }
+        }
+      } else {
+        // CREATE New Marker
+        const marker = window.L.marker([note.lat, note.lng], { icon })
+            .addTo(map)
+            .bindPopup(popupContent);
 
-      // ALWAYS show label for PUBLIC notes
-      if (isPublic) {
-          marker.bindTooltip(note.locationName, { 
-              permanent: true, 
-              direction: 'bottom',
-              className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
-          });
+        // ALWAYS show label for PUBLIC notes
+        if (isPublic) {
+            marker.bindTooltip(note.locationName, { 
+                permanent: true, 
+                direction: 'bottom',
+                className: 'bg-slate-900 text-white px-2 py-1 rounded border border-slate-700 text-xs font-bold opacity-90'
+            });
+        }
+
+        marker.on('popupopen', () => setSelectedNote(note));
+        markersRef.current[note.id] = marker;
       }
-
-      marker.on('popupopen', () => setSelectedNote(note));
-      markersRef.current[note.id] = marker;
     });
     
     // Open popup if selected
