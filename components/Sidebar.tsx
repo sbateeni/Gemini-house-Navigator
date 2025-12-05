@@ -89,56 +89,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [isOpen, setIsOpen]);
 
-  // --- SOURCE MODE VIEW ---
-  if (isSource) {
-      return (
-        <div 
-            className={`
-                fixed inset-y-0 right-0 z-[1500] 
-                w-full md:w-80 
-                bg-slate-900/95 backdrop-blur-xl 
-                border-l border-slate-800 
-                shadow-2xl 
-                transform transition-transform duration-300 ease-in-out
-                flex flex-col text-right
-                pb-0
-                ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-                md:translate-x-0 md:relative
-            `}
-        >
-            {/* Close Button for Mobile */}
-            <div className="absolute top-4 left-4 md:hidden z-50">
-               <button onClick={() => setIsOpen(false)} className="p-2 bg-slate-800 rounded-full text-white shadow-lg">
-                  <X size={20} />
-               </button>
-            </div>
-
-            <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center border border-green-500/30 animate-pulse">
-                    <ShieldCheck size={32} className="text-green-500" />
-                </div>
-                <h2 className="text-xl font-bold text-white">وضع المصدر الآمن</h2>
-                <p className="text-sm text-slate-400 leading-relaxed">
-                    يمكنك إضافة المواقع بالنقر على الخريطة. <br/>
-                    لا يتم عرض البيانات المسجلة هنا لسلامتك.
-                </p>
-                <div className="mt-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 text-xs text-slate-400">
-                    عدد المواقع المسجلة: <span className="text-green-400 font-bold">{notes.length}</span>
-                </div>
-            </div>
-            
-            <SidebarFooter 
-                isAdmin={false}
-                onOpenDashboard={() => {}}
-                onOpenSettings={() => {}}
-                onOpenCampaigns={() => {}}
-                onLogout={onLogout}
-            />
-        </div>
-      );
-  }
-
-  // --- STANDARD VIEW ---
   return (
     <div 
       ref={sidebarRef}
@@ -150,12 +100,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         shadow-2xl 
         transform transition-transform duration-300 ease-in-out
         flex flex-col text-right
-        pb-0
+        pb-16 /* Added padding to clear the operations log bar */
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         md:relative md:translate-x-0
         ${!isOpen && 'md:!w-0 md:!border-0'}
       `}
     >
+      {/* Mobile Close Button */}
+      <div className="absolute top-4 left-4 md:hidden z-50">
+           <button onClick={() => setIsOpen(false)} className="p-2 bg-slate-800 rounded-full text-white shadow-lg">
+              <X size={20} />
+           </button>
+      </div>
+
       <SidebarHeader 
         setIsOpen={setIsOpen} 
         myStatus={myStatus} 
@@ -165,6 +122,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isSearching={isSearching}
         onSearch={onSearch}
       />
+
+      {isSource && (
+          <div className="mx-2 mt-2 p-2 bg-green-900/20 border border-green-500/30 rounded-lg flex items-center justify-center gap-2">
+               <ShieldCheck size={16} className="text-green-500 animate-pulse" />
+               <span className="text-green-400 text-xs font-bold">وضع المصدر الآمن (مشفر)</span>
+          </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2 scroll-smooth">
         
@@ -186,7 +150,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
         </div>
 
-        <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />
+        {/* Hide Units for Source */}
+        {!isSource && <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />}
 
         <SidebarNotes 
             notes={notes}

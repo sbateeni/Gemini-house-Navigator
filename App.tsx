@@ -20,6 +20,7 @@ export default function App() {
   // SOURCE MODE STATE
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
   const [sourceTimeLeft, setSourceTimeLeft] = useState<number>(0);
+  const [showDatabaseFix, setShowDatabaseFix] = useState(false);
 
   const {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
@@ -133,11 +134,15 @@ export default function App() {
       );
   }
 
+  // Auto-show DB Setup if critical tables missing
   if (tableMissing) return <DatabaseSetupModal />;
 
   return (
     <div className="flex h-screen w-full bg-slate-950 overflow-hidden" dir="rtl">
       
+      {/* Manual DB Fix Modal */}
+      {showDatabaseFix && <DatabaseSetupModal onClose={() => setShowDatabaseFix(false)} />}
+
       {/* Source Mode Timer Overlay */}
       {sourceSession && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] bg-green-900/90 border border-green-500 rounded-full px-6 py-2 shadow-2xl flex items-center gap-4">
@@ -300,6 +305,7 @@ export default function App() {
             userRole={sourceSession ? 'source' : userRole}
             mapProvider={mapProvider}
             setMapProvider={setMapProvider}
+            onOpenDatabaseFix={() => { setShowSettings(false); setShowDatabaseFix(true); }}
             
             commandUser={commandUser}
             closeCommandUser={() => setCommandUser(null)}

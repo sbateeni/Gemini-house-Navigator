@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye, LogOut } from 'lucide-react';
+import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye, LogOut, Wrench } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -12,6 +12,7 @@ interface SettingsModalProps {
   mapProvider: string;
   setMapProvider: (provider: string) => void;
   onLogout: () => void;
+  onOpenDatabaseFix?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -21,7 +22,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   userRole,
   mapProvider,
   setMapProvider,
-  onLogout
+  onLogout,
+  onOpenDatabaseFix
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -87,7 +89,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const initialChar = username.charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+    <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-2xl">
           <h2 className="text-xl font-bold text-white">الإعدادات</h2>
@@ -151,33 +153,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                 ))}
             </div>
-            <p className="text-[10px] text-slate-500 mt-2 text-center">
-                ملاحظة: "Esri Clarity" توفر صوراً أحدث للمباني الجديدة، بينما "Google Hybrid" توفر أفضل تقريب (Zoom).
-            </p>
           </section>
 
           {/* Offline Maps Section */}
           <section>
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">الخرائط دون اتصال</h3>
-                <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">مفعل</span>
+                <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">البيانات</h3>
+                <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">متصل</span>
             </div>
             
             <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
-                <p className="text-xs text-slate-400">
-                    <Database size={14} className="inline ml-1 mb-0.5" />
-                    يتم حفظ الملاحظات تلقائياً على جهازك. يمكنك العمل دون إنترنت وسيتم المزامنة عند عودة الاتصال.
-                </p>
-
-                <div className="border-t border-slate-700/50 pt-4">
+                <div className="border-b border-slate-700/50 pb-4 mb-2">
                     <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
                         <Download size={16} className="text-blue-400" />
-                        تحميل منطقة العمليات
+                        تحميل المنطقة
                     </h4>
-                    <p className="text-xs text-slate-500 mb-3">
-                        حفظ صور الأقمار الصناعية للمنطقة الحالية لاستخدامها في وضع عدم الاتصال.
-                    </p>
-
                     {isDownloading ? (
                         <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
                             <div className="flex justify-between text-xs text-white mb-1">
@@ -190,23 +180,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                     style={{ width: `${downloadProgress ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` }}
                                 ></div>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1 text-center">الرجاء عدم إغلاق النافذة</p>
                         </div>
                     ) : (
                         <button 
                             onClick={handleDownloadMap}
                             className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
                         >
-                            <Download size={16} /> تحميل المنطقة الحالية
+                            <Download size={16} /> تحميل
                         </button>
                     )}
+                </div>
 
-                    <button 
+                <div className="flex flex-col gap-2">
+                     <button 
                         onClick={handleClearCache}
-                        className="w-full mt-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2"
+                        className="w-full text-slate-400 hover:text-white hover:bg-slate-700 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-slate-700/50"
                     >
-                        <Trash2 size={14} /> حذف البيانات المحفوظة
+                        <Trash2 size={14} /> حذف الكاش
                     </button>
+
+                    {onOpenDatabaseFix && (
+                        <button 
+                            onClick={onOpenDatabaseFix}
+                            className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-900/30 mt-2"
+                        >
+                            <Wrench size={14} /> إصلاح مشاكل قاعدة البيانات (SQL)
+                        </button>
+                    )}
                 </div>
             </div>
           </section>

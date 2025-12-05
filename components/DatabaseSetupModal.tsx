@@ -1,8 +1,12 @@
 
 import React, { useState } from 'react';
-import { Database, Copy, ExternalLink, Check, ShieldAlert } from 'lucide-react';
+import { Database, Copy, ExternalLink, Check, ShieldAlert, X } from 'lucide-react';
 
-export const DatabaseSetupModal: React.FC = () => {
+interface DatabaseSetupModalProps {
+    onClose?: () => void;
+}
+
+export const DatabaseSetupModal: React.FC<DatabaseSetupModalProps> = ({ onClose }) => {
   const [copied, setCopied] = useState(false);
 
   const setupSQL = `
@@ -161,20 +165,27 @@ NOTIFY pgrst, 'reload schema';
   };
 
   return (
-    <div className="fixed inset-0 z-[1500] bg-slate-950 flex flex-col items-center justify-center p-4" dir="rtl">
+    <div className="fixed inset-0 z-[4000] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in zoom-in-95">
         
-        <div className="p-6 border-b border-slate-800 flex items-start gap-4">
-          <div className="bg-red-900/20 p-3 rounded-xl border border-red-900/50">
-            <ShieldAlert className="text-red-500 w-8 h-8" />
+        <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="bg-red-900/20 p-3 rounded-xl border border-red-900/50">
+                <ShieldAlert className="text-red-500 w-8 h-8" />
+            </div>
+            <div>
+                <h1 className="text-xl font-bold text-white mb-1">إصلاح أذونات قاعدة البيانات (RLS)</h1>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                هذا الإجراء يحل مشاكل اختفاء البيانات أو خطأ 42501. <br/>
+                الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase.
+                </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-white mb-1">إصلاح أذونات قاعدة البيانات (Error 42501)</h1>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              حدث خطأ في صلاحيات الكتابة (RLS Policy). <br/>
-              الرجاء نسخ الكود أدناه وتشغيله في محرر SQL في Supabase لإصلاح الصلاحيات.
-            </p>
-          </div>
+          {onClose && (
+              <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white">
+                  <X size={24} />
+              </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-hidden relative group">

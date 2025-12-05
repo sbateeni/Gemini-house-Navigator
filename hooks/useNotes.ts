@@ -28,11 +28,14 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
         
         if (error.code === 'TABLE_MISSING') {
             setTableMissing(true);
-        } else if (error.message === 'Offline' || error.message?.includes('fetch')) {
-            // Only set offline if it's genuinely a network/fetch issue
+        } else if (error.message === 'Offline') {
+            // Explicit offline from DB service
+            setIsConnected(false);
+        } else if (error.message?.includes('fetch') || error.name === 'TypeError') {
+            // Network fetch error
             setIsConnected(false);
         }
-        // Don't set offline for RLS errors, just log them.
+        // Ignore other errors (like RLS) for "isConnected" status
       } finally {
         setLoadingNotes(false);
       }
@@ -69,7 +72,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
       )
       .subscribe((status) => {
           if (status === 'SUBSCRIBED') setIsConnected(true);
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setIsConnected(false);
+          // Don't mark offline immediately on CHANNEL_ERROR, just retry silently
       });
 
     return () => {

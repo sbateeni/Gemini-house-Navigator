@@ -34,6 +34,7 @@ interface ModalContainerProps {
   userRole: UserRole | null;
   mapProvider: string;
   setMapProvider: (val: string) => void;
+  onOpenDatabaseFix?: () => void;
 
   // Tactical Command Props
   commandUser: MapUser | null;
@@ -87,6 +88,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   userRole,
   mapProvider,
   setMapProvider,
+  onOpenDatabaseFix,
   commandUser,
   closeCommandUser,
   onIntercept,
@@ -135,6 +137,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         mapProvider={mapProvider}
         setMapProvider={setMapProvider}
         onLogout={onLogout}
+        onOpenDatabaseFix={onOpenDatabaseFix}
       />
 
       <UserCommandModal 
