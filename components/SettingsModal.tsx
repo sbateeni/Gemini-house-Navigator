@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, User, Map, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Database, AlertTriangle, Mountain, Satellite, Eye, LogOut, Wrench } from 'lucide-react';
+import { X, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Wrench, LogOut, Mountain, Satellite, EyeOff, Map } from 'lucide-react';
 import { offlineMaps } from '../services/offlineMaps';
 import { UserRole } from '../types';
 
@@ -29,6 +29,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+  const isSource = userRole === 'source';
 
   if (!isOpen) return null;
 
@@ -79,7 +80,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       { id: 'carto', name: 'Tactical Dark', desc: 'نمط ليلي تكتيكي (منخفض التوهج)', icon: Layers, iconColor: 'text-slate-400' },
   ];
 
-  // Safely extract string values to prevent object rendering errors
+  // Safely extract string values
   let username = user?.user_metadata?.username;
   if (typeof username !== 'string') {
       username = user?.email?.split('@')[0] || 'مستخدم';
@@ -111,7 +112,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="text-white font-bold text-lg">{username}</div>
                   <div className="text-slate-400 text-sm flex items-center gap-1.5">
                     <Shield size={12} className={isAdmin ? 'text-purple-400' : 'text-slate-500'} />
-                    <span className="capitalize">{isAdmin ? 'مدير النظام' : 'عنصر'}</span>
+                    <span className="capitalize">{isAdmin ? 'مدير النظام' : isSource ? 'مصدر مؤقت' : 'عنصر'}</span>
                   </div>
                 </div>
               </div>
@@ -127,89 +128,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={onLogout}
                   className="w-full flex items-center justify-center gap-2 mt-3 bg-red-900/10 hover:bg-red-900/20 text-red-400 border border-red-900/30 py-2.5 rounded-lg text-sm font-bold transition-all"
               >
-                  <LogOut size={16} /> تسجيل الخروج
+                  <LogOut size={16} /> {isSource ? 'إنهاء المهمة' : 'تسجيل الخروج'}
               </button>
             </div>
           </section>
 
-          {/* Map Provider Section */}
-          <section>
-            <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
-            <div className="space-y-2 grid grid-cols-1 gap-2">
-                {providers.map(p => (
-                    <button
-                        key={p.id}
-                        onClick={() => setMapProvider(p.id)}
-                        className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
-                    >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 ${p.iconColor}`}`}>
-                            <p.icon size={20} />
-                        </div>
-                        <div className="text-right flex-1 min-w-0">
-                            <div className={`font-bold truncate ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
-                            <div className="text-[10px] text-slate-400 truncate">{p.desc}</div>
-                        </div>
-                        {mapProvider === p.id && <CheckCircle2 className="text-blue-500 shrink-0" size={20} />}
-                    </button>
-                ))}
-            </div>
-          </section>
+          {isSource ? (
+              // RESTRICTED VIEW FOR SOURCE
+              <section className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-8 text-center space-y-4">
+                  <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-2">
+                      <EyeOff className="text-slate-500 w-8 h-8" />
+                  </div>
+                  <div>
+                      <h3 className="text-white font-bold text-lg">بيانات مقيدة</h3>
+                      <p className="text-slate-400 text-sm mt-2">
+                          تم إخفاء بيانات الوحدات الأخرى والخرائط التفصيلية لأسباب أمنية.
+                      </p>
+                  </div>
+              </section>
+          ) : (
+              // NORMAL VIEW FOR USERS/ADMINS
+              <>
+                {/* Map Provider Section */}
+                <section>
+                    <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-4">مصدر الخرائط</h3>
+                    <div className="space-y-2 grid grid-cols-1 gap-2">
+                        {providers.map(p => (
+                            <button
+                                key={p.id}
+                                onClick={() => setMapProvider(p.id)}
+                                className={`w-full p-3 rounded-xl border flex items-center gap-4 transition-all ${mapProvider === p.id ? 'bg-blue-900/20 border-blue-500/50 shadow-lg relative z-10' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'}`}
+                            >
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${mapProvider === p.id ? 'bg-blue-600 text-white' : `bg-slate-700 ${p.iconColor}`}`}>
+                                    <p.icon size={20} />
+                                </div>
+                                <div className="text-right flex-1 min-w-0">
+                                    <div className={`font-bold truncate ${mapProvider === p.id ? 'text-blue-400' : 'text-white'}`}>{p.name}</div>
+                                    <div className="text-[10px] text-slate-400 truncate">{p.desc}</div>
+                                </div>
+                                {mapProvider === p.id && <CheckCircle2 className="text-blue-500 shrink-0" size={20} />}
+                            </button>
+                        ))}
+                    </div>
+                </section>
 
-          {/* Offline Maps Section */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">البيانات</h3>
-                <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">متصل</span>
-            </div>
-            
-            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
-                <div className="border-b border-slate-700/50 pb-4 mb-2">
-                    <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                        <Download size={16} className="text-blue-400" />
-                        تحميل المنطقة
-                    </h4>
-                    {isDownloading ? (
-                        <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
-                            <div className="flex justify-between text-xs text-white mb-1">
-                                <span>جاري التحميل...</span>
-                                <span>{downloadProgress ? Math.round((downloadProgress.current / downloadProgress.total) * 100) : 0}%</span>
-                            </div>
-                            <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                <div 
-                                    className="bg-blue-500 h-full transition-all duration-300"
-                                    style={{ width: `${downloadProgress ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` }}
-                                ></div>
-                            </div>
+                {/* Offline Maps Section */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs uppercase text-slate-500 font-bold tracking-wider">البيانات</h3>
+                        <span className="text-[10px] bg-green-900/30 text-green-400 border border-green-900/50 px-2 py-0.5 rounded">متصل</span>
+                    </div>
+                    
+                    <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50 space-y-4">
+                        <div className="border-b border-slate-700/50 pb-4 mb-2">
+                            <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                                <Download size={16} className="text-blue-400" />
+                                تحميل المنطقة
+                            </h4>
+                            {isDownloading ? (
+                                <div className="bg-slate-900 rounded-lg p-3 border border-slate-700">
+                                    <div className="flex justify-between text-xs text-white mb-1">
+                                        <span>جاري التحميل...</span>
+                                        <span>{downloadProgress ? Math.round((downloadProgress.current / downloadProgress.total) * 100) : 0}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                                        <div 
+                                            className="bg-blue-500 h-full transition-all duration-300"
+                                            style={{ width: `${downloadProgress ? (downloadProgress.current / downloadProgress.total) * 100 : 0}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={handleDownloadMap}
+                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Download size={16} /> تحميل
+                                </button>
+                            )}
                         </div>
-                    ) : (
-                        <button 
-                            onClick={handleDownloadMap}
-                            className="w-full bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Download size={16} /> تحميل
-                        </button>
-                    )}
-                </div>
 
-                <div className="flex flex-col gap-2">
-                     <button 
-                        onClick={handleClearCache}
-                        className="w-full text-slate-400 hover:text-white hover:bg-slate-700 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-slate-700/50"
-                    >
-                        <Trash2 size={14} /> حذف الكاش
-                    </button>
+                        <div className="flex flex-col gap-2">
+                            <button 
+                                onClick={handleClearCache}
+                                className="w-full text-slate-400 hover:text-white hover:bg-slate-700 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 border border-slate-700/50"
+                            >
+                                <Trash2 size={14} /> حذف الكاش
+                            </button>
 
-                    {onOpenDatabaseFix && (
-                        <button 
-                            onClick={onOpenDatabaseFix}
-                            className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-900/30 mt-2"
-                        >
-                            <Wrench size={14} /> إصلاح مشاكل قاعدة البيانات (SQL)
-                        </button>
-                    )}
-                </div>
-            </div>
-          </section>
+                            {onOpenDatabaseFix && (
+                                <button 
+                                    onClick={onOpenDatabaseFix}
+                                    className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-red-900/30 mt-2"
+                                >
+                                    <Wrench size={14} /> إصلاح مشاكل قاعدة البيانات (SQL)
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </section>
+              </>
+          )}
         </div>
       </div>
     </div>

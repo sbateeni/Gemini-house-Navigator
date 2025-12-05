@@ -158,12 +158,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleRevokeCode = async (codeStr: string) => {
-      if (confirm("هل أنت متأكد من حذف هذا الكود نهائياً؟")) {
+      // Confirmed hard delete from both DB and UI
+      if (confirm("هل أنت متأكد من حذف هذا الكود نهائياً من السجلات؟")) {
           try {
-              await db.revokeAccessCode(codeStr);
+              // Optimistically update UI
               setAccessCodes(prev => prev.filter(c => c.code !== codeStr));
+              await db.revokeAccessCode(codeStr);
           } catch (e) {
-              alert("فشل الحذف");
+              alert("فشل الحذف. يرجى المحاولة مرة أخرى.");
+              fetchData(); // Revert if failed
           }
       }
   };
@@ -328,7 +331,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                        </div>
                                        
                                        <div className="flex items-center gap-2">
-                                            {/* Always show Renew if Expired, or Delete if Active */}
+                                            {/* Renew button if expired */}
                                             {isExpired && (
                                                 <button 
                                                     onClick={() => handleRenewCode(ac.code)}
@@ -339,10 +342,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                                 </button>
                                             )}
 
+                                            {/* Delete Button - Always available to clear inactive items */}
                                             <button 
                                                 onClick={() => handleRevokeCode(ac.code)}
                                                 className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded-lg border border-red-900/50 transition-colors"
-                                                title="حذف نهائي"
+                                                title="حذف نهائي من السجلات"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
