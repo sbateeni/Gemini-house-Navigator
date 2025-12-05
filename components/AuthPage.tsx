@@ -2,8 +2,165 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, Send, CheckSquare, Square, KeyRound, LogOut } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, KeyRound, LogOut, CheckSquare, Square } from 'lucide-react';
 import { SourceSession } from '../types';
+
+// --- NATIVE STYLES (NO TAILWIND DEPENDENCY FOR LAYOUT) ---
+const styles: { [key: string]: React.CSSProperties } = {
+  container: {
+    backgroundColor: '#0f172a', // Deep Dark Blue
+    minHeight: '100vh',
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    direction: 'rtl',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  backgroundGlow: {
+    position: 'absolute',
+    width: '600px',
+    height: '600px',
+    background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(15,23,42,0) 70%)',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    pointerEvents: 'none',
+    zIndex: 0
+  },
+  card: {
+    backgroundColor: '#1e293b', // Slate 900
+    borderRadius: '24px',
+    padding: '40px',
+    width: '100%',
+    maxWidth: '420px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+    position: 'relative',
+    zIndex: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '10px'
+  },
+  logoBox: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '20px',
+    margin: '0 auto 20px auto',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+    transition: 'background-color 0.3s ease'
+  },
+  title: {
+    fontSize: '28px',
+    fontWeight: '800',
+    color: '#ffffff',
+    margin: '0 0 5px 0'
+  },
+  subtitle: {
+    fontSize: '14px',
+    color: '#94a3b8',
+    margin: 0
+  },
+  tabsContainer: {
+    backgroundColor: '#0f172a',
+    padding: '5px',
+    borderRadius: '12px',
+    display: 'flex',
+    gap: '5px',
+    border: '1px solid #334155'
+  },
+  tab: {
+    flex: 1,
+    padding: '12px',
+    borderRadius: '8px',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  },
+  inputGroup: {
+    position: 'relative',
+    marginBottom: '15px'
+  },
+  input: {
+    width: '100%',
+    backgroundColor: '#0f172a',
+    border: '1px solid #334155',
+    borderRadius: '12px',
+    padding: '16px 50px 16px 16px', // Right padding for icon
+    fontSize: '16px',
+    color: 'white',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s'
+  },
+  icon: {
+    position: 'absolute',
+    top: '50%',
+    right: '16px',
+    transform: 'translateY(-50%)',
+    color: '#64748b',
+    pointerEvents: 'none'
+  },
+  button: {
+    width: '100%',
+    padding: '16px',
+    borderRadius: '12px',
+    border: 'none',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: 'white',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    marginTop: '10px',
+    transition: 'transform 0.1s ease'
+  },
+  linkBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#38bdf8', // Sky 400
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 5px'
+  },
+  messageBox: {
+    padding: '15px',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+    lineHeight: '1.5'
+  },
+  logoutBtn: {
+    position: 'absolute',
+    top: '20px',
+    left: '20px',
+    background: 'none',
+    border: 'none',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '5px'
+  }
+};
 
 interface AuthPageProps {
   onSourceLogin?: (session: SourceSession) => void;
@@ -15,12 +172,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   const [showResend, setShowResend] = useState(false); 
   const [rememberMe, setRememberMe] = useState(false);
-
+  
+  // Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [accessCode, setAccessCode] = useState('');
 
+  // Styles helpers based on state
+  const isSource = authMode === 'source';
+  
   useEffect(() => {
     const savedEmail = localStorage.getItem('gemini_saved_email');
     if (savedEmail) {
@@ -36,14 +197,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
     setShowResend(false);
 
     try {
-      if (authMode === 'source') {
-         const res = await db.verifyAccessCode(accessCode.replace(/\s/g, ''));
+      if (isSource) {
+         const cleanCode = accessCode.replace(/\s/g, '');
+         if (cleanCode.length < 5) throw new Error('يرجى إدخال الكود بشكل صحيح');
+         
+         const res = await db.verifyAccessCode(cleanCode);
          if (res.valid && res.expiresAt) {
-             const session: SourceSession = {
-                 code: accessCode.replace(/\s/g, ''),
-                 expiresAt: res.expiresAt
-             };
-             if (onSourceLogin) onSourceLogin(session);
+             if (onSourceLogin) onSourceLogin({ code: cleanCode, expiresAt: res.expiresAt });
          } else {
              throw new Error(res.error || 'كود غير صالح');
          }
@@ -55,53 +215,31 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
       if (authMode === 'reset') {
         const { error } = await auth.resetPassword(email);
         if (error) throw error;
-        setMessage({ type: 'success', text: 'تم إرسال رابط استعادة كلمة المرور إلى بريدك!' });
+        setMessage({ type: 'success', text: 'تم إرسال الرابط بنجاح.' });
       } else if (authMode === 'login') {
-        if (rememberMe) {
-            localStorage.setItem('gemini_saved_email', email);
-        } else {
-            localStorage.removeItem('gemini_saved_email');
-        }
+        if (rememberMe) localStorage.setItem('gemini_saved_email', email);
+        else localStorage.removeItem('gemini_saved_email');
 
         const { error } = await auth.signIn(email, password);
         if (error) {
-          if (error.message.includes("Email not confirmed")) {
-            setShowResend(true);
-          }
+          if (error.message.includes("Email not confirmed")) setShowResend(true);
           throw error;
         }
       } else {
         const { data, error } = await auth.signUp(email, password, username);
         if (error) throw error;
-        if (data.user && data.user.identities && data.user.identities.length === 0) {
-            setMessage({ type: 'error', text: 'هذا البريد مسجل بالفعل.' });
-        } else {
-            setMessage({ type: 'success', text: 'تم التسجيل بنجاح! الرجاء التحقق من بريدك الإلكتروني.' });
-        }
+        if (data.user?.identities?.length === 0) setMessage({ type: 'error', text: 'البريد مسجل مسبقاً.' });
+        else setMessage({ type: 'success', text: 'تم التسجيل! تفقد بريدك.' });
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'حدث خطأ ما' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendConfirmation = async () => {
-    setLoading(true);
-    try {
-      const { error } = await auth.resendConfirmation(email);
-      if (error) throw error;
-      setMessage({ type: 'success', text: 'تم إرسال الرابط! تفقد بريدك الوارد (أو الرسائل المزعجة).' });
-      setShowResend(false);
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'فشل إرسال البريد.' });
+      setMessage({ type: 'error', text: err.message || 'حدث خطأ' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleForceLogout = async () => {
-      if(confirm("هل أنت متأكد من تسجيل الخروج ومسح جميع البيانات المحلية؟")) {
+      if(confirm("إعادة ضبط التطبيق ومسح البيانات؟")) {
           localStorage.clear();
           await auth.signOut();
           window.location.reload();
@@ -109,214 +247,179 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      {/* Background Decor */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[100px] ${authMode === 'source' ? 'bg-green-600/20' : 'bg-blue-600/20'}`}></div>
-        <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[100px] ${authMode === 'source' ? 'bg-emerald-600/20' : 'bg-indigo-600/20'}`}></div>
-      </div>
-
-      <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl w-full max-w-md shadow-2xl relative z-10">
-        
-        {/* Force Logout Button (Top Left inside card) */}
-        <button 
-            onClick={handleForceLogout}
-            className="absolute top-4 left-4 p-2 text-slate-500 hover:text-red-400 transition-colors rounded-full hover:bg-slate-800"
-            title="تسجيل خروج إجباري / مسح البيانات"
-        >
-            <LogOut size={18} />
+    <div style={styles.container}>
+      <div style={styles.backgroundGlow}></div>
+      
+      <div style={styles.card}>
+        {/* Utility Button */}
+        <button onClick={handleForceLogout} style={styles.logoutBtn} title="إعادة ضبط">
+           <LogOut size={18} />
         </button>
 
-        <div className="text-center mb-8 mt-2">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg transition-colors duration-500
-              ${authMode === 'source' ? 'bg-gradient-to-br from-emerald-600 to-green-600 shadow-green-500/20' : 'bg-gradient-to-br from-blue-600 to-indigo-600 shadow-blue-500/20'}
-          `}>
-            {authMode === 'source' ? <KeyRound className="text-white w-8 h-8" /> : <ShieldCheck className="text-white w-8 h-8" />}
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {authMode === 'reset' ? 'استعادة كلمة المرور' : 
-             authMode === 'signup' ? 'إنشاء حساب جديد' : 
-             authMode === 'source' ? 'الدخول الآمن للمصدر' : 'تسجيل الدخول'}
-          </h1>
-          <p className="text-slate-400 text-sm">
-            {authMode === 'source' ? 'أدخل رمز الوصول الخاص بالمهمة (صلاحية 30 دقيقة)' : 
-             authMode === 'reset' ? 'أدخل بريدك لاستلام رابط الاستعادة' : 
-             'نظام العمليات الجغرافية الآمن'}
-          </p>
-        </div>
-
-        {/* Auth Mode Tabs - Flexbox for smoother look */}
-        <div className="flex gap-2 mb-6 bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full">
-           <button 
-             onClick={() => { setAuthMode('login'); setMessage(null); }}
-             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all text-center whitespace-nowrap ${authMode !== 'source' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
-           >
-             طاقم العمليات
-           </button>
-           <button 
-             onClick={() => { setAuthMode('source'); setMessage(null); }}
-             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all text-center whitespace-nowrap ${authMode === 'source' ? 'bg-green-900/40 text-green-400 shadow border border-green-900/50' : 'text-slate-500 hover:text-slate-300'}`}
-           >
-             مصدر (مؤقت)
-           </button>
-        </div>
-
-        {message && (
-          <div className={`mb-6 p-4 rounded-xl flex flex-col items-start gap-2 text-sm ${message.type === 'error' ? 'bg-red-900/20 text-red-400 border border-red-900/50' : 'bg-green-900/20 text-green-400 border border-green-900/50'}`}>
-            <div className="flex items-start gap-3">
-               <AlertCircle size={18} className="shrink-0 mt-0.5" />
-               <p>{message.text}</p>
+        {/* Header */}
+        <div style={styles.header}>
+            <div style={{
+                ...styles.logoBox, 
+                background: isSource ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)'
+            }}>
+                {isSource ? <KeyRound size={40} color="white" /> : <ShieldCheck size={40} color="white" />}
             </div>
-            
-            {showResend && message.type === 'error' && (
-              <button 
-                type="button"
-                onClick={handleResendConfirmation}
-                className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-white px-3 py-2 rounded-lg border border-red-700/50 flex items-center gap-2 transition-colors w-full justify-center font-bold"
-              >
-                <Send size={12} className="rotate-180" /> إعادة إرسال التفعيل
-              </button>
-            )}
-          </div>
+            <h1 style={styles.title}>{isSource ? 'دخول المصادر' : 'تسجيل الدخول'}</h1>
+            <p style={styles.subtitle}>نظام العمليات الجغرافية الآمن</p>
+        </div>
+
+        {/* Custom Tabs */}
+        <div style={styles.tabsContainer}>
+            <button 
+                onClick={() => { setAuthMode('login'); setMessage(null); }}
+                style={{
+                    ...styles.tab,
+                    backgroundColor: !isSource ? '#1e293b' : 'transparent',
+                    color: !isSource ? 'white' : '#64748b',
+                    boxShadow: !isSource ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
+                }}
+            >
+                طاقم العمليات
+            </button>
+            <button 
+                onClick={() => { setAuthMode('source'); setMessage(null); }}
+                style={{
+                    ...styles.tab,
+                    backgroundColor: isSource ? '#064e3b' : 'transparent',
+                    color: isSource ? '#34d399' : '#64748b',
+                    boxShadow: isSource ? '0 2px 4px rgba(0,0,0,0.2)' : 'none'
+                }}
+            >
+                مصدر (مؤقت)
+            </button>
+        </div>
+
+        {/* Messages */}
+        {message && (
+            <div style={{
+                ...styles.messageBox,
+                backgroundColor: message.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                color: message.type === 'error' ? '#f87171' : '#4ade80',
+                border: `1px solid ${message.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)'}`
+            }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <div>
+                    {message.text}
+                    {showResend && message.type === 'error' && (
+                        <div style={{marginTop: '5px'}}>
+                           <button onClick={() => auth.resendConfirmation(email)} style={{...styles.linkBtn, color: '#f87171', textDecoration: 'underline'}}>إعادة الإرسال</button>
+                        </div>
+                    )}
+                </div>
+            </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {authMode === 'source' ? (
-             <div className="space-y-4 animate-in fade-in slide-in-from-right-10">
-                <div className="relative group">
-                    <KeyRound className="absolute right-4 top-3.5 text-green-500/70" size={20} />
-                    <input
-                        type="text"
-                        name="accessCode"
-                        placeholder="أدخل رمز الوصول (16 خانة)"
+        {/* Form */}
+        <form onSubmit={handleSubmit}>
+            {isSource ? (
+                <div style={styles.inputGroup}>
+                    <div style={styles.icon}><KeyRound size={20} /></div>
+                    <input 
+                        type="text" 
+                        placeholder="0000 0000 0000 0000"
                         value={accessCode}
                         onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             if (val.length <= 16) setAccessCode(val);
                         }}
-                        className="w-full bg-slate-950 border border-green-900/50 rounded-xl py-3 pr-12 pl-4 text-white placeholder-slate-600 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-all font-mono text-center tracking-widest text-lg shadow-inner"
+                        style={{...styles.input, textAlign: 'center', letterSpacing: '2px', fontFamily: 'monospace', fontSize: '18px'}}
                         maxLength={16}
                     />
+                    <p style={{fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '8px'}}>* أدخل الكود السري المكون من 16 خانة</p>
                 </div>
-                <p className="text-[10px] text-center text-slate-500">
-                    * هذا الرمز صالح لمرة واحدة ولمدة 30 دقيقة فقط من وقت إنشائه.
-                </p>
-             </div>
-          ) : (
-            <>
-                {authMode === 'signup' && (
-                    <div className="relative group animate-in fade-in slide-in-from-left-10">
-                    <User className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
-                    <input
-                        type="text"
-                        name="username"
-                        autoComplete="username"
-                        placeholder="اسم المستخدم"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required={authMode === 'signup'}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
+            ) : (
+                <>
+                    {authMode === 'signup' && (
+                         <div style={styles.inputGroup}>
+                            <div style={styles.icon}><User size={20} /></div>
+                            <input 
+                                type="text" 
+                                placeholder="اسم المستخدم"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                style={styles.input}
+                                required
+                            />
+                        </div>
+                    )}
+
+                    <div style={styles.inputGroup}>
+                        <div style={styles.icon}><Mail size={20} /></div>
+                        <input 
+                            type="email" 
+                            placeholder="البريد الإلكتروني"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            style={styles.input}
+                            required
+                        />
                     </div>
-                )}
 
-                <div className="relative group animate-in fade-in">
-                    <Mail className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
-                    <input
-                    type="email"
-                    name="email"
-                    autoComplete="email"
-                    placeholder="البريد الإلكتروني"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
-                </div>
+                    {authMode !== 'reset' && (
+                        <div style={styles.inputGroup}>
+                            <div style={styles.icon}><Lock size={20} /></div>
+                            <input 
+                                type="password" 
+                                placeholder="كلمة المرور"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                style={styles.input}
+                                required
+                            />
+                        </div>
+                    )}
 
-                {authMode !== 'reset' && (
-                    <div className="relative group animate-in fade-in">
-                    <Lock className="absolute right-4 top-3.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={20} />
-                    <input
-                        type="password"
-                        name="password"
-                        autoComplete={authMode === 'login' ? "current-password" : "new-password"}
-                        placeholder="كلمة المرور"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 pr-12 pl-4 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                    />
-                    </div>
-                )}
-
-                {authMode === 'login' && (
-                    <div className="flex items-center gap-2 mt-2">
-                        <button 
-                            type="button"
-                            onClick={() => setRememberMe(!rememberMe)}
-                            className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-sm"
-                        >
-                            {rememberMe ? (
-                                <CheckSquare size={18} className="text-blue-500" />
-                            ) : (
-                                <Square size={18} />
-                            )}
-                            <span>تذكرني</span>
-                        </button>
-                    </div>
-                )}
-            </>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || (authMode === 'source' && accessCode.length < 16)}
-            className={`w-full font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 mt-4 disabled:opacity-50 disabled:cursor-not-allowed
-               ${authMode === 'source' 
-                 ? 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20' 
-                 : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'}
-            `}
-          >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : (
-                authMode === 'source' ? 'بدء المهمة (30 دقيقة)' : 
-                authMode === 'reset' ? 'إرسال الرابط' : 
-                authMode === 'login' ? 'دخول' : 'تسجيل'
+                    {authMode === 'login' && (
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '13px', color: '#94a3b8'}}>
+                             <button type="button" onClick={() => setRememberMe(!rememberMe)} style={{background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'}}>
+                                {rememberMe ? <CheckSquare size={16} color="#3b82f6" /> : <Square size={16} />}
+                                تذكرني
+                             </button>
+                             <button type="button" onClick={() => { setAuthMode('reset'); setMessage(null); }} style={{...styles.linkBtn, fontSize: '13px'}}>نسيت كلمة المرور؟</button>
+                        </div>
+                    )}
+                </>
             )}
-          </button>
+
+            <button 
+                type="submit" 
+                disabled={loading}
+                style={{
+                    ...styles.button,
+                    backgroundColor: isSource ? '#10b981' : '#3b82f6',
+                    boxShadow: isSource ? '0 4px 14px 0 rgba(16,185,129,0.39)' : '0 4px 14px 0 rgba(59,130,246,0.39)',
+                    opacity: loading ? 0.7 : 1,
+                    cursor: loading ? 'wait' : 'pointer'
+                }}
+            >
+                {loading && <Loader2 className="animate-spin" size={20} />}
+                {isSource ? 'بدء المهمة' : authMode === 'login' ? 'دخول' : authMode === 'signup' ? 'إنشاء حساب' : 'إرسال'}
+            </button>
         </form>
 
-        {authMode !== 'source' && (
-            <div className="mt-6 text-center text-sm text-slate-400 space-y-2">
-            {authMode !== 'reset' ? (
-                <>
-                <p>
-                    {authMode === 'login' ? "ليس لديك حساب؟" : "لديك حساب بالفعل؟"}{' '}
-                    <button
-                    onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setMessage(null); setShowResend(false); }}
-                    className="text-blue-400 hover:text-blue-300 font-semibold"
-                    >
-                    {authMode === 'login' ? 'إنشاء حساب' : 'تسجيل الدخول'}
-                    </button>
-                </p>
-                <button
-                    onClick={() => { setAuthMode('reset'); setMessage(null); setShowResend(false); }}
-                    className="text-slate-500 hover:text-slate-300 text-xs"
+        {/* Footer */}
+        {!isSource && authMode !== 'reset' && (
+            <div style={{textAlign: 'center', marginTop: '10px', fontSize: '13px', color: '#64748b'}}>
+                {authMode === 'login' ? 'ليس لديك حساب؟' : 'لديك حساب؟'}
+                <button 
+                    onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setMessage(null); }} 
+                    style={styles.linkBtn}
                 >
-                    نسيت كلمة المرور؟
+                    {authMode === 'login' ? 'سجل الآن' : 'تسجيل الدخول'}
                 </button>
-                </>
-            ) : (
-                <button
-                onClick={() => { setAuthMode('login'); setMessage(null); setShowResend(false); }}
-                className="text-blue-400 hover:text-blue-300 font-semibold"
-                >
-                العودة للدخول
-                </button>
-            )}
             </div>
         )}
+        {authMode === 'reset' && (
+             <div style={{textAlign: 'center', marginTop: '10px'}}>
+                <button onClick={() => setAuthMode('login')} style={{...styles.linkBtn, color: '#94a3b8'}}>العودة للدخول</button>
+             </div>
+        )}
+
       </div>
     </div>
   );
