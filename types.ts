@@ -119,9 +119,11 @@ export interface SourceSession {
 }
 
 export interface ActiveCampaign {
+  id?: string; // Database ID
   name: string;
   participantIds: Set<string>;
   targetIds: Set<string>;
   commanderIds: Set<string>;
   startTime: number;
+  createdBy?: string;
 }

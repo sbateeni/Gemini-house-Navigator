@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry, AccessCode } from '../types';
+import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry, AccessCode, ActiveCampaign } from '../types';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -567,5 +567,62 @@ export const db = {
     if (!navigator.onLine) throw new Error("Cannot clear logs while offline.");
     const { error } = await supabase.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw error;
+  },
+
+  // --- CAMPAIGN MANAGEMENT ---
+  async createCampaign(campaign: Omit<ActiveCampaign, 'id'>): Promise<void> {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('campaigns').insert({
+          name: campaign.name,
+          participants: Array.from(campaign.participantIds), // Convert Set to Array for DB
+          targets: Array.from(campaign.targetIds),
+          commanders: Array.from(campaign.commanderIds),
+          start_time: campaign.startTime,
+          is_active: true,
+          created_by: user?.id
+      });
+      if (error) throw error;
+  },
+
+  async updateCampaign(id: string, updates: Partial<ActiveCampaign>): Promise<void> {
+      const dbUpdates: any = {};
+      if (updates.name) dbUpdates.name = updates.name;
+      if (updates.participantIds) dbUpdates.participants = Array.from(updates.participantIds);
+      if (updates.targetIds) dbUpdates.targets = Array.from(updates.targetIds);
+      if (updates.commanderIds) dbUpdates.commanders = Array.from(updates.commanderIds);
+      
+      const { error } = await supabase.from('campaigns').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+  },
+
+  async endCampaign(id: string): Promise<void> {
+      const { error } = await supabase.from('campaigns').update({ is_active: false }).eq('id', id);
+      if (error) throw error;
+  },
+
+  async getActiveCampaign(): Promise<ActiveCampaign | null> {
+      try {
+          const { data, error } = await supabase
+            .from('campaigns')
+            .select('*')
+            .eq('is_active', true)
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (error) return null;
+
+          return {
+              id: data.id,
+              name: data.name,
+              participantIds: new Set(data.participants || []),
+              targetIds: new Set(data.targets || []),
+              commanderIds: new Set(data.commanders || []),
+              startTime: data.start_time,
+              createdBy: data.created_by
+          };
+      } catch (e) {
+          return null;
+      }
   }
 };

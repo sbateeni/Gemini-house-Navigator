@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession, UserPermissions, UserProfile } from './types';
 import { db } from './services/db';
-import { Timer, LogOut, X, ShieldAlert, KeyRound, Gamepad2, Edit3 } from 'lucide-react';
+import { Timer, LogOut, X, ShieldAlert, KeyRound, Gamepad2, Edit3, LogIn, ArrowRight } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -40,7 +40,8 @@ export default function App() {
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
     targetUserFilter, setTargetUserFilter,
-    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign
+    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign, 
+    isInCampaignMode, handleJoinCampaign, handleLeaveCampaignView
   } = useAppLogic(!!sourceSession);
 
   // --- 3. SOURCE MODE LOGIC ---
@@ -70,23 +71,21 @@ export default function App() {
   const activeUserProfile = sourceSession ? sourceProfile : userProfile;
   const activePermissions = sourceSession ? sourcePermissions : permissions;
   const activeUserRole = sourceSession ? 'source' : userRole;
+  const canManageCampaign = ['super_admin', 'governorate_admin', 'center_admin', 'officer', 'judicial'].includes(activeUserRole || '');
   
   // --- FILTERING LOGIC ---
   // 1. Filter Notes based on Campaign OR User Filter
   let displayedNotes = notes;
+  let displayedUsers = onlineUsers;
   
-  if (activeCampaign) {
+  // Only apply campaign filters if the user has JOINED the campaign view
+  if (activeCampaign && isInCampaignMode) {
       // In campaign mode, ONLY show target IDs (auto-updated when caught)
       displayedNotes = notes.filter(n => activeCampaign.targetIds.has(n.id));
-  } else if (targetUserFilter) {
-      displayedNotes = notes.filter(n => n.createdBy === targetUserFilter.id);
-  }
-
-  // 2. Filter Users based on Campaign
-  let displayedUsers = onlineUsers;
-  if (activeCampaign) {
       // In campaign mode, ONLY show participating user IDs
       displayedUsers = onlineUsers.filter(u => activeCampaign.participantIds.has(u.id));
+  } else if (targetUserFilter) {
+      displayedNotes = notes.filter(n => n.createdBy === targetUserFilter.id);
   }
 
   const handleSourceLogin = async (session: SourceSession) => {
@@ -185,32 +184,60 @@ export default function App() {
 
       {/* ACTIVE CAMPAIGN BANNER (TOP) */}
       {activeCampaign && (
-          <div className="fixed top-0 left-0 right-0 z-[2000] bg-red-900/90 backdrop-blur-md border-b-2 border-red-500 shadow-2xl flex items-center justify-between px-4 py-2 animate-in slide-in-from-top-full">
+          <div className={`fixed top-0 left-0 right-0 z-[2000] backdrop-blur-md border-b-2 shadow-2xl flex items-center justify-between px-4 py-2 animate-in slide-in-from-top-full 
+              ${isInCampaignMode ? 'bg-red-900/90 border-red-500' : 'bg-blue-900/90 border-blue-500'}`}>
+              
               <div className="flex items-center gap-3">
-                  <div className="bg-red-500 rounded-full p-2 animate-pulse">
+                  <div className={`rounded-full p-2 animate-pulse ${isInCampaignMode ? 'bg-red-500' : 'bg-blue-500'}`}>
                       <Gamepad2 className="text-white w-5 h-5" />
                   </div>
                   <div>
-                      <div className="text-white font-bold text-sm tracking-wider">عملية نشطة: {activeCampaign.name}</div>
-                      <div className="text-[10px] text-red-200 font-mono">
+                      <div className="text-white font-bold text-sm tracking-wider">
+                          {isInCampaignMode ? 'عملية نشطة:' : 'حملة جارية:'} {activeCampaign.name}
+                      </div>
+                      <div className={`text-[10px] font-mono ${isInCampaignMode ? 'text-red-200' : 'text-blue-200'}`}>
                           القوة: {activeCampaign.participantIds.size} | الأهداف: {activeCampaign.targetIds.size}
                       </div>
                   </div>
               </div>
               
               <div className="flex items-center gap-2">
-                  <button 
-                      onClick={() => setShowCampaigns(true)}
-                      className="bg-red-800/50 hover:bg-red-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-red-500/50"
-                  >
-                      <Edit3 size={14} /> تعديل
-                  </button>
-                  <button 
-                      onClick={handleEndCampaign}
-                      className="bg-white text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-lg"
-                  >
-                      إنهاء
-                  </button>
+                  {!isInCampaignMode ? (
+                      <button 
+                          onClick={handleJoinCampaign}
+                          className="bg-white text-blue-700 hover:bg-blue-50 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-lg flex items-center gap-1"
+                      >
+                          <LogIn size={14} /> انضمام
+                      </button>
+                  ) : (
+                      <>
+                          {canManageCampaign && (
+                              <button 
+                                  onClick={() => setShowCampaigns(true)}
+                                  className="bg-red-800/50 hover:bg-red-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-red-500/50"
+                              >
+                                  <Edit3 size={14} /> تعديل
+                              </button>
+                          )}
+                          
+                          <button 
+                              onClick={handleLeaveCampaignView}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-slate-600 flex items-center gap-1"
+                              title="الخروج من وضع الحملة (العودة للخريطة العامة)"
+                          >
+                              <ArrowRight size={14} /> خروج
+                          </button>
+
+                          {canManageCampaign && (
+                              <button 
+                                  onClick={handleEndCampaign}
+                                  className="bg-white text-red-700 hover:bg-red-50 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-lg"
+                              >
+                                  إنهاء
+                              </button>
+                          )}
+                      </>
+                  )}
               </div>
           </div>
       )}

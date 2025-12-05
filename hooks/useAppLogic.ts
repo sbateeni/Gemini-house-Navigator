@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, MapUser, UnitStatus, Assignment, ActiveCampaign, UserProfile } from '../types';
 import { db } from '../services/db';
+import { supabase } from '../services/supabase';
 import { searchPlace, identifyLocation } from '../services/gemini';
 
 // Hooks
@@ -80,8 +81,9 @@ export function useAppLogic(isSourceMode: boolean = false) {
   // ADMIN FILTER STATE
   const [targetUserFilter, setTargetUserFilter] = useState<{id: string, name: string} | null>(null);
 
-  // CAMPAIGN STATE
+  // --- CAMPAIGN STATE (REALTIME) ---
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null);
+  const [isInCampaignMode, setIsInCampaignMode] = useState(false); // Local flag: did the user click "Join"?
 
   // Find Distressed User
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
@@ -110,6 +112,38 @@ export function useAppLogic(isSourceMode: boolean = false) {
           db.getAllProfiles().then(setAllProfiles);
       }
   }, [hasAccess, isAnyAdmin, showCampaigns]); // Refresh when opening modal
+
+  // --- CAMPAIGN SYNC & REALTIME ---
+  const fetchActiveCampaign = async () => {
+      const campaign = await db.getActiveCampaign();
+      setActiveCampaign(campaign);
+      
+      // Auto-join if I am the creator
+      if (campaign && campaign.createdBy === session?.user?.id) {
+          setIsInCampaignMode(true);
+      } else if (!campaign) {
+          setIsInCampaignMode(false);
+      }
+  };
+
+  useEffect(() => {
+      if (!session) return;
+      fetchActiveCampaign();
+
+      const channel = supabase.channel('active_campaigns')
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'campaigns' },
+              () => {
+                  console.log("Campaign update detected");
+                  fetchActiveCampaign();
+              }
+          )
+          .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
+  }, [session]);
+
 
   // Log Status Changes
   useEffect(() => {
@@ -314,32 +348,69 @@ export function useAppLogic(isSourceMode: boolean = false) {
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
   };
 
-  // --- CAMPAIGN LOGIC ---
+  // --- CAMPAIGN ACTIONS (DB) ---
 
-  const handleStartCampaign = (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
-      setActiveCampaign({
-          name,
-          participantIds: participants,
-          targetIds: targets,
-          commanderIds: commanders,
-          startTime: Date.now()
-      });
-      handleStopNavigation();
+  const handleStartCampaign = async (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
+      try {
+          await db.createCampaign({
+              name,
+              participantIds: participants,
+              targetIds: targets,
+              commanderIds: commanders,
+              startTime: Date.now()
+          });
+          handleStopNavigation();
+      } catch (e) {
+          console.error(e);
+          alert("فشل بدء الحملة. تأكد من تحديث قاعدة البيانات.");
+      }
   };
 
-  const handleUpdateCampaign = (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
-      if (!activeCampaign) return;
-      setActiveCampaign({
-          ...activeCampaign,
-          name,
-          participantIds: participants,
-          targetIds: targets,
-          commanderIds: commanders
-      });
+  const handleUpdateCampaign = async (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
+      if (!activeCampaign || !activeCampaign.id) return;
+      try {
+          await db.updateCampaign(activeCampaign.id, {
+              name,
+              participantIds: participants,
+              targetIds: targets,
+              commanderIds: commanders
+          });
+      } catch (e) {
+          alert("فشل تحديث الحملة.");
+      }
   };
 
-  const handleEndCampaign = () => {
-      setActiveCampaign(null);
+  const handleEndCampaign = async () => {
+      if (!activeCampaign || !activeCampaign.id) return;
+      if (!confirm("هل أنت متأكد من إنهاء الحملة لجميع الوحدات؟")) return;
+      try {
+          await db.endCampaign(activeCampaign.id);
+          setIsInCampaignMode(false);
+      } catch (e) {
+          alert("فشل إنهاء الحملة.");
+      }
+  };
+
+  const handleJoinCampaign = () => {
+      if (!activeCampaign || !session?.user) return;
+      const uid = session.user.id;
+      // Allow Creators, Commanders, and Participants
+      const isAuthorized = 
+          activeCampaign.createdBy === uid || 
+          activeCampaign.commanderIds.has(uid) || 
+          activeCampaign.participantIds.has(uid);
+
+      if (isAuthorized) {
+          setIsInCampaignMode(true);
+          handleStopNavigation();
+          alert("تم الانضمام إلى غرفة عمليات الحملة.");
+      } else {
+          alert("عذراً، أنت غير مدرج في قائمة هذه الحملة.");
+      }
+  };
+
+  const handleLeaveCampaignView = () => {
+      setIsInCampaignMode(false);
   };
 
   // Modified Update Status to handle Campaign Cleanup
@@ -349,12 +420,11 @@ export function useAppLogic(isSourceMode: boolean = false) {
       await updateNote({ ...note, status });
       
       // AUTO-REMOVE FROM CAMPAIGN if Caught
-      if (status === 'caught' && activeCampaign && activeCampaign.targetIds.has(id)) {
+      if (status === 'caught' && activeCampaign && activeCampaign.id && activeCampaign.targetIds.has(id)) {
           const newTargets = new Set(activeCampaign.targetIds);
           newTargets.delete(id);
-          setActiveCampaign({ ...activeCampaign, targetIds: newTargets });
-          // Optional: Notify user
-          // alert("تم حذف الهدف من قائمة الحملة النشطة.");
+          // Sync update to DB
+          await db.updateCampaign(activeCampaign.id, { targetIds: newTargets });
       }
     }
   };
@@ -388,6 +458,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
     // Admin Filters
     targetUserFilter, setTargetUserFilter,
     // Campaign
-    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign
+    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign,
+    isInCampaignMode, handleJoinCampaign, handleLeaveCampaignView
   };
 }

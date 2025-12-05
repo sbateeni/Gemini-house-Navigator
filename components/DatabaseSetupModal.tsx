@@ -87,12 +87,25 @@ create table if not exists assignments (
   created_at bigint
 );
 
+-- جدول الحملات الجديد
+create table if not exists campaigns (
+  id uuid default gen_random_uuid() primary key,
+  name text,
+  participants jsonb, -- Array of IDs
+  targets jsonb, -- Array of IDs
+  commanders jsonb, -- Array of IDs
+  start_time bigint,
+  is_active boolean default true,
+  created_by uuid references auth.users(id)
+);
+
 -- 2. تفعيل RLS
 alter table profiles enable row level security;
 alter table notes enable row level security;
 alter table access_codes enable row level security;
 alter table logs enable row level security;
 alter table assignments enable row level security;
+alter table campaigns enable row level security;
 
 -- 3. تحديث السياسات (Fix 42501 Error)
 
@@ -127,6 +140,13 @@ CREATE POLICY "Read Codes" on access_codes for select using (true);
 
 DROP POLICY IF EXISTS "Manage Codes" ON access_codes;
 CREATE POLICY "Manage Codes" on access_codes for all using (auth.role() = 'authenticated');
+
+-- سياسات Campaigns
+DROP POLICY IF EXISTS "Read Campaigns" ON campaigns;
+CREATE POLICY "Read Campaigns" on campaigns for select using (true);
+
+DROP POLICY IF EXISTS "Manage Campaigns" ON campaigns;
+CREATE POLICY "Manage Campaigns" on campaigns for all using (auth.role() = 'authenticated');
 
 -- 4. إصلاح دالة المصادر (تجاوز RLS)
 create or replace function create_source_note(p_code text, p_note_data jsonb)
@@ -175,9 +195,9 @@ NOTIFY pgrst, 'reload schema';
                 <ShieldAlert className="text-red-500 w-8 h-8" />
             </div>
             <div>
-                <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات</h1>
+                <h1 className="text-xl font-bold text-white mb-1">تحديث قاعدة البيانات (مطلوب)</h1>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                لحل مشكلة "Failed to save/update note"، يجب تشغيل هذا الكود في Supabase لإضافة العمود الناقص (visibility).
+                تم إضافة جدول جديد "campaigns" لدعم الحملات الجماعية. يرجى تنفيذ الكود أدناه.
                 </p>
             </div>
           </div>
