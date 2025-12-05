@@ -1,6 +1,4 @@
 
-
-
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
@@ -9,23 +7,32 @@ import { MapNote, UserProfile } from '../types';
 export function useNotes(session: any, isApproved: boolean, isAccountDeleted: boolean, userProfile: UserProfile | null) {
   const [notes, setNotes] = useState<MapNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true); // Default to true, only set false on confirmed error
   const [tableMissing, setTableMissing] = useState(false);
 
   // Sync function
   const refreshNotes = async () => {
-      if (!userProfile) return;
+      // If we are waiting for profile but not source, don't fetch yet
+      // BUT if we are source (session provided but no profile yet?), wait.
+      // Actually source logic is handled in App.tsx manually for initial load.
+      // This hook handles *updates*.
+      
+      if (!userProfile) return; // Wait for profile for standard users
+
       try {
         const savedNotes = await db.getAllNotes(userProfile);
         setNotes(savedNotes);
         setIsConnected(true);
       } catch (error: any) {
+        console.error("Failed to fetch notes:", error);
+        
         if (error.code === 'TABLE_MISSING') {
             setTableMissing(true);
-        } else {
-            console.warn("Running in Offline Mode (Cache)");
+        } else if (error.message === 'Offline' || error.message?.includes('fetch')) {
+            // Only set offline if it's genuinely a network/fetch issue
             setIsConnected(false);
         }
+        // Don't set offline for RLS errors, just log them.
       } finally {
         setLoadingNotes(false);
       }
@@ -40,9 +47,9 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
     // Setup Online Listener for Auto-Sync
     const handleOnline = async () => {
         console.log("Network restored. Syncing...");
+        setIsConnected(true);
         await db.syncPendingNotes();
         await refreshNotes();
-        setIsConnected(true);
     };
 
     const handleOffline = () => {
@@ -60,7 +67,10 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
         { event: '*', schema: 'public', table: 'notes' },
         () => { refreshNotes(); }
       )
-      .subscribe();
+      .subscribe((status) => {
+          if (status === 'SUBSCRIBED') setIsConnected(true);
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setIsConnected(false);
+      });
 
     return () => {
        supabase.removeChannel(notesChannel);

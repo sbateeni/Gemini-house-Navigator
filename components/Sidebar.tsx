@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser } from '../types';
-import { Wifi, WifiOff, XCircle, ShieldCheck } from 'lucide-react';
+import { Wifi, WifiOff, XCircle, ShieldCheck, X } from 'lucide-react';
 import { db } from '../services/db';
 
 import { SidebarHeader } from './sidebar/SidebarHeader';
@@ -89,11 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [isOpen, setIsOpen]);
 
-  // --- SOURCE MODE VIEW (FIXED LAYOUT) ---
+  // --- SOURCE MODE VIEW ---
   if (isSource) {
       return (
         <div 
-            ref={sidebarRef}
             className={`
                 fixed inset-y-0 right-0 z-[1500] 
                 w-full md:w-80 
@@ -102,12 +101,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 shadow-2xl 
                 transform transition-transform duration-300 ease-in-out
                 flex flex-col text-right
-                pb-0 /* Removed padding bottom to align with flexbox footer */
+                pb-0
                 ${isOpen ? 'translate-x-0' : 'translate-x-full'}
-                md:relative md:translate-x-0
-                ${!isOpen && 'md:!w-0 md:!border-0'}
+                md:translate-x-0 md:relative
             `}
         >
+            {/* Close Button for Mobile */}
+            <div className="absolute top-4 left-4 md:hidden z-50">
+               <button onClick={() => setIsOpen(false)} className="p-2 bg-slate-800 rounded-full text-white shadow-lg">
+                  <X size={20} />
+               </button>
+            </div>
+
             <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center border border-green-500/30 animate-pulse">
                     <ShieldCheck size={32} className="text-green-500" />
@@ -117,6 +122,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     يمكنك إضافة المواقع بالنقر على الخريطة. <br/>
                     لا يتم عرض البيانات المسجلة هنا لسلامتك.
                 </p>
+                <div className="mt-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 text-xs text-slate-400">
+                    عدد المواقع المسجلة: <span className="text-green-400 font-bold">{notes.length}</span>
+                </div>
             </div>
             
             <SidebarFooter 

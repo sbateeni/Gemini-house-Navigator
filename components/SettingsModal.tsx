@@ -87,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const initialChar = username.charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+    <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950 rounded-t-2xl">
           <h2 className="text-xl font-bold text-white">الإعدادات</h2>

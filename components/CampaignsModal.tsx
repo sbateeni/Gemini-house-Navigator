@@ -42,7 +42,7 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({ isOpen, onClose 
     };
 
     return (
-        <div className="fixed inset-0 z-[1600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
             <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
                 <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
                     <div className="flex items-center gap-3">
