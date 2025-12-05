@@ -15,6 +15,7 @@ interface MapControlsProps {
   onAcceptAssignment: (a: Assignment) => void;
   hasActiveRoute: boolean;
   onClearRoute: () => void;
+  hasActiveCampaign?: boolean; // New prop to adjust position
 }
 
 export const MapControls: React.FC<MapControlsProps> = ({
@@ -27,10 +28,13 @@ export const MapControls: React.FC<MapControlsProps> = ({
   assignments,
   onAcceptAssignment,
   hasActiveRoute,
-  onClearRoute
+  onClearRoute,
+  hasActiveCampaign = false
 }) => {
   return (
-    <div className="absolute top-4 left-4 z-[400] flex flex-col gap-3">
+    <div 
+      className={`absolute left-4 z-[400] flex flex-col gap-3 transition-all duration-300 ease-in-out ${hasActiveCampaign ? 'top-20' : 'top-4'}`}
+    >
        {/* Sidebar Toggle */}
        <button 
          onClick={() => setSidebarOpen(!sidebarOpen)}

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession, UserPermissions, UserProfile } from './types';
 import { db } from './services/db';
-import { Timer, LogOut, X, ShieldAlert, KeyRound, Gamepad2, Edit3, LogIn, ArrowRight } from 'lucide-react';
+import { Timer, LogOut, X, ShieldAlert, KeyRound, Siren, Edit3, LogIn, ArrowRight } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -189,7 +189,8 @@ export default function App() {
               
               <div className="flex items-center gap-3">
                   <div className={`rounded-full p-2 animate-pulse ${isInCampaignMode ? 'bg-red-500' : 'bg-blue-500'}`}>
-                      <Gamepad2 className="text-white w-5 h-5" />
+                      {/* Changed Icon to Siren (Visual proxy for Handcuffs/Operation) */}
+                      <Siren className="text-white w-5 h-5" />
                   </div>
                   <div>
                       <div className="text-white font-bold text-sm tracking-wider">
@@ -392,6 +393,7 @@ export default function App() {
               handleStopNavigation();
               clearSecondaryRoute();
           }}
+          hasActiveCampaign={!!activeCampaign} // Pass campaign state to move controls down
         />
 
         {/* Modal Container with Source-Aware Props */}
