@@ -22,7 +22,6 @@ import { FlightHUD } from './components/FlightHUD';
 
 export default function App() {
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
-  const [sourceTimeLeft, setSourceTimeLeft] = useState<number>(0);
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
   const [isFlightMode, setIsFlightMode] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -68,8 +67,24 @@ export default function App() {
     isInCampaignMode, handleJoinCampaign, handleLeaveCampaignView
   } = logic;
 
+  // شرط عرض واجهة الدخول: إذا لم يكن هناك جلسة مستخدم عادية ولا جلسة "مصدر"
   if (authLoading && !sourceSession) return <LoadingScreen />;
-  if (!session && !sourceSession && isConfigured) return <AuthPage onSourceLogin={(s) => setSourceSession(s)} />;
+  
+  if (!session && !sourceSession) {
+    return <AuthPage onSourceLogin={(s) => setSourceSession(s)} />;
+  }
+
+  // إذا كان الحساب غير مفعل (بانتظار موافقة الإدارة)
+  if (!isApproved && !sourceSession && session && !isBanned) {
+      return (
+        <PendingApproval 
+            onLogout={handleLogout} 
+            isDeleted={isAccountDeleted} 
+            email={session.user?.email}
+            onCheckStatus={refreshAuth}
+        />
+      );
+  }
 
   return (
     <div className="flex h-screen w-full bg-[#020617] text-white overflow-hidden select-none" dir="rtl">
