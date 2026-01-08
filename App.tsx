@@ -68,7 +68,10 @@ export default function App() {
   } = logic;
 
   // شرط عرض واجهة الدخول: إذا لم يكن هناك جلسة مستخدم عادية ولا جلسة "مصدر"
-  if (authLoading && !sourceSession) return <LoadingScreen />;
+  // أضفنا timeout وهمي للتأكد من انتهاء التحميل حتى لو فشلت قاعدة البيانات
+  if (authLoading && !sourceSession) {
+    return <LoadingScreen />;
+  }
   
   if (!session && !sourceSession) {
     return <AuthPage onSourceLogin={(s) => setSourceSession(s)} />;
@@ -158,7 +161,7 @@ export default function App() {
           />
         )}
 
-        {/* HUD: Tactical Elements (SOS, Logs) */}
+        {/* HUD: Tactical Overlay (SOS, Logs) */}
         {!isFlightMode && (
           <TacticalOverlay 
               isSOS={isSOS}

@@ -15,6 +15,10 @@ export const supabase = isConfigured
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         getUser: async () => ({ data: { user: null }, error: null }),
         signOut: async () => ({ error: null }),
+        signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: "التطبيق يعمل في وضع المعاينة. يرجى استخدام دخول المصادر أو التحقق من إعدادات Supabase." } }),
+        signUp: async () => ({ data: { user: null, session: null }, error: { message: "التسجيل معطل في وضع المعاينة." } }),
+        resetPasswordForEmail: async () => ({ data: null, error: { message: "استعادة كلمة المرور معطلة في وضع المعاينة." } }),
+        resend: async () => ({ data: null, error: { message: "إعادة الإرسال معطلة في وضع المعاينة." } }),
       },
       from: () => ({
         select: () => ({ order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }), eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
