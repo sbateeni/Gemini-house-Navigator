@@ -11,6 +11,7 @@
   --slate-900: #0f172a;
   --slate-800: #1e293b;
   --blue-600: #2563eb;
+  --emerald-500: #10b981;
 }
 
 html, body, #root {
@@ -29,38 +30,46 @@ body {
   direction: rtl;
 }
 
-/* تحسين شريط التمرير */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.1); }
 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* تنسيقات الخريطة Leaflet */
+/* Tactical UI Elements */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.8);
+}
+
 .leaflet-container {
   background: var(--slate-950) !important;
+  outline: none;
 }
 
 .leaflet-popup-content-wrapper {
-  background: rgba(15, 23, 42, 0.9) !important;
-  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(20px);
   color: #f1f5f9 !important;
-  border: 1px solid rgba(59, 130, 246, 0.3) !important;
-  border-radius: 1rem !important;
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  border-radius: 1.5rem !important;
   direction: rtl;
   text-align: right;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
 }
 
 .leaflet-popup-tip {
-  background: rgba(15, 23, 42, 0.9) !important;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: rgba(15, 23, 42, 0.95) !important;
 }
 
-.leaflet-control-container {
-  display: none !important;
+.custom-div-icon {
+  background: transparent !important;
+  border: none !important;
 }
 
-/* أنيميشن مخصصة */
+/* Tactical Animations */
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -70,22 +79,22 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  50% { opacity: 0.8; transform: scale(1.05); box-shadow: 0 0 20px 10px rgba(59, 130, 246, 0); }
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+  50% { opacity: 0.8; transform: scale(1.05); box-shadow: 0 0 40px rgba(59, 130, 246, 0.3); }
 }
 .animate-pulse-glow {
-  animation: pulse-glow 2s infinite;
+  animation: pulse-glow 2s infinite ease-in-out;
 }
 
-/* واجهة الزجاج (Glassmorphism) */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
 }
-
-/* تصحيح أيقونات الخريطة */
-.custom-div-icon {
-  background: transparent !important;
-  border: none !important;
+.scan-effect::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(59, 130, 246, 0.08) 50%, transparent 100%);
+  animation: scan-line 3s linear infinite;
+  pointer-events: none;
 }

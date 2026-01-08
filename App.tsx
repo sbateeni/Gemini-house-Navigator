@@ -33,7 +33,6 @@ export default function App() {
   const flight = useFlightEngine();
 
   // --- 2. SYNC MAP WITH FLIGHT ---
-  // نستخدم حالة الطيران لتحديث إحداثيات الخريطة بشكل سلس
   const currentFlightCoords = isFlightMode ? { lat: flight.lat, lng: flight.lng, zoom: 16, timestamp: Date.now() } : null;
 
   const handleAskCoPilot = async () => {
@@ -73,8 +72,8 @@ export default function App() {
   if (!session && !sourceSession && isConfigured) return <AuthPage onSourceLogin={(s) => setSourceSession(s)} />;
 
   return (
-    <div className="flex h-screen w-full bg-[#020617] overflow-hidden" dir="rtl">
-      {/* 1. Sidebar - Fixed width on Desktop, full screen on Mobile */}
+    <div className="flex h-screen w-full bg-[#020617] text-white overflow-hidden select-none" dir="rtl">
+      {/* 1. Sidebar */}
       <Sidebar 
           isOpen={sidebarOpen}
           setIsOpen={setSidebarOpen}
@@ -160,10 +159,12 @@ export default function App() {
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[4000] w-[90%] max-w-lg glass-panel p-6 rounded-[2rem] shadow-2xl animate-in fade-in zoom-in-95 border-b-4 border-blue-500/50">
             <div className="flex justify-between items-start mb-4">
                <div className="flex items-center gap-3 text-blue-400">
-                  <Sparkles size={20} className="animate-pulse" />
-                  <h3 className="font-bold">تحليل Gemini للموقع</h3>
+                  <div className="bg-blue-600/20 p-2 rounded-xl">
+                    <Sparkles size={20} className="animate-pulse" />
+                  </div>
+                  <h3 className="font-bold">تحليل برج المراقبة الذكي</h3>
                </div>
-               <button onClick={() => setAiAnalysis(null)} className="p-1 hover:bg-slate-800 rounded-full text-slate-500">
+               <button onClick={() => setAiAnalysis(null)} className="p-1 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
                   <X size={20} />
                </button>
             </div>
@@ -197,7 +198,7 @@ export default function App() {
               flight.startFlight();
             }
           }}
-          className={`absolute bottom-28 left-4 z-[400] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-4 transition-all duration-500
+          className={`absolute bottom-28 left-4 z-[400] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(0,0,0,0.6)] border-4 transition-all duration-500
             ${isFlightMode 
               ? 'bg-blue-600 border-blue-400 text-white animate-pulse-glow rotate-[-45deg]' 
               : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-blue-400 hover:border-blue-500/50'}
