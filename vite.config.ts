@@ -8,11 +8,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Manually filter env vars to avoid exposing system variables
+// قائمة المفاتيح التي قد يوفرها Vercel أو Supabase Integration
 const envKeys = [
   'API_KEY',
   'VITE_SUPABASE_URL',
-  'VITE_SUPABASE_ANON_KEY'
+  'VITE_SUPABASE_ANON_KEY',
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY'
 ];
 
 const processEnv: Record<string, string | undefined> = {};
@@ -22,7 +24,6 @@ envKeys.forEach(key => {
   }
 });
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -36,6 +37,6 @@ export default defineConfig({
     },
   },
   define: {
-    'process.env': processEnv
+    'process.env': JSON.stringify(processEnv)
   }
 });

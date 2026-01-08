@@ -1,12 +1,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+// التحقق من كافة الاحتمالات لمفاتيح البيئة (Vite vs Vercel Standard)
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-export const isConfigured = Boolean(supabaseUrl && supabaseKey);
+export const isConfigured = Boolean(supabaseUrl && supabaseKey && supabaseUrl.includes('supabase.co'));
 
-// إنشاء العميل فقط إذا كانت الإعدادات متوفرة، وإلا توفير كائن فارغ آمن
+// إنشاء العميل الحقيقي أو كائن وهمي للمعاينة فقط في حال غياب الإعدادات تماماً
 export const supabase = isConfigured 
   ? createClient(supabaseUrl, supabaseKey) 
   : {
@@ -15,13 +16,32 @@ export const supabase = isConfigured
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         getUser: async () => ({ data: { user: null }, error: null }),
         signOut: async () => ({ error: null }),
-        signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: "التطبيق يعمل في وضع المعاينة. يرجى استخدام دخول المصادر أو التحقق من إعدادات Supabase." } }),
-        signUp: async () => ({ data: { user: null, session: null }, error: { message: "التسجيل معطل في وضع المعاينة." } }),
-        resetPasswordForEmail: async () => ({ data: null, error: { message: "استعادة كلمة المرور معطلة في وضع المعاينة." } }),
-        resend: async () => ({ data: null, error: { message: "إعادة الإرسال معطلة في وضع المعاينة." } }),
+        signInWithPassword: async () => ({ 
+          data: { user: null, session: null }, 
+          error: { message: "إعدادات Supabase غير مكتملة في Vercel. تأكد من إضافة SUPABASE_URL و SUPABASE_ANON_KEY في Environment Variables." } 
+        }),
+        signUp: async () => ({ data: { user: null, session: null }, error: { message: "التسجيل معطل." } }),
+        resetPasswordForEmail: async () => ({ data: null, error: { message: "معطل." } }),
+        resend: async () => ({ data: null, error: { message: "معطل." } }),
       },
       from: () => ({
-        select: () => ({ order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }), eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+        select: () => ({ 
+          order: () => ({ 
+            limit: () => ({ 
+              maybeSingle: () => Promise.resolve({ data: null, error: null }),
+              single: () => Promise.resolve({ data: null, error: null })
+            }),
+            eq: () => ({ 
+              single: () => Promise.resolve({ data: null, error: null }),
+              maybeSingle: () => Promise.resolve({ data: null, error: null })
+            })
+          }),
+          eq: () => ({ 
+            single: () => Promise.resolve({ data: null, error: null }),
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) })
+          })
+        }),
         upsert: () => Promise.resolve({ error: null }),
         insert: () => Promise.resolve({ error: null }),
         update: () => ({ eq: () => Promise.resolve({ error: null }) }),
@@ -37,5 +57,5 @@ export const supabase = isConfigured
     } as any;
 
 if (!isConfigured) {
-  console.warn("إعدادات Supabase مفقودة. التطبيق يعمل الآن في 'وضع المعاينة' (Preview Mode) بدون قاعدة بيانات سحابية.");
+  console.warn("Supabase keys are missing or invalid. Check your Vercel/Local environment variables.");
 }
