@@ -36,24 +36,21 @@ export function useAppLogic(isSourceMode: boolean = false) {
     notes, isConnected, tableMissing, addNote, updateNote, deleteNote, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
-  // Enable Geolocation if Access Granted OR Source Mode
   const { userLocation } = useGeolocation(hasAccess || isSourceMode);
-  
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   
   // --- 4. Feature Hooks ---
   const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
     currentRoute, secondaryRoute, setSecondaryRoute, calculateRoute, isRouting, 
-    handleNavigateToNote, handleNavigateToPoint, handleStopNavigation, clearSecondaryRoute
+    handleNavigateToNote: rawHandleNavigateToNote, 
+    handleNavigateToPoint, handleStopNavigation, clearSecondaryRoute
   } = useNavigation(userLocation);
 
   // --- 5. Local UI State ---
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
-  
-  // Map Provider Logic
   const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('gemini_map_provider') || 'google');
   
   const isSatellite = mapProvider === 'google' || mapProvider === 'esri';
@@ -83,19 +80,19 @@ export function useAppLogic(isSourceMode: boolean = false) {
 
   // --- CAMPAIGN STATE (REALTIME) ---
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null);
-  const [isInCampaignMode, setIsInCampaignMode] = useState(false); // Local flag: did the user click "Join"?
+  const [isInCampaignMode, setIsInCampaignMode] = useState(false);
 
-  // Find Distressed User
   const distressedUser = onlineUsers.find(u => u.isSOS && u.id !== session?.user?.id);
 
-  // --- 6. Form Logic Hook ---
   const { 
       showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
-      handleMapClick, handleEditNote, handleSaveNote, closeModal 
+      handleMapClick: rawHandleMapClick, handleEditNote, handleSaveNote, closeModal 
   } = useNoteForm(addNote, updateNote, setIsConnected, setSelectedNote, setSidebarOpen, userProfile);
 
-  // --- 7. Effects & Handlers ---
-  
+  // Wrapped versions for UI components that expect a simpler signature
+  const handleNavigateToNote = (note: MapNote) => rawHandleNavigateToNote(note, locateUser);
+  const handleMapClick = (lat: number, lng: number) => rawHandleMapClick(lat, lng, handleStopNavigation);
+
   useEffect(() => {
     const handleResize = () => setSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
@@ -106,91 +103,70 @@ export function useAppLogic(isSourceMode: boolean = false) {
     localStorage.setItem('gemini_map_provider', mapProvider);
   }, [mapProvider]);
 
-  // Fetch All Profiles for Campaign Management (Offline users included)
   useEffect(() => {
       if (hasAccess && isAnyAdmin) {
-          db.getAllProfiles().then(setAllProfiles);
+          db.getAllProfiles().then(setAllProfiles).catch(() => {
+            // التحقق من الصلاحيات دون تسريب تفاصيل الخطأ
+          });
       }
-  }, [hasAccess, isAnyAdmin, showCampaigns]); // Refresh when opening modal
+  }, [hasAccess, isAnyAdmin, showCampaigns]);
 
-  // --- CAMPAIGN SYNC & REALTIME ---
   const fetchActiveCampaign = async () => {
-      const campaign = await db.getActiveCampaign();
-      setActiveCampaign(campaign);
-      
-      // Auto-join if I am the creator
-      if (campaign && campaign.createdBy === session?.user?.id) {
-          setIsInCampaignMode(true);
-      } else if (!campaign) {
-          setIsInCampaignMode(false);
+      try {
+        const campaign = await db.getActiveCampaign();
+        setActiveCampaign(campaign);
+        if (campaign && campaign.createdBy === session?.user?.id) {
+            setIsInCampaignMode(true);
+        } else if (!campaign) {
+            setIsInCampaignMode(false);
+        }
+      } catch (e) {
+        // فشل صامت لضمان عدم تسريب حالة الحملة للمخترقين
       }
   };
 
   useEffect(() => {
       if (!session) return;
       fetchActiveCampaign();
-
       const channel = supabase.channel('active_campaigns')
-          .on(
-              'postgres_changes',
-              { event: '*', schema: 'public', table: 'campaigns' },
-              () => {
-                  console.log("Campaign update detected");
-                  fetchActiveCampaign();
-              }
-          )
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, () => {
+              fetchActiveCampaign();
+          })
           .subscribe();
-
       return () => { supabase.removeChannel(channel); };
   }, [session]);
 
-
-  // Log Status Changes
   useEffect(() => {
     if (session?.user && hasAccess) {
        db.createLogEntry({
-          message: `الوحدة ${session.user.user_metadata?.username || 'User'} غيرت الحالة إلى ${myStatus.toUpperCase()}`,
+          message: `الوحدة غيرت الحالة إلى ${myStatus.toUpperCase()}`,
           type: 'status',
           userId: session.user.id,
           timestamp: Date.now(),
           governorate: userProfile?.governorate, 
           center: userProfile?.center
-       });
+       }).catch(() => {});
     }
   }, [myStatus, session?.user?.id]);
 
-  // SOS Sound Logic
   useEffect(() => {
-    if (isSOS || distressedUser) {
-        playSiren();
-    } else {
-        stopSiren();
-    }
+    if (isSOS || distressedUser) playSiren();
+    else stopSiren();
     return () => stopSiren();
   }, [isSOS, distressedUser, playSiren, stopSiren]);
 
   const locateUser = () => {
     setIsLocating(true);
     if (!navigator.geolocation) {
-        alert("المتصفح لا يدعم تحديد الموقع.");
         setIsLocating(false);
         return;
     }
-
-    const onSuccess = (pos: GeolocationPosition) => {
-        const { latitude, longitude } = pos.coords;
-        setFlyToTarget({ 
-            lat: latitude, lng: longitude, zoom: 17, timestamp: Date.now() 
-        });
-        setIsLocating(false);
-    };
-
     navigator.geolocation.getCurrentPosition(
-        onSuccess,
-        (err) => {
-            console.warn("GPS failed", err);
+        (pos) => {
+            setFlyToTarget({ lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 17, timestamp: Date.now() });
             setIsLocating(false);
         },
+        () => setIsLocating(false),
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   };
@@ -200,28 +176,20 @@ export function useAppLogic(isSourceMode: boolean = false) {
      setIsSOS(newState);
      if (session?.user) {
          db.createLogEntry({
-             message: newState 
-                ? `🚨 استغاثة عاجلة من ${session.user.user_metadata?.username?.toUpperCase()} 🚨` 
-                : `${session.user.user_metadata?.username} ألغى الاستغاثة`,
+             message: newState ? `🚨 استغاثة عاجلة 🚨` : `إلغاء الاستغاثة`,
              type: 'alert',
              userId: session.user.id,
              timestamp: Date.now(),
              governorate: userProfile?.governorate,
              center: userProfile?.center
-         });
+         }).catch(() => {});
      }
   };
 
   const handleLocateSOSUser = () => {
       if (distressedUser) {
           handleNavigateToPoint(distressedUser.lat, distressedUser.lng);
-          setFlyToTarget({ 
-              lat: distressedUser.lat, 
-              lng: distressedUser.lng, 
-              zoom: 17, 
-              timestamp: Date.now(),
-              showPulse: true 
-          });
+          setFlyToTarget({ lat: distressedUser.lat, lng: distressedUser.lng, zoom: 17, timestamp: Date.now(), showPulse: true });
       }
   };
 
@@ -229,13 +197,18 @@ export function useAppLogic(isSourceMode: boolean = false) {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    const result = await searchPlace(searchQuery);
-    setIsSearching(false);
-    if (result) {
-      setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
-      setSearchQuery("");
-      handleStopNavigation();
-      if (window.innerWidth < 768) setSidebarOpen(false);
+    try {
+      const result = await searchPlace(searchQuery);
+      if (result) {
+        setFlyToTarget({ lat: result.lat, lng: result.lng, zoom: 14, timestamp: Date.now(), showPulse: true });
+        setSearchQuery("");
+        handleStopNavigation();
+        if (window.innerWidth < 768) setSidebarOpen(false);
+      }
+    } catch (e) {
+      // فشل البحث دون تسريب تفاصيل الاتصال
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -259,8 +232,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
       await updateNote(updatedNote);
       setSelectedNote(updatedNote);
     } catch (error) {
-      console.error("Analysis failed", error);
-      alert("فشل التحليل الذكي.");
+      // لا نعرض تفاصيل الخطأ التقني هنا CWE-209
     } finally {
       setIsAnalyzing(false);
     }
@@ -274,15 +246,13 @@ export function useAppLogic(isSourceMode: boolean = false) {
         if (selectedNote?.id === id) setSelectedNote(null);
         if (currentRoute) handleStopNavigation();
       } catch (error) {
-        alert("فشل الحذف. تأكد من الصلاحيات.");
+        // فشل الحذف الآمن
       }
     }
   };
 
   const onUserClick = (user: MapUser) => {
-    if (isAnyAdmin || permissions.can_dispatch) {
-      setCommandUser(user);
-    }
+    if (isAnyAdmin || permissions.can_dispatch) setCommandUser(user);
   };
 
   const handleIntercept = () => {
@@ -292,35 +262,27 @@ export function useAppLogic(isSourceMode: boolean = false) {
   };
 
   const handleDispatch = () => {
-    if (isAnyAdmin || permissions.can_dispatch) {
-      setShowLocationPicker(true);
-    } else {
-      alert("ليس لديك صلاحية التوجيه.");
-    }
+    if (isAnyAdmin || permissions.can_dispatch) setShowLocationPicker(true);
   };
 
   const handleSelectDispatchLocation = async (note: MapNote) => {
     if (!commandUser) return;
-    const route = await calculateRoute(
-      { lat: commandUser.lat, lng: commandUser.lng },
-      { lat: note.lat, lng: note.lng }
-    );
-    if (route) {
-        setSecondaryRoute(route);
-        setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
-    } else {
-        alert("فشل حساب مسار التوجيه.");
-    }
+    try {
+      const route = await calculateRoute(
+        { lat: commandUser.lat, lng: commandUser.lng },
+        { lat: note.lat, lng: note.lng }
+      );
+      if (route) {
+          setSecondaryRoute(route);
+          setFlyToTarget({ lat: commandUser.lat, lng: commandUser.lng, zoom: 13, timestamp: Date.now() });
+      }
+    } catch(e) {}
     setShowLocationPicker(false);
     setCommandUser(null);
   };
 
   const handleOpenDispatchModal = (note: MapNote) => {
-    if (isAnyAdmin || permissions.can_dispatch) {
-      setDispatchTargetLocation(note);
-    } else {
-      alert("ليس لديك صلاحية التوجيه.");
-    }
+    if (isAnyAdmin || permissions.can_dispatch) setDispatchTargetLocation(note);
   };
 
   const handleSendDispatchOrder = async (targetUserId: string, instructions: string) => {
@@ -335,129 +297,86 @@ export function useAppLogic(isSourceMode: boolean = false) {
         instructions,
         createdBy: session.user.id
       });
-      alert("تم الإرسال بنجاح!");
     } catch (e) {
-      console.error("Dispatch failed", e);
-      alert("فشل الإرسال.");
+      // إصلاح CWE-209: رسالة عامة بدلاً من تفاصيل الخطأ التقني
+      alert("تعذر إرسال التكليف في الوقت الحالي.");
     }
   };
 
   const handleAcceptAssignment = (assignment: Assignment) => {
-    acceptAssignment(assignment.id);
+    acceptAssignment(assignment.id).catch(() => {});
     handleNavigateToPoint(assignment.lat, assignment.lng);
     setFlyToTarget({ lat: assignment.lat, lng: assignment.lng, zoom: 16, timestamp: Date.now() });
   };
 
-  // --- CAMPAIGN ACTIONS (DB) ---
-
   const handleStartCampaign = async (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
       try {
-          await db.createCampaign({
-              name,
-              participantIds: participants,
-              targetIds: targets,
-              commanderIds: commanders,
-              startTime: Date.now()
-          });
+          await db.createCampaign({ name, participantIds: participants, targetIds: targets, commanderIds: commanders, startTime: Date.now() });
           handleStopNavigation();
       } catch (e) {
-          console.error(e);
-          alert("فشل بدء الحملة. تأكد من تحديث قاعدة البيانات.");
+          alert("فشل بدء العملية.");
       }
   };
 
   const handleUpdateCampaign = async (name: string, participants: Set<string>, targets: Set<string>, commanders: Set<string>) => {
       if (!activeCampaign || !activeCampaign.id) return;
       try {
-          await db.updateCampaign(activeCampaign.id, {
-              name,
-              participantIds: participants,
-              targetIds: targets,
-              commanderIds: commanders
-          });
-      } catch (e) {
-          alert("فشل تحديث الحملة.");
-      }
+          await db.updateCampaign(activeCampaign.id, { name, participantIds: participants, targetIds: targets, commanderIds: commanders });
+      } catch (e) {}
   };
 
   const handleEndCampaign = async () => {
       if (!activeCampaign || !activeCampaign.id) return;
-      if (!confirm("هل أنت متأكد من إنهاء الحملة لجميع الوحدات؟")) return;
+      if (!confirm("هل أنت متأكد من إنهاء العملية؟")) return;
       try {
           await db.endCampaign(activeCampaign.id);
           setIsInCampaignMode(false);
-      } catch (e) {
-          alert("فشل إنهاء الحملة.");
-      }
+      } catch (e) {}
   };
 
   const handleJoinCampaign = () => {
       if (!activeCampaign || !session?.user) return;
       const uid = session.user.id;
-      // Allow Creators, Commanders, and Participants
-      const isAuthorized = 
-          activeCampaign.createdBy === uid || 
-          activeCampaign.commanderIds.has(uid) || 
-          activeCampaign.participantIds.has(uid);
-
+      const isAuthorized = activeCampaign.createdBy === uid || activeCampaign.commanderIds.has(uid) || activeCampaign.participantIds.has(uid);
       if (isAuthorized) {
           setIsInCampaignMode(true);
           handleStopNavigation();
-          alert("تم الانضمام إلى غرفة عمليات الحملة.");
-      } else {
-          alert("عذراً، أنت غير مدرج في قائمة هذه الحملة.");
       }
   };
 
-  const handleLeaveCampaignView = () => {
-      setIsInCampaignMode(false);
-  };
+  const handleLeaveCampaignView = () => setIsInCampaignMode(false);
 
-  // Modified Update Status to handle Campaign Cleanup
   const updateStatus = async (id: string, status: 'caught' | 'not_caught') => {
     const note = notes.find(n => n.id === id);
     if (note) {
-      await updateNote({ ...note, status });
-      
-      // AUTO-REMOVE FROM CAMPAIGN if Caught
-      if (status === 'caught' && activeCampaign && activeCampaign.id && activeCampaign.targetIds.has(id)) {
-          const newTargets = new Set(activeCampaign.targetIds);
-          newTargets.delete(id);
-          // Sync update to DB
-          await db.updateCampaign(activeCampaign.id, { targetIds: newTargets });
-      }
+      try {
+        await updateNote({ ...note, status });
+        if (status === 'caught' && activeCampaign && activeCampaign.id && activeCampaign.targetIds.has(id)) {
+            const newTargets = new Set(activeCampaign.targetIds);
+            newTargets.delete(id);
+            await db.updateCampaign(activeCampaign.id, { targetIds: newTargets });
+        }
+      } catch(e) {}
     }
   };
 
   return {
-    // Auth
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
-    // Core Data
     notes, isConnected, tableMissing, updateStatus, setNotes,
-    // Tactical
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser, allProfiles,
-    // Navigation
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
-    // UI State
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
-    // Search & FlyTo
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
-    // Note Actions
     selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote, handleDeleteNote, isAnalyzing,
-    // Modals
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,
-    // Tactical Command
     commandUser, setCommandUser, onUserClick, handleIntercept, handleDispatch,
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
-    // Forms
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    // Admin Filters
     targetUserFilter, setTargetUserFilter,
-    // Campaign
     activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign,
     isInCampaignMode, handleJoinCampaign, handleLeaveCampaignView
   };

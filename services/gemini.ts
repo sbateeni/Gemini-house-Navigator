@@ -14,6 +14,7 @@ const getClient = () => {
 export const searchPlace = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
   const ai = getClient();
   try {
+    // Maps grounding is only supported in Gemini 2.5 series models.
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{
@@ -30,7 +31,7 @@ export const searchPlace = async (query: string): Promise<{ lat: number; lng: nu
       }],
       config: {
         tools: [{ googleMaps: {} }],
-        // Note: responseMimeType is not allowed with tools, so we parse manually
+        // Note: responseMimeType and responseSchema are not allowed with maps grounding
       }
     });
 
@@ -59,6 +60,7 @@ export const identifyLocation = async (
   const ai = getClient();
   
   try {
+    // Maps grounding is only supported in Gemini 2.5 series models.
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [

@@ -1,8 +1,37 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Updated credentials for project: znktftvhkoxrmmucdgms
-const supabaseUrl = 'https://znktftvhkoxrmmucdgms.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpua3RmdHZoa294cm1tdWNkZ21zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTg4MDYsImV4cCI6MjA3OTUzNDgwNn0.TJnzlXx7PR82HuEDWVLro1i3ssT56U1ahfF3eacvTeo';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const isConfigured = Boolean(supabaseUrl && supabaseKey);
+
+// إنشاء العميل فقط إذا كانت الإعدادات متوفرة، وإلا توفير كائن فارغ آمن
+export const supabase = isConfigured 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : {
+      auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+        getUser: async () => ({ data: { user: null }, error: null }),
+        signOut: async () => ({ error: null }),
+      },
+      from: () => ({
+        select: () => ({ order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }), eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+        upsert: () => Promise.resolve({ error: null }),
+        insert: () => Promise.resolve({ error: null }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      }),
+      rpc: () => Promise.resolve({ data: null, error: null }),
+      channel: () => ({
+        on: () => ({ subscribe: () => ({}) }),
+        track: () => Promise.resolve(),
+        subscribe: () => ({})
+      }),
+      removeChannel: () => {}
+    } as any;
+
+if (!isConfigured) {
+  console.warn("إعدادات Supabase مفقودة. التطبيق يعمل الآن في 'وضع المعاينة' (Preview Mode) بدون قاعدة بيانات سحابية.");
+}

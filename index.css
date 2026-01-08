@@ -1,63 +1,91 @@
 
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  --slate-950: #020617;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --blue-600: #2563eb;
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background-color: var(--slate-950);
 }
 
 body { 
-  background-color: #0f172a; 
   color: white; 
   -webkit-tap-highlight-color: transparent; 
-  font-family: system-ui, -apple-system, sans-serif; 
+  font-family: var(--font-sans);
+  direction: rtl;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #1e293b; }
-::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
+/* تحسين شريط التمرير */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.1); }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* RTL Support for Leaflet Popups */
+/* تنسيقات الخريطة Leaflet */
+.leaflet-container {
+  background: var(--slate-950) !important;
+}
+
 .leaflet-popup-content-wrapper {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #3b82f6;
-  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.9) !important;
+  backdrop-filter: blur(8px);
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  border-radius: 1rem !important;
   direction: rtl;
   text-align: right;
-}
-.leaflet-popup-tip {
-  background: #1e293b;
-  border: 1px solid #3b82f6;
-  border-top: none;
-  border-left: none;
-}
-.leaflet-popup-content {
-  margin: 12px;
-  line-height: 1.6;
-}
-.leaflet-container a.leaflet-popup-close-button {
-  color: #94a3b8;
-  right: auto;
-  left: 8px; /* Move close button to left for RTL */
-  top: 8px;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5);
 }
 
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.leaflet-control-container {
+  display: none !important;
+}
+
+/* أنيميشن مخصصة */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+  50% { opacity: 0.8; transform: scale(1.05); box-shadow: 0 0 20px 10px rgba(59, 130, 246, 0); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+/* واجهة الزجاج (Glassmorphism) */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* تصحيح أيقونات الخريطة */
 .custom-div-icon {
-  background: transparent;
-  border: none;
-}
-/* Hide default leaflet controls we replace */
-.leaflet-bottom.leaflet-right {
-  display: none;
-}
-.leaflet-control-zoom {
-  display: none;
-}
-.leaflet-top.leaflet-left {
-  left: 20px; /* Adjust if needed */
+  background: transparent !important;
+  border: none !important;
 }
