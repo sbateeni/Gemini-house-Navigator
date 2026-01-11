@@ -41,7 +41,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const fetchData = async () => {
     setLoading(true);
-    const users = await db.getAllProfiles(currentUserProfile || undefined);
+    // Fix: db.getAllProfiles takes 0 arguments in services/db.ts
+    const users = await db.getAllProfiles();
     setProfiles(users);
     
     if (isOfficerOrAbove) {

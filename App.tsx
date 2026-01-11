@@ -1,12 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
-import { useFlightEngine } from './hooks/useFlightEngine';
-import { SourceSession, UserPermissions, UserProfile } from './types';
-import { db } from './services/db';
-import { isConfigured } from './services/supabase';
+import { SourceSession } from './types';
 import { identifyLocation } from './services/gemini';
-import { Timer, LogOut, X, ShieldAlert, KeyRound, Siren, Edit3, LogIn, ArrowRight, Database, Plane, Map as MapIcon, Sparkles } from 'lucide-react';
+import { X, Sparkles, Map as MapIcon, ShieldAlert } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -18,40 +15,34 @@ import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { TacticalOverlay } from './components/layout/TacticalOverlay';
-import { FlightHUD } from './components/FlightHUD';
 
 export default function App() {
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
-  const [isFlightMode, setIsFlightMode] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAILoading, setIsAILoading] = useState(false);
 
   // --- 1. CORE LOGIC HOOKS ---
   const logic = useAppLogic(!!sourceSession);
-  const flight = useFlightEngine();
 
-  // --- 2. SYNC MAP WITH FLIGHT ---
-  const currentFlightCoords = isFlightMode ? { lat: flight.lat, lng: flight.lng, zoom: 16, timestamp: Date.now() } : null;
-
-  const handleAskCoPilot = async () => {
+  const handleAIAnalysis = async (lat: number, lng: number) => {
     setIsAILoading(true);
     try {
-      const result = await identifyLocation(flight.lat, flight.lng, "ماذا يوجد تحت الطائرة الآن؟");
+      const result = await identifyLocation(lat, lng, "تحليل استخباراتي للموقع المختار");
       setAiAnalysis(result.details);
     } catch (e) {
-      setAiAnalysis("عذراً، فقدت الاتصال ببرج المراقبة الذكي.");
+      setAiAnalysis("عذراً، تعذر الوصول للمحلل الذكي حالياً.");
     } finally {
       setIsAILoading(false);
     }
   };
 
   const {
-    session, authLoading, userRole, isApproved, isAccountDeleted, permissions, hasAccess, handleLogout, refreshAuth, userProfile, isBanned,
-    notes, isConnected, tableMissing, updateStatus, setNotes,
+    session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned,
+    notes, isConnected, tableMissing, updateStatus,
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser, allProfiles,
-    currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation, clearSecondaryRoute,
+    currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
     selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote, handleDeleteNote, isAnalyzing,
@@ -59,16 +50,13 @@ export default function App() {
     showCampaigns, setShowCampaigns,
     commandUser, setCommandUser, onUserClick, handleIntercept, handleDispatch,
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,
-    dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
+    dispatchTargetLocation, setDispatchTargetLocation, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    targetUserFilter, setTargetUserFilter,
-    activeCampaign, handleStartCampaign, handleEndCampaign, handleUpdateCampaign, 
-    isInCampaignMode, handleJoinCampaign, handleLeaveCampaignView
+    setTargetUserFilter,
+    activeCampaign, handleStartCampaign, handleUpdateCampaign
   } = logic;
 
-  // شرط عرض واجهة الدخول: إذا لم يكن هناك جلسة مستخدم عادية ولا جلسة "مصدر"
-  // أضفنا timeout وهمي للتأكد من انتهاء التحميل حتى لو فشلت قاعدة البيانات
   if (authLoading && !sourceSession) {
     return <LoadingScreen />;
   }
@@ -77,7 +65,6 @@ export default function App() {
     return <AuthPage onSourceLogin={(s) => setSourceSession(s)} />;
   }
 
-  // إذا كان الحساب غير مفعل (بانتظار موافقة الإدارة)
   if (!isApproved && !sourceSession && session && !isBanned) {
       return (
         <PendingApproval 
@@ -109,8 +96,11 @@ export default function App() {
           onStopNavigation={handleStopNavigation}
           routeData={currentRoute}
           isRouting={isRouting}
-          onAnalyzeNote={handleAnalyzeNote}
-          isAnalyzing={isAnalyzing}
+          onAnalyzeNote={(note) => {
+              handleAIAnalysis(note.lat, note.lng);
+              handleAnalyzeNote(note);
+          }}
+          isAnalyzing={isAnalyzing || isAILoading}
           onUpdateStatus={updateStatus}
           isConnected={isConnected}
           userRole={sourceSession ? 'source' : userRole}
@@ -136,9 +126,9 @@ export default function App() {
           selectedNote={selectedNote}
           setSelectedNote={setSelectedNote}
           onMapClick={handleMapClick}
-          flyToTarget={currentFlightCoords || flyToTarget}
+          flyToTarget={flyToTarget}
           tempMarkerCoords={tempCoords}
-          userLocation={isFlightMode ? { lat: flight.lat, lng: flight.lng } : userLocation}
+          userLocation={userLocation}
           currentRoute={currentRoute}
           secondaryRoute={secondaryRoute}
           otherUsers={onlineUsers}
@@ -148,31 +138,16 @@ export default function App() {
           currentUserId={userProfile?.id}
         />
 
-        {/* HUD: Flight Interface */}
-        {isFlightMode && (
-          <FlightHUD 
-            speed={flight.speed}
-            heading={flight.heading}
-            altitude={flight.altitude}
-            isFlying={flight.isFlying}
-            onControl={flight.controlFlight}
-            onAskAI={handleAskCoPilot}
-            isAILoading={isAILoading}
-          />
-        )}
-
         {/* HUD: Tactical Overlay (SOS, Logs) */}
-        {!isFlightMode && (
-          <TacticalOverlay 
-              isSOS={isSOS}
-              onToggleSOS={handleToggleSOS}
-              onExpandLogs={() => setShowFullLogs(true)}
-              distressedUser={distressedUser}
-              onLocateSOS={handleLocateSOSUser}
-          />
-        )}
+        <TacticalOverlay 
+            isSOS={isSOS}
+            onToggleSOS={handleToggleSOS}
+            onExpandLogs={() => setShowFullLogs(true)}
+            distressedUser={distressedUser}
+            onLocateSOS={handleLocateSOSUser}
+        />
 
-        {/* AI Analysis Floating Modal */}
+        {/* AI Intelligence Floating Modal */}
         {aiAnalysis && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[4000] w-[90%] max-w-lg glass-panel p-6 rounded-[2rem] shadow-2xl animate-in fade-in zoom-in-95 border-b-4 border-blue-500/50">
             <div className="flex justify-between items-start mb-4">
@@ -180,7 +155,7 @@ export default function App() {
                   <div className="bg-blue-600/20 p-2 rounded-xl">
                     <Sparkles size={20} className="animate-pulse" />
                   </div>
-                  <h3 className="font-bold">تحليل برج المراقبة الذكي</h3>
+                  <h3 className="font-bold">تحليل الاستخبارات الجغرافية</h3>
                </div>
                <button onClick={() => setAiAnalysis(null)} className="p-1 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
                   <X size={20} />
@@ -204,27 +179,6 @@ export default function App() {
           onClearRoute={handleStopNavigation}
           hasActiveCampaign={!!activeCampaign}
         />
-
-        {/* Toggle Flight Mode Button */}
-        <button 
-          onClick={() => {
-            if (isFlightMode) {
-              flight.stopFlight();
-              setIsFlightMode(false);
-            } else {
-              setIsFlightMode(true);
-              flight.startFlight();
-            }
-          }}
-          className={`absolute bottom-28 left-4 z-[400] w-14 h-14 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(0,0,0,0.6)] border-4 transition-all duration-500
-            ${isFlightMode 
-              ? 'bg-blue-600 border-blue-400 text-white animate-pulse-glow rotate-[-45deg]' 
-              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-blue-400 hover:border-blue-500/50'}
-          `}
-          title={isFlightMode ? "إغلاق وضع الطيران" : "تشغيل وضع الطيران"}
-        >
-          <Plane size={24} />
-        </button>
 
         {/* Modal Manager */}
         <ModalContainer
@@ -274,7 +228,7 @@ export default function App() {
             onLogout={handleLogout}
         />
 
-        {/* DB Setup Warning (Only if needed) */}
+        {/* DB Setup Warning */}
         {showDatabaseFix && <DatabaseSetupModal onClose={() => setShowDatabaseFix(false)} />}
       </div>
     </div>

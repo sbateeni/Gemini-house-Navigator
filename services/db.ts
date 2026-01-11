@@ -15,27 +15,6 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
 const CACHE_KEY_NOTES = 'gemini_offline_notes';
 const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
 
-// Define Numeric Ranks for visibility comparison
-const ROLE_RANKS: Record<string, number> = {
-  super_admin: 100,
-  admin: 90,
-  governorate_admin: 80,
-  center_admin: 70,
-  judicial: 65, 
-  officer: 60,
-  user: 50,
-  source: 0, 
-  banned: 0
-};
-
-const getRankValue = (role?: string) => ROLE_RANKS[role || 'user'] || 10;
-
-const safeString = (val: any, fallback: string = ''): string => {
-  if (typeof val === 'string') return val;
-  if (typeof val === 'number') return String(val);
-  return fallback;
-};
-
 const getDeviceId = () => {
     let id = localStorage.getItem('gemini_device_id');
     if (!id) {
@@ -46,27 +25,17 @@ const getDeviceId = () => {
 };
 
 export const db = {
-  // --- OFFLINE SYNC LOGIC ---
   async syncPendingNotes() {
     if (!navigator.onLine) return;
-    
     const pendingJson = localStorage.getItem(CACHE_KEY_PENDING_NOTES);
     if (!pendingJson) return;
-
     const pendingNotes: MapNote[] = JSON.parse(pendingJson);
-    if (pendingNotes.length === 0) return;
-
     for (const note of pendingNotes) {
-      try {
-        await this.addNote(note, true);
-      } catch (e) {
-        console.error("Failed to sync note", note.id, e);
-      }
+      try { await this.addNote(note, true); } catch (e) {}
     }
     localStorage.removeItem(CACHE_KEY_PENDING_NOTES);
   },
 
-  // --- SOURCE ACCESS LOGIC ---
   async verifyAccessCode(code: string): Promise<{ valid: boolean, error?: string, expiresAt?: number, label?: string }> {
      try {
          const deviceId = getDeviceId();
@@ -74,33 +43,19 @@ export const db = {
              p_code: code,
              p_device_id: deviceId
          });
-
-         if (error) {
-             if (error.code === 'PGRST202' || error.code === '42883') { 
-                 const e: any = new Error("Database Schema Missing");
-                 e.code = 'TABLE_MISSING';
-                 throw e;
-             }
-             return { valid: false, error: 'خطأ في الاتصال بقاعدة البيانات' };
-         }
-
-         if (data && data.success) {
-             return { valid: true, expiresAt: data.expires_at, label: data.label };
-         } else {
-             return { valid: false, error: data?.message || 'كود غير صالح' };
-         }
-     } catch (e: any) {
-         if (e.code === 'TABLE_MISSING') throw e;
-         return { valid: false, error: 'خطأ في النظام' };
+         if (error) return { valid: false, error: 'تعذر التحقق من الكود حالياً' };
+         if (data && data.success) return { valid: true, expiresAt: data.expires_at, label: data.label };
+         return { valid: false, error: data?.message || 'كود غير صالح أو مستخدم على جهاز آخر' };
+     } catch (e) {
+         return { valid: false, error: 'خطأ أمني في النظام' };
      }
   },
 
-  // --- CORE FUNCTIONS ---
   async getAllNotes(currentUserProfile?: UserProfile, sourceCode?: string): Promise<MapNote[]> {
     try {
       if (!navigator.onLine) throw new Error("Offline");
-
-      // إعداد كود المصدر في جلسة Postgres لتفعيل الـ RLS بشكل صحيح
+      
+      // إجبار قاعدة البيانات على تطبيق سياق المصدر إذا وجد
       if (sourceCode) {
           await supabase.rpc('set_source_context', { p_code: sourceCode });
       }
@@ -110,15 +65,15 @@ export const db = {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) throw new Error("Access Denied");
 
       const notes = (data || []).map((row: any) => ({
         id: row.id,
         lat: row.lat,
         lng: row.lng,
-        userNote: safeString(row.user_note),
-        locationName: safeString(row.location_name, 'موقع'),
-        aiAnalysis: safeString(row.ai_analysis),
+        userNote: row.user_note,
+        locationName: row.location_name,
+        aiAnalysis: row.ai_analysis,
         createdAt: row.created_at,
         status: row.status,
         sources: row.sources,
@@ -131,9 +86,7 @@ export const db = {
 
       localStorage.setItem(CACHE_KEY_NOTES, JSON.stringify(notes));
       return notes;
-
-    } catch (error: any) {
-      if (error.code === 'TABLE_MISSING') throw error;
+    } catch (error) {
       const cached = localStorage.getItem(CACHE_KEY_NOTES);
       return cached ? JSON.parse(cached) : [];
     }
@@ -145,7 +98,7 @@ export const db = {
             p_code: note.accessCode,
             p_note_data: { ...note, device_id: getDeviceId() }
         });
-        if (error) throw error;
+        if (error) throw new Error("Unauthorized submission");
         return;
     }
 
@@ -157,6 +110,8 @@ export const db = {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Authentication required");
+
     const dbRow = {
       id: note.id,
       lat: note.lat,
@@ -169,28 +124,28 @@ export const db = {
       sources: note.sources || [],
       governorate: note.governorate, 
       center: note.center,
-      created_by: user?.id,
+      created_by: user.id,
       visibility: note.visibility || 'private'
     };
 
     const { error } = await supabase.from('notes').upsert(dbRow);
-    if (error) throw error;
+    if (error) throw new Error("Database integrity violation");
   },
 
   async deleteNote(id: string): Promise<void> {
     const { error } = await supabase.from('notes').delete().eq('id', id);
-    if (error) throw error;
+    if (error) throw new Error("Delete failed or unauthorized");
   },
 
   async getUserProfile(userId: string): Promise<UserProfile | null> {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    if (error) return null; 
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (error || !data) return null; 
     return {
       id: data.id,
-      username: safeString(data.username, 'User'),
+      username: data.username || 'Unknown',
       role: data.role,
       isApproved: data.is_approved === true,
-      email: safeString(data.email),
+      email: data.email,
       permissions: { ...DEFAULT_PERMISSIONS, ...(data.permissions || {}) },
       governorate: data.governorate,
       center: data.center,
@@ -198,15 +153,15 @@ export const db = {
     };
   },
 
-  async getAllProfiles(currentUserProfile?: UserProfile): Promise<UserProfile[]> {
+  async getAllProfiles(): Promise<UserProfile[]> {
     const { data, error } = await supabase.from('profiles').select('*').order('role', { ascending: true });
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map((row: any) => ({
       id: row.id,
-      username: safeString(row.username, 'User'),
+      username: row.username,
       role: row.role,
       isApproved: row.is_approved === true,
-      email: safeString(row.email),
+      email: row.email,
       permissions: { ...DEFAULT_PERMISSIONS, ...(row.permissions || {}) },
       governorate: row.governorate,
       center: row.center,
@@ -222,15 +177,14 @@ export const db = {
   },
 
   async createLogEntry(log: Omit<LogEntry, 'id'>): Promise<void> {
-    const row = {
+    await supabase.from('logs').insert({
       message: log.message,
       type: log.type,
       user_id: log.userId,
       timestamp: log.timestamp,
       governorate: log.governorate,
       center: log.center
-    };
-    await supabase.from('logs').insert(row);
+    });
   },
 
   async getRecentLogs(): Promise<LogEntry[]> {
@@ -238,7 +192,7 @@ export const db = {
     if (error) return [];
     return (data || []).map((row: any) => ({
       id: row.id,
-      message: safeString(row.message),
+      message: row.message,
       type: row.type,
       userId: row.user_id,
       timestamp: row.timestamp,
@@ -248,13 +202,12 @@ export const db = {
   },
 
   async clearAllLogs(): Promise<void> {
-    const { error } = await supabase.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (error) throw error;
+    await supabase.from('logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   },
 
   async createCampaign(campaign: Omit<ActiveCampaign, 'id'>): Promise<void> {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('campaigns').insert({
+      await supabase.from('campaigns').insert({
           name: campaign.name,
           participants: Array.from(campaign.participantIds),
           targets: Array.from(campaign.targetIds),
@@ -263,7 +216,6 @@ export const db = {
           is_active: true,
           created_by: user?.id
       });
-      if (error) throw error;
   },
 
   async getActiveCampaign(): Promise<ActiveCampaign | null> {

@@ -1,24 +1,16 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, GroundingSource } from '../types';
 
-let client: GoogleGenAI | null = null;
-
-const getClient = () => {
-  if (!client) {
-    client = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
-  return client;
-};
+// Use this helper to always get a fresh client instance right before API calls
+const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const searchPlace = async (query: string): Promise<{ lat: number; lng: number; name: string } | null> => {
-  const ai = getClient();
+  const ai = getAiClient();
   try {
     // Maps grounding is only supported in Gemini 2.5 series models.
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [{
-        role: 'user',
+      contents: {
         parts: [{ text: `
           Find the geographic location for: "${query}" using Google Maps.
           Return ONLY a valid JSON object with these keys:
@@ -28,7 +20,7 @@ export const searchPlace = async (query: string): Promise<{ lat: number; lng: nu
           
           Do not include markdown formatting or explanations. Just the JSON.
         ` }]
-      }],
+      },
       config: {
         tools: [{ googleMaps: {} }],
         // Note: responseMimeType and responseSchema are not allowed with maps grounding
@@ -57,27 +49,24 @@ export const identifyLocation = async (
   lng: number,
   userNote: string
 ): Promise<AnalysisResult> => {
-  const ai = getClient();
+  const ai = getAiClient();
   
   try {
     // Maps grounding is only supported in Gemini 2.5 series models.
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `
-            I am creating a map journal entry at coordinates: ${lat}, ${lng}.
-            My personal note is: "${userNote}".
-            
-            Using Google Maps data:
-            1. Identify the specific name of this location (Business, Park, Landmark, or Address).
-            2. Provide a rich, interesting description of what is here, combining my note with real-world facts.
-            
-            Format the response as a simple JSON object with keys: 'name' (string) and 'details' (string).
-          ` }]
-        }
-      ],
+      contents: {
+        parts: [{ text: `
+          I am creating a map journal entry at coordinates: ${lat}, ${lng}.
+          My personal note is: "${userNote}".
+          
+          Using Google Maps data:
+          1. Identify the specific name of this location (Business, Park, Landmark, or Address).
+          2. Provide a rich, interesting description of what is here, combining my note with real-world facts.
+          
+          Format the response as a simple JSON object with keys: 'name' (string) and 'details' (string).
+        ` }]
+      },
       config: {
         tools: [{ googleMaps: {} }],
         toolConfig: {
