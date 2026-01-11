@@ -102,16 +102,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
   const [password, setPassword] = useState('');
   const [accessCode, setAccessCode] = useState('');
 
-  const handleDemoMode = () => {
-    if (onSourceLogin) {
-      onSourceLogin({ 
-        code: 'DEMO-MODE', 
-        expiresAt: Date.now() + 3600000, 
-        label: 'جولة استكشافية (تجربة)' 
-      });
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -173,14 +163,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
             {authMode === 'login' ? 'الدخول كـ مصدر مؤقت' : 'العودة لدخول الطاقم'}
           </button>
         </div>
-
-        {/* زر وضع التجربة يظهر دائماً في حالة عدم وجود إعدادات لإتاحة الوصول للطائرة */}
-        {!isConfigured && (
-          <button onClick={handleDemoMode} style={{ ...styles.button, ...styles.demoBtn }}>
-            <Play size={18} />
-            بدء جولة تجريبية (بدون قاعدة بيانات)
-          </button>
-        )}
       </div>
     </div>
   );
