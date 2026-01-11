@@ -5,7 +5,8 @@ import { Assignment } from '../types';
 
 interface NotificationBellProps {
   assignments: Assignment[];
-  onAccept: (assignment: Assignment) => void;
+  // Fix: changed from (assignment: Assignment) => void to (id: string) => void
+  onAccept: (id: string) => void;
 }
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({ assignments, onAccept }) => {
@@ -54,7 +55,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ assignments,
                        
                        {assign.status === 'pending' ? (
                          <button 
-                           onClick={() => { onAccept(assign); setIsOpen(false); }}
+                           // Fix: pass assign.id instead of assign
+                           onClick={() => { onAccept(assign.id); setIsOpen(false); }}
                            className="w-full bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                          >
                            <CheckCircle2 size={14} /> قبول وتوجه

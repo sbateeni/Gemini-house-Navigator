@@ -19,18 +19,43 @@ html, body, #root {
   outline: none;
 }
 
+/* Glassmorphism Advanced */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Scanline Effect for Dashboards */
+.glass-panel::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  z-index: 2;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.1;
 }
 
 /* تحسينات الخريطة */
 .leaflet-popup-content-wrapper {
-  background: rgba(15, 23, 42, 0.95) !important;
+  background: rgba(15, 23, 42, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
   color: white !important;
-  border-radius: 12px !important;
-  border: 1px solid rgba(59, 130, 246, 0.5) !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  padding: 5px !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.9) !important;
 }
 
 .custom-div-icon {
@@ -52,4 +77,19 @@ html, body, #root {
 }
 .animate-pulse-glow {
   animation: pulse-glow 2s infinite ease-in-out;
+}
+
+/* Custom Scrollbar for Tactical Feel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.6);
 }

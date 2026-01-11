@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Settings, LogOut, Gamepad2 } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, Briefcase } from 'lucide-react';
 
 interface SidebarFooterProps {
   isAdmin: boolean;
@@ -26,7 +26,7 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isAdmin, onOpenDas
            
            {isAdmin && (
                <button onClick={onOpenCampaigns} className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-yellow-500 border border-slate-700 py-2 rounded-lg text-xs font-bold transition-all">
-                   <Gamepad2 size={16} /> حملات الاعتقال
+                   <Briefcase size={16} /> مركز المهام الميدانية
                </button>
            )}
 

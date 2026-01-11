@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession } from './types';
 import { identifyLocation } from './services/gemini';
-import { X, Sparkles, Map as MapIcon, ShieldAlert } from 'lucide-react';
+import { X, Sparkles, LayoutPanelTop, Monitor } from 'lucide-react';
 
 // Components
 import { ModalContainer } from './components/ModalContainer';
@@ -15,12 +15,14 @@ import { AuthPage } from './components/AuthPage';
 import { PendingApproval } from './components/PendingApproval';
 import { LoadingScreen } from './components/layout/LoadingScreen';
 import { TacticalOverlay } from './components/layout/TacticalOverlay';
+import { StrategicDashboard } from './components/StrategicDashboard';
 
 export default function App() {
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
   const [showDatabaseFix, setShowDatabaseFix] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAILoading, setIsAILoading] = useState(false);
+  const [showStrategicHub, setShowStrategicHub] = useState(true);
 
   // --- 1. CORE LOGIC HOOKS ---
   const logic = useAppLogic(!!sourceSession);
@@ -76,8 +78,11 @@ export default function App() {
       );
   }
 
+  const isOpsManager = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
+
   return (
     <div className="flex h-screen w-full bg-[#020617] text-white overflow-hidden select-none" dir="rtl">
+      
       {/* 1. Sidebar */}
       <Sidebar 
           isOpen={sidebarOpen}
@@ -118,6 +123,15 @@ export default function App() {
       {/* 2. Main Content Area */}
       <div className="flex-1 relative h-full overflow-hidden">
         
+        {/* Dubai Strategic Dashboard Layer */}
+        {isOpsManager && (
+            <StrategicDashboard 
+                onlineUsers={onlineUsers}
+                notes={notes}
+                isOpen={showStrategicHub}
+            />
+        )}
+
         {/* Map Background */}
         <LeafletMap 
           isSatellite={isSatellite}
@@ -149,7 +163,7 @@ export default function App() {
 
         {/* AI Intelligence Floating Modal */}
         {aiAnalysis && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[4000] w-[90%] max-w-lg glass-panel p-6 rounded-[2rem] shadow-2xl animate-in fade-in zoom-in-95 border-b-4 border-blue-500/50">
+          <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[4000] w-[90%] max-w-lg glass-panel p-6 rounded-[2rem] shadow-2xl animate-in fade-in zoom-in-95 border-b-4 border-blue-500/50">
             <div className="flex justify-between items-start mb-4">
                <div className="flex items-center gap-3 text-blue-400">
                   <div className="bg-blue-600/20 p-2 rounded-xl">
@@ -179,6 +193,19 @@ export default function App() {
           onClearRoute={handleStopNavigation}
           hasActiveCampaign={!!activeCampaign}
         />
+
+        {/* Tactical Hub Toggle (Dubai Style) */}
+        {isOpsManager && (
+            <button 
+                onClick={() => setShowStrategicHub(!showStrategicHub)}
+                className={`absolute bottom-24 left-4 z-[400] w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-xl border
+                ${showStrategicHub ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900/90 border-slate-700 text-slate-400 hover:bg-slate-800'}
+                `}
+                title="مركز غياث للبيانات الاستراتيجية"
+            >
+                <Monitor size={20} />
+            </button>
+        )}
 
         {/* Modal Manager */}
         <ModalContainer

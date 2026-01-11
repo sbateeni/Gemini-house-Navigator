@@ -12,7 +12,8 @@ interface MapControlsProps {
   onLocateUser: () => void;
   isLocating?: boolean;
   assignments: Assignment[];
-  onAcceptAssignment: (a: Assignment) => void;
+  // Fix: changed from (a: Assignment) => void to (id: string) => void
+  onAcceptAssignment: (id: string) => void;
   hasActiveRoute: boolean;
   onClearRoute: () => void;
   hasActiveCampaign?: boolean; // New prop to adjust position
