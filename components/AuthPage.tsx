@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
 import { isConfigured } from '../services/supabase';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, KeyRound, LogOut, CheckSquare, Square, Play } from 'lucide-react';
+import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, KeyRound, LogOut, CheckSquare, Square, Play, Check } from 'lucide-react';
 import { SourceSession } from '../types';
 
 const styles: { [key: string]: React.CSSProperties } = {
@@ -55,6 +55,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   title: { fontSize: '24px', fontWeight: '800', color: 'white', textAlign: 'center', margin: 0 },
   subtitle: { fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginTop: '5px' },
+  inputGroup: {
+    position: 'relative',
+    width: '100%',
+  },
   input: {
     width: '100%',
     backgroundColor: '#020617',
@@ -65,6 +69,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: 'white',
     outline: 'none',
     boxSizing: 'border-box',
+    transition: 'border-color 0.2s',
   },
   button: {
     width: '100%',
@@ -81,11 +86,13 @@ const styles: { [key: string]: React.CSSProperties } = {
     gap: '10px',
     transition: 'all 0.2s',
   },
-  demoBtn: {
-    backgroundColor: 'transparent',
-    border: '2px dashed #3b82f6',
-    color: '#3b82f6',
-    marginTop: '10px'
+  checkboxWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    marginTop: '2px',
+    userSelect: 'none',
   }
 };
 
@@ -101,6 +108,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [accessCode, setAccessCode] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // تحميل البيانات المحفوظة عند التحميل
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('ops_saved_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +133,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
       } else {
         const { error } = await auth.signIn(email, password);
         if (error) throw error;
+
+        // إدارة ميزة "تذكرني"
+        if (rememberMe) {
+          localStorage.setItem('ops_saved_email', email);
+        } else {
+          localStorage.removeItem('ops_saved_email');
+        }
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'حدث خطأ' });
@@ -132,7 +156,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
           <ShieldCheck size={35} color="white" />
         </div>
         <h1 style={styles.title}>دخول النظام</h1>
-        <p style={styles.subtitle}>نظام العمليات الجغرافية الآمن</p>
+        <p style={styles.subtitle}>مركز القيادة والسيطرة الجغرافي</p>
 
         {message && (
           <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
@@ -143,11 +167,60 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {authMode === 'login' ? (
             <>
-              <input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} style={styles.input} required />
-              <input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} style={styles.input} required />
+              <div style={styles.inputGroup}>
+                <input 
+                  type="email" 
+                  placeholder="البريد الإلكتروني" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  style={styles.input} 
+                  required 
+                />
+                <Mail size={18} style={{ position: 'absolute', right: '15px', top: '15px', color: '#64748b' }} />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <input 
+                  type="password" 
+                  placeholder="كلمة المرور" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  style={styles.input} 
+                  required 
+                />
+                <Lock size={18} style={{ position: 'absolute', right: '15px', top: '15px', color: '#64748b' }} />
+              </div>
+
+              {/* خيار تذكرني */}
+              <div style={styles.checkboxWrapper} onClick={() => setRememberMe(!rememberMe)}>
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '4px',
+                  border: `2px solid ${rememberMe ? '#3b82f6' : '#1e293b'}`,
+                  backgroundColor: rememberMe ? '#3b82f6' : '#020617',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}>
+                  {rememberMe && <Check size={12} color="white" strokeWidth={4} />}
+                </div>
+                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>حفظ بيانات الدخول</span>
+              </div>
             </>
           ) : (
-            <input type="text" placeholder="كود المصدر (16 رقم)" value={accessCode} onChange={e => setAccessCode(e.target.value)} style={styles.input} required />
+            <div style={styles.inputGroup}>
+              <input 
+                type="text" 
+                placeholder="كود المصدر (16 رقم)" 
+                value={accessCode} 
+                onChange={e => setAccessCode(e.target.value)} 
+                style={styles.input} 
+                required 
+              />
+              <KeyRound size={18} style={{ position: 'absolute', right: '15px', top: '15px', color: '#64748b' }} />
+            </div>
           )}
 
           <button type="submit" disabled={loading} style={{ ...styles.button, backgroundColor: '#2563eb' }}>
@@ -157,7 +230,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
 
         <div style={{ textAlign: 'center' }}>
           <button 
-            onClick={() => setAuthMode(authMode === 'login' ? 'source' : 'login')}
+            onClick={() => {
+              setAuthMode(authMode === 'login' ? 'source' : 'login');
+              setMessage(null);
+            }}
             style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold' }}
           >
             {authMode === 'login' ? 'الدخول كـ مصدر مؤقت' : 'العودة لدخول الطاقم'}
