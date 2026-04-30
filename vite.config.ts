@@ -1,5 +1,5 @@
 
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
@@ -17,26 +17,39 @@ const envKeys = [
   'SUPABASE_ANON_KEY'
 ];
 
-const processEnv: Record<string, string | undefined> = {};
-envKeys.forEach(key => {
-  if (process.env[key]) {
-    processEnv[key] = process.env[key];
-  }
-});
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const mergedEnv = { ...process.env, ...env };
 
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'), 
-      '@components': path.resolve(__dirname, './components'),
-      '@services': path.resolve(__dirname, './services')
+  const processEnv: Record<string, string | undefined> = {};
+  envKeys.forEach(key => {
+    if (mergedEnv[key]) {
+      processEnv[key] = mergedEnv[key];
+    }
+  });
+
+  return {
+    plugins: [
+      react(),
+      tailwindcss(),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './'),
+        '@components': path.resolve(__dirname, './components'),
+        '@services': path.resolve(__dirname, './services')
+      },
     },
-  },
-  define: {
-    'process.env': JSON.stringify(processEnv)
-  }
+    define: {
+      'process.env': JSON.stringify(processEnv)
+    },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: './test/setup.ts',
+      coverage: {
+        provider: 'v8'
+      }
+    }
+  };
 });

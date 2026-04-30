@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useId } from 'react';
 import { auth } from '../services/auth';
 import { db } from '../services/db';
-import { isConfigured } from '../services/supabase';
-import { Loader2, Mail, Lock, User, ShieldCheck, AlertCircle, KeyRound, LogOut, CheckSquare, Square, Play, Check } from 'lucide-react';
+import { Loader2, Mail, Lock, ShieldCheck, KeyRound, Check } from 'lucide-react';
 import { SourceSession } from '../types';
 
 const styles: { [key: string]: React.CSSProperties } = {
@@ -101,23 +100,28 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
+  const rememberId = useId();
   const [authMode, setAuthMode] = useState<'login' | 'source'>('login');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('ops_saved_email') || '');
   const [password, setPassword] = useState('');
   const [accessCode, setAccessCode] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('ops_saved_email')));
 
-  // تحميل البيانات المحفوظة عند التحميل
-  useEffect(() => {
-    const savedEmail = localStorage.getItem('ops_saved_email');
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
+  const getAuthErrorMessage = (errorMessage: string) => {
+    if (errorMessage.includes('Invalid login credentials')) {
+      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
     }
-  }, []);
+    if (errorMessage.includes('Email not confirmed')) {
+      return 'الحساب غير مفعل. يرجى تأكيد البريد الإلكتروني أولاً.';
+    }
+    if (errorMessage.includes('إعدادات Supabase غير مكتملة')) {
+      return 'تعذر الاتصال بمنظومة التحقق. تأكد من إعدادات البيئة.';
+    }
+    return 'تعذر تسجيل الدخول الآن. حاول مرة أخرى.';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +136,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
          } else throw new Error(res.error || 'كود غير صالح');
       } else {
         const { error } = await auth.signIn(email, password);
-        if (error) throw error;
+        if (error) throw new Error(getAuthErrorMessage(error.message || ''));
 
         // إدارة ميزة "تذكرني"
         if (rememberMe) {
@@ -141,8 +145,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
           localStorage.removeItem('ops_saved_email');
         }
       }
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'حدث خطأ' });
+    } catch (err: unknown) {
+      const errorText = err instanceof Error ? err.message : 'حدث خطأ';
+      setMessage({ type: 'error', text: errorText });
     } finally {
       setLoading(false);
     }
@@ -159,7 +164,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
         <p style={styles.subtitle}>مركز القيادة والسيطرة الجغرافي</p>
 
         {message && (
-          <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div role="alert" aria-live="polite" style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '12px', border: '1px solid rgba(239,68,68,0.2)' }}>
             {message.text}
           </div>
         )}
@@ -192,8 +197,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
               </div>
 
               {/* خيار تذكرني */}
-              <div style={styles.checkboxWrapper} onClick={() => setRememberMe(!rememberMe)}>
-                <div style={{
+              <label htmlFor={rememberId} style={styles.checkboxWrapper}>
+                <input
+                  id={rememberId}
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
+                />
+                <div aria-hidden="true" style={{
                   width: '18px',
                   height: '18px',
                   borderRadius: '4px',
@@ -206,8 +218,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSourceLogin }) => {
                 }}>
                   {rememberMe && <Check size={12} color="white" strokeWidth={4} />}
                 </div>
-                <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'bold' }}>حفظ بيانات الدخول</span>
-              </div>
+                <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 'bold' }}>حفظ بيانات الدخول (يتم حفظ البريد فقط على هذا الجهاز)</span>
+              </label>
             </>
           ) : (
             <div style={styles.inputGroup}>
