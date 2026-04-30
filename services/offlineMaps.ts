@@ -3,7 +3,7 @@
 
 // This service manages storing map images (tiles) in IndexedDB for offline usage.
 
-const DB_NAME = 'gemini_map_cache';
+const DB_NAME = 'ops_map_cache';
 const STORE_NAME = 'tiles';
 const DB_VERSION = 1;
 

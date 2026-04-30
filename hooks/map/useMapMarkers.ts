@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { MapNote } from '../../types';
 import { createNotePopupHtml, createTempMarkerIconHtml, createSelfIconHtml } from '../../utils/mapHelpers';
+import { getNoteDisplayTitle } from '../../utils/noteDisplay';
 
 export function useMapMarkers(
     mapInstanceRef: React.MutableRefObject<any>,
@@ -31,34 +32,34 @@ export function useMapMarkers(
     onDispatchRef.current = onDispatch;
   }, [notes, onNavigate, onDispatch]);
 
-  // 1. Setup Global Event Listeners for Popup Buttons
   useEffect(() => {
-      const handleNavigate = (e: any) => {
-          const noteId = e.detail;
-          const note = notesRef.current.find(n => n.id === noteId);
-          if (note && onNavigateRef.current) {
-              onNavigateRef.current(note);
-              mapInstanceRef.current?.closePopup();
-          }
-      };
+    const handlePopupActionClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const actionButton = target?.closest('button[data-map-action][data-note-id]') as HTMLButtonElement | null;
+      if (!actionButton) return;
 
-      const handleDispatch = (e: any) => {
-          const noteId = e.detail;
-          const note = notesRef.current.find(n => n.id === noteId);
-          if (note && onDispatchRef.current) {
-              onDispatchRef.current(note);
-              mapInstanceRef.current?.closePopup();
-          }
-      };
+      event.preventDefault();
+      event.stopPropagation();
 
-      window.addEventListener('map-navigate', handleNavigate);
-      window.addEventListener('map-dispatch', handleDispatch);
+      const action = actionButton.getAttribute('data-map-action');
+      const noteId = actionButton.getAttribute('data-note-id');
+      if (!action || !noteId) return;
 
-      return () => {
-          window.removeEventListener('map-navigate', handleNavigate);
-          window.removeEventListener('map-dispatch', handleDispatch);
-      };
-  }, []);
+      const note = notesRef.current.find((n) => n.id === noteId);
+      if (!note) return;
+
+      if (action === 'navigate' && onNavigateRef.current) {
+        onNavigateRef.current(note);
+      }
+      if (action === 'dispatch' && onDispatchRef.current) {
+        onDispatchRef.current(note);
+      }
+      mapInstanceRef.current?.closePopup();
+    };
+
+    document.addEventListener('click', handlePopupActionClick, true);
+    return () => document.removeEventListener('click', handlePopupActionClick, true);
+  }, [mapInstanceRef]);
 
   // 2. Render Note Markers
   useEffect(() => {
@@ -109,6 +110,28 @@ export function useMapMarkers(
 
       const canCommand = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
       const popupContent = createNotePopupHtml(note, canCommand);
+      const handlePopupOpen = (event: unknown) => {
+        setSelectedNote(note);
+        const popupEvent = event as { popup?: { getElement?: () => HTMLElement | null } };
+        const popupElement = popupEvent.popup?.getElement?.() || null;
+        if (!popupElement) return;
+
+        const navigateButton = popupElement.querySelector<HTMLButtonElement>('button[data-map-action="navigate"]');
+        const dispatchButton = popupElement.querySelector<HTMLButtonElement>('button[data-map-action="dispatch"]');
+
+        if (navigateButton) {
+          navigateButton.onclick = () => {
+            if (onNavigateRef.current) onNavigateRef.current(note);
+            map.closePopup();
+          };
+        }
+        if (dispatchButton) {
+          dispatchButton.onclick = () => {
+            if (onDispatchRef.current) onDispatchRef.current(note);
+            map.closePopup();
+          };
+        }
+      };
 
       if (markersRef.current[note.id]) {
         // UPDATE Existing Marker
@@ -116,12 +139,14 @@ export function useMapMarkers(
         marker.setLatLng([note.lat, note.lng]);
         marker.setIcon(icon);
         marker.setPopupContent(popupContent);
+        marker.off('popupopen');
+        marker.on('popupopen', handlePopupOpen);
         
         // Update tooltip logic for ALL notes (if visible)
         if (isPublic) {
              // Re-bind to ensure new options (top direction) are applied if changed
              marker.unbindTooltip();
-             marker.bindTooltip(note.locationName, { 
+             marker.bindTooltip(getNoteDisplayTitle(note), {
                 permanent: true, 
                 direction: 'top', // Show above the marker
                 offset: [0, -28], // Push up to clear the icon height (32px approx)
@@ -136,7 +161,7 @@ export function useMapMarkers(
 
         // ALWAYS show label for PUBLIC notes
         if (isPublic) {
-            marker.bindTooltip(note.locationName, { 
+            marker.bindTooltip(getNoteDisplayTitle(note), {
                 permanent: true, 
                 direction: 'top', // Show above the marker
                 offset: [0, -28], // Push up to clear the icon height
@@ -144,7 +169,7 @@ export function useMapMarkers(
             });
         }
 
-        marker.on('popupopen', () => setSelectedNote(note));
+        marker.on('popupopen', handlePopupOpen);
         markersRef.current[note.id] = marker;
       }
     });
@@ -154,7 +179,7 @@ export function useMapMarkers(
         markersRef.current[selectedNote.id].openPopup();
     }
 
-  }, [notes, isSatellite, selectedNote, userRole, mapInstanceRef.current]);
+  }, [notes, isSatellite, selectedNote, userRole, mapInstanceRef, setSelectedNote]);
 
   // 3. Handle FlyTo
   useEffect(() => {
@@ -163,7 +188,7 @@ export function useMapMarkers(
       duration: 1.5,
       easeLinearity: 0.25
     });
-  }, [flyToTarget]);
+  }, [flyToTarget, mapInstanceRef]);
 
   // 4. Temp Marker
   useEffect(() => {
@@ -184,7 +209,7 @@ export function useMapMarkers(
       const marker = window.L.marker([tempMarkerCoords.lat, tempMarkerCoords.lng], { icon }).addTo(map);
       markersRef.current['temp'] = marker;
     }
-  }, [tempMarkerCoords]);
+  }, [tempMarkerCoords, mapInstanceRef]);
 
   // 5. Self Location Marker
   useEffect(() => {
@@ -209,5 +234,5 @@ export function useMapMarkers(
       });
       hasInitialFlownToUserRef.current = true;
     }
-  }, [userLocation]);
+  }, [userLocation, mapInstanceRef]);
 }

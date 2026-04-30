@@ -1,22 +1,23 @@
 
 import React from 'react';
-import { Users, Clock, Shield, Award, WifiOff, Scale } from 'lucide-react';
+import { Users, Shield, Award, WifiOff, Scale } from 'lucide-react';
 import { MapUser, UserProfile } from '../../types';
 
 interface SidebarUnitsProps {
   onlineUsers: MapUser[];
   allProfiles: UserProfile[];
+  currentUserId?: string;
 }
 
-export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProfiles }) => {
-  const statusColors: any = {
+export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProfiles, currentUserId }) => {
+  const statusColors: Record<'patrol' | 'busy' | 'pursuit' | 'offline', string> = {
     patrol: 'bg-green-500',
     busy: 'bg-yellow-500',
     pursuit: 'bg-red-500',
     offline: 'bg-slate-500'
   };
 
-  const statusLabels: any = {
+  const statusLabels: Record<'patrol' | 'busy' | 'pursuit' | 'offline', string> = {
     patrol: 'دورية',
     busy: 'مشغول',
     pursuit: 'مطاردة',
@@ -58,9 +59,6 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
     return bLastSeen - aLastSeen;
   });
 
-  const now = Date.now();
-  const BACKGROUND_THRESHOLD = 30 * 60 * 1000; // 30 minutes
-
   return (
     <div className="mb-4 space-y-1">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-1 flex items-center justify-between">
@@ -72,14 +70,12 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
             // Check if mapUser exists. If it exists, it means it's either LIVE or BACKGROUND (fetched via usePresence)
             // usePresence filters DB users by 30 mins.
             
-            const isVisibleOnMap = !!mapUser;
-            const isLive = mapUser?.isOnline === true;
+            const isSelf = u.id === currentUserId;
+            const isVisibleOnMap = !!mapUser || isSelf;
+            const isLive = mapUser?.isOnline === true || isSelf;
             
             // Check true offline status (longer than 30 mins)
-            const lastSeenDelta = now - (u.last_seen || 0);
-            const isTrulyOffline = !isVisibleOnMap;
-
-            let status = isVisibleOnMap ? (mapUser?.status || 'patrol') : 'offline';
+            const status = isVisibleOnMap ? (mapUser?.status || 'patrol') : 'offline';
             
             // UI States
             let dotColor, textColor, bgColor, borderColor, statusText;
@@ -97,8 +93,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
                 textColor = 'text-orange-200';
                 bgColor = 'bg-orange-900/10';
                 borderColor = 'border-orange-900/30';
-                const minsAgo = Math.floor(lastSeenDelta / 60000);
-                statusText = `فقدان إشارة (منذ ${minsAgo}د)`;
+                statusText = 'فقدان إشارة (حديث)';
             } else {
                 // Offline (> 30 mins)
                 dotColor = 'bg-red-900';
@@ -109,12 +104,12 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
             }
 
             return (
-                <div key={u.id} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${bgColor} ${borderColor}`}>
-                        <div className="flex items-center gap-2 w-full">
+                <div key={u.id} className={`flex items-start justify-between px-3 py-2.5 rounded-lg border ${bgColor} ${borderColor}`}>
+                        <div className="flex items-start gap-2 w-full min-w-0">
                             {/* Status Dot */}
                             <div className={`w-2 h-2 shrink-0 rounded-full ${dotColor} ${isLive ? 'animate-pulse' : ''}`}></div>
                             
-                            <div className="flex flex-col w-full min-w-0">
+                            <div className="flex flex-col w-full min-w-0 gap-1">
                                 <div className="flex items-center justify-between gap-2">
                                     <span className={`text-xs font-bold truncate ${textColor}`}>{u.username}</span>
                                     
@@ -127,7 +122,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
                                     </span>
                                 </div>
 
-                                <div className="flex items-center gap-1 mt-0.5">
+                                <div className="flex items-center gap-1 flex-wrap">
                                     {!isLive && isVisibleOnMap && <WifiOff size={8} className="text-orange-400" />}
                                     <span className={`text-[9px] ${!isLive && isVisibleOnMap ? 'text-orange-400 font-bold' : 'text-slate-500'}`}>
                                         {statusText}
@@ -135,7 +130,7 @@ export const SidebarUnits: React.FC<SidebarUnitsProps> = ({ onlineUsers, allProf
                                     
                                     {/* Optional Location Text */}
                                     {u.governorate && (
-                                        <span className="text-[9px] text-slate-600 mr-auto truncate dir-rtl">
+                                        <span className="text-[9px] text-slate-600 mr-auto break-words">
                                             {u.center ? ` - ${u.center}` : ` - ${u.governorate}`}
                                         </span>
                                     )}

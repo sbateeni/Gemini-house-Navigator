@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
-import { MapNote, UserProfile } from '../types';
+import { MapNote, UserProfile, WantedStatus } from '../types';
 
 export function useNotes(session: any, isApproved: boolean, isAccountDeleted: boolean, userProfile: UserProfile | null) {
   const [notes, setNotes] = useState<MapNote[]>([]);
@@ -105,7 +105,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
     await db.deleteNote(id);
   };
 
-  const updateStatus = async (id: string, status: 'caught' | 'not_caught') => {
+  const updateStatus = async (id: string, status: WantedStatus) => {
     const note = notes.find(n => n.id === id);
     if (note) {
       await updateNote({ ...note, status });

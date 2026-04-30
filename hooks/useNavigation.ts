@@ -23,9 +23,13 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
     updateRoute();
   }, [userLocation, navigationTarget]);
 
+  const warnGpsRequired = () => {
+    alert('يرجى تفعيل GPS/خدمات الموقع أولاً ثم إعادة الضغط على زر "ذهاب".');
+  };
+
   const handleNavigateToNote = async (note: MapNote, locateUserCallback: () => void) => {
       if (!userLocation) {
-          alert("We need your location. Please wait for GPS.");
+          warnGpsRequired();
           locateUserCallback();
           return;
       }
@@ -35,14 +39,15 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
       setIsRouting(false);
       if (route) setCurrentRoute(route);
       else {
-        alert("Could not find a driving route.");
+        alert("تعذر العثور على مسار قيادة.");
         setNavigationTarget(null);
       }
   };
 
-  const handleNavigateToPoint = async (lat: number, lng: number) => {
+  const handleNavigateToPoint = async (lat: number, lng: number, locateUserCallback?: () => void) => {
       if (!userLocation) {
-          alert("Waiting for GPS...");
+          warnGpsRequired();
+          locateUserCallback?.();
           return;
       }
       setIsRouting(true);

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Gamepad2, Users, MapPin, Eye, Search, CheckCircle, Shield, Wifi, WifiOff } from 'lucide-react';
+import { X, Gamepad2, Users, MapPin, Eye, Search, CheckCircle, Shield, LucideIcon } from 'lucide-react';
 import { MapUser, MapNote, UserProfile, ActiveCampaign } from '../types';
+import { normalizeWantedStatus } from '../utils/status';
 
 interface CampaignsModalProps {
     isOpen: boolean;
@@ -25,7 +26,7 @@ const MultiSelectSection = ({
     placeholder 
 }: {
     title: string,
-    icon: any,
+    icon: LucideIcon,
     items: { id: string, label: string, subLabel?: string, color?: string, isOnline?: boolean }[],
     selectedIds: Set<string>,
     onToggle: (id: string) => void,
@@ -125,18 +126,20 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
     // Initialize with existing campaign data if available
     useEffect(() => {
         if (isOpen) {
-            if (activeCampaign) {
-                setCampaignName(activeCampaign.name);
-                setParticipants(new Set(activeCampaign.participantIds));
-                setTargets(new Set(activeCampaign.targetIds));
-                setCommanders(new Set(activeCampaign.commanderIds));
-            } else {
-                // Reset for new campaign
-                setCampaignName("");
-                setParticipants(new Set());
-                setTargets(new Set());
-                setCommanders(new Set([currentUserProfile?.id || '']));
-            }
+            queueMicrotask(() => {
+                if (activeCampaign) {
+                    setCampaignName(activeCampaign.name);
+                    setParticipants(new Set(activeCampaign.participantIds));
+                    setTargets(new Set(activeCampaign.targetIds));
+                    setCommanders(new Set(activeCampaign.commanderIds));
+                } else {
+                    // Reset for new campaign
+                    setCampaignName("");
+                    setParticipants(new Set());
+                    setTargets(new Set());
+                    setCommanders(new Set([currentUserProfile?.id || '']));
+                }
+            });
         }
     }, [isOpen, activeCampaign, currentUserProfile]);
 
@@ -162,7 +165,7 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
 
     // 2. Targets (Not Caught Notes)
     const availableTargets = notes
-        .filter(n => n.status !== 'caught') // Only pending targets
+        .filter(n => normalizeWantedStatus(n.status) !== 'closed')
         .map(n => ({
             id: n.id,
             label: n.locationName,
@@ -205,7 +208,7 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
             const summary = `
             تم إطلاق الحملة: ${campaignName}
             القوة: ${participants.size} عنصر
-            الأهداف: ${targets.size} موقع
+            المطاليب: ${targets.size}
             القيادة: ${commanders.size} ضباط
             `;
             if (confirm(summary + "\n\nهل أنت متأكد من البدء؟")) {
@@ -232,8 +235,11 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
                                 {activeCampaign ? 'تعديل الحملة الجارية' : 'إطلاق حملة أمنية'}
                             </h2>
                             <p className="text-xs text-slate-400">
-                                {activeCampaign ? 'تحديث القوات والأهداف المتبقية' : 'تخصيص القوات والأهداف والصلاحيات'}
+                                {activeCampaign ? 'تحديث القوة والمطاليب المتبقية' : 'تخصيص القوة والمطاليب والصلاحيات'}
                             </p>
+                            <span className={`text-[10px] font-bold ${activeCampaign ? 'text-green-400' : 'text-yellow-400'}`}>
+                                الحالة: {activeCampaign ? 'جارية' : 'مخططة'}
+                            </span>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white">
@@ -268,7 +274,7 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
 
                     {/* Section 2: Targets */}
                     <MultiSelectSection 
-                        title="الأهداف المتبقية" 
+                        title="المطاليب المتبقية" 
                         icon={MapPin} 
                         items={availableTargets}
                         selectedIds={targets}
@@ -283,7 +289,7 @@ export const CampaignsModal: React.FC<CampaignsModalProps> = ({
                             <div>
                                 <h4 className="text-sm font-bold text-purple-200">صلاحيات الرؤية الكاملة</h4>
                                 <p className="text-[10px] text-purple-300/70 leading-relaxed mt-1">
-                                    المختارون هنا فقط سيرون أسماء العناصر والأهداف على الخريطة.
+                                    المختارون هنا فقط سيرون أسماء الوحدات والمطاليب على الخريطة.
                                     <br/>باقي القوة المشاركة سترى نقاطاً مبهمة فقط.
                                 </p>
                             </div>

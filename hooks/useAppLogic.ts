@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapNote, MapUser, UnitStatus, ActiveCampaign, UserProfile } from '../types';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
-import { searchPlace } from '../services/gemini';
+import { searchPlace } from '../services/geocoding';
 
 // Hooks
 import { useAuth } from './useAuth';
@@ -35,7 +35,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
-    currentRoute, secondaryRoute, setSecondaryRoute, calculateRoute, isRouting, 
+    currentRoute, secondaryRoute, isRouting, 
     handleNavigateToNote: rawHandleNavigateToNote, 
     handleNavigateToPoint, handleStopNavigation
   } = useNavigation(userLocation);
@@ -43,10 +43,14 @@ export function useAppLogic(isSourceMode: boolean = false) {
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
-  const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('gemini_map_provider') || 'google');
+  const [mapProvider, setMapProvider] = useState(() => localStorage.getItem('ops_map_provider') || 'google');
   
   const isSatellite = mapProvider === 'google' || mapProvider === 'esri';
   const setIsSatellite = (val: boolean) => setMapProvider(val ? 'google' : 'carto');
+
+  useEffect(() => {
+    localStorage.setItem('ops_map_provider', mapProvider);
+  }, [mapProvider]);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -57,8 +61,6 @@ export function useAppLogic(isSourceMode: boolean = false) {
   const [showSettings, setShowSettings] = useState(false);
   const [showFullLogs, setShowFullLogs] = useState(false);
   const [showCampaigns, setShowCampaigns] = useState(false); 
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
   const [commandUser, setCommandUser] = useState<MapUser | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [dispatchTargetLocation, setDispatchTargetLocation] = useState<MapNote | null>(null);
@@ -169,12 +171,12 @@ export function useAppLogic(isSourceMode: boolean = false) {
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
-    selectedNote, setSelectedNote, flyToNote, handleAnalyzeNote: (n: any) => {}, handleDeleteNote: deleteNote, isAnalyzing,
+    selectedNote, setSelectedNote, flyToNote, handleDeleteNote: deleteNote,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,
     commandUser, setCommandUser, onUserClick: (u: MapUser) => setCommandUser(u), handleIntercept: () => {
         if (commandUser) {
-            handleNavigateToPoint(commandUser.lat, commandUser.lng);
+            handleNavigateToPoint(commandUser.lat, commandUser.lng, locateUser);
             setCommandUser(null);
         }
     }, handleDispatch: () => {
@@ -187,12 +189,12 @@ export function useAppLogic(isSourceMode: boolean = false) {
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal: (n: MapNote) => setDispatchTargetLocation(n), handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
     handleMapClick, handleEditNote, handleSaveNote, closeModal,
-    setTargetUserFilter: (f: any) => {},
+    setTargetUserFilter: () => {},
     activeCampaign, handleStartCampaign: (n: string, p: Set<string>, t: Set<string>, c: Set<string>) => {
         db.createCampaign({ name: n, participantIds: p, targetIds: t, commanderIds: c, startTime: Date.now() });
     }, handleEndCampaign: () => {
         if (activeCampaign?.id) db.endCampaign(activeCampaign.id);
-    }, handleUpdateCampaign: (n: string, p: Set<string>, t: Set<string>, c: Set<string>) => {
+    }, handleUpdateCampaign: (_name: string, _participants: Set<string>, t: Set<string>) => {
         if (activeCampaign?.id) db.updateCampaign(activeCampaign.id, { targetIds: t });
     }
   };

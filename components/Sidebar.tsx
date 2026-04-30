@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser } from '../types';
+import { MapNote, RouteData, UnitStatus, UserProfile, UserRole, MapUser, WantedStatus } from '../types';
 import { Wifi, WifiOff, XCircle, ShieldCheck, X, Eye } from 'lucide-react';
 import { db } from '../services/db';
 
@@ -13,8 +13,6 @@ interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   notes: MapNote[];
-  selectedNote: MapNote | null;
-  setSelectedNote: (note: MapNote | null) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   isSearching: boolean;
@@ -24,10 +22,7 @@ interface SidebarProps {
   onNavigateToNote: (note: MapNote) => void;
   onStopNavigation: () => void;
   routeData: RouteData | null;
-  isRouting: boolean;
-  onAnalyzeNote: (note: MapNote) => void;
-  isAnalyzing: boolean;
-  onUpdateStatus: (id: string, status: 'caught' | 'not_caught') => void;
+  onUpdateStatus: (id: string, status: WantedStatus) => void;
   isConnected: boolean;
   userRole: UserRole | null;
   onLogout: () => void;
@@ -38,19 +33,20 @@ interface SidebarProps {
   myStatus: UnitStatus;
   setMyStatus: (s: UnitStatus) => void;
   onlineUsers: MapUser[]; 
-  currentUserId: string;
+  currentUserId?: string;
   onOpenCampaigns: () => void; 
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  isOpen, setIsOpen, notes, selectedNote, setSelectedNote, searchQuery, setSearchQuery, isSearching, onSearch,
-  onFlyToNote, onDeleteNote, onNavigateToNote, onStopNavigation, routeData, isRouting, onAnalyzeNote, isAnalyzing,
+  isOpen, setIsOpen, notes, searchQuery, setSearchQuery, isSearching, onSearch,
+  onFlyToNote, onDeleteNote, onNavigateToNote, onStopNavigation, routeData,
   onUpdateStatus, isConnected, userRole, onLogout, onEditNote, onOpenDashboard, onOpenSettings, canCreate,
   myStatus, setMyStatus, onlineUsers, currentUserId, onOpenCampaigns
 }) => {
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [noteSearchQuery, setNoteSearchQuery] = useState(""); 
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
 
   const isAdmin = ['super_admin', 'governorate_admin', 'center_admin', 'admin'].includes(userRole || '');
   const isSource = userRole === 'source';
@@ -69,6 +65,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [isAdmin, isSource]);
 
   useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop && !isOpen) {
+      setIsOpen(true);
+    }
+  }, [isDesktop, isOpen, setIsOpen]);
+
+  useEffect(() => {
+    if (isDesktop) return;
     if (!isOpen) return;
     let inactivityTimer: ReturnType<typeof setTimeout>;
     const resetTimer = () => {
@@ -87,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         events.forEach(event => { sidebarElement.removeEventListener(event, resetTimer); });
       }
     };
-  }, [isOpen, setIsOpen]);
+  }, [isDesktop, isOpen, setIsOpen]);
 
   return (
     <div 
@@ -101,9 +110,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         transform transition-transform duration-300 ease-in-out
         flex flex-col text-right
         pb-16 /* Added padding to clear the operations log bar */
-        ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+        ${isDesktop || isOpen ? 'translate-x-0' : 'translate-x-full'}
         md:relative md:translate-x-0
-        ${!isOpen && 'md:!w-0 md:!border-0'}
       `}
     >
       {/* Mobile Close Button */}
@@ -157,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Hide Units for Source, but maybe show a placeholder so it looks populated? */}
         {!isSource ? (
-            <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} />
+            <SidebarUnits onlineUsers={onlineUsers} allProfiles={allProfiles} currentUserId={currentUserId} />
         ) : (
             <div className="px-2 py-4 text-center border-b border-slate-800/50 mb-2">
                 <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-slate-800 mb-2 text-slate-500">
@@ -171,14 +179,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <SidebarNotes 
             notes={notes}
-            selectedNote={selectedNote}
             canCreate={canCreate}
-            isAnalyzing={isAnalyzing}
             onFlyToNote={onFlyToNote}
             onEditNote={onEditNote}
             onDeleteNote={onDeleteNote}
             onNavigateToNote={onNavigateToNote}
-            onAnalyzeNote={onAnalyzeNote}
             onUpdateStatus={onUpdateStatus}
             noteSearchQuery={noteSearchQuery}
             setNoteSearchQuery={setNoteSearchQuery}

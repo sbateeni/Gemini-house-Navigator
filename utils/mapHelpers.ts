@@ -1,5 +1,6 @@
 
 import { MapNote, MapUser } from '../types';
+import { getNoteDisplayTitle } from './noteDisplay';
 
 export const createNoteIconHtml = (isSatellite: boolean) => `
   <div style="
@@ -18,21 +19,22 @@ export const createNoteIconHtml = (isSatellite: boolean) => `
   </div>
 `;
 
-// UPDATED: Using onclick with window.dispatchEvent to guarantee events fire regardless of Leaflet rendering cycle
 export const createNotePopupHtml = (note: MapNote, canCommand: boolean) => `
   <div class="font-sans min-w-[180px] text-right" dir="rtl">
-    <strong class="text-sm text-blue-400 block mb-1">${note.locationName}</strong>
+    <strong class="text-sm text-blue-400 block mb-1">${getNoteDisplayTitle(note)}</strong>
     <p class="text-xs mb-3 line-clamp-2 text-slate-300">${note.userNote}</p>
     <div class="flex gap-2">
        <button 
-         onclick="window.dispatchEvent(new CustomEvent('map-navigate', { detail: '${note.id}' }))"
+         data-map-action="navigate"
+         data-note-id="${note.id}"
          class="flex-1 bg-blue-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-blue-500 transition-colors"
        >
           ذهاب
        </button>
        ${canCommand ? `
          <button 
-           onclick="window.dispatchEvent(new CustomEvent('map-dispatch', { detail: '${note.id}' }))"
+           data-map-action="dispatch"
+           data-note-id="${note.id}"
            class="flex-1 bg-purple-600 text-white text-[10px] font-bold py-1.5 rounded hover:bg-purple-500 transition-colors"
          >
             توجيه

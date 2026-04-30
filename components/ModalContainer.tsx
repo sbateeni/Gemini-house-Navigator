@@ -18,13 +18,13 @@ interface ModalContainerProps {
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
   onSaveNote: (visibility: 'public' | 'private', title?: string) => void;
-  isAnalyzing: boolean;
   isEditingNote: boolean;
 
   // Dashboard Props
   showDashboard: boolean;
   closeDashboard: () => void;
   currentUserId: string;
+  currentUserEmail?: string;
   currentUserProfile: UserProfile | null;
   onlineUsers: MapUser[]; 
   allProfiles: UserProfile[]; // New
@@ -32,7 +32,7 @@ interface ModalContainerProps {
   // Settings Props
   showSettings: boolean;
   closeSettings: () => void;
-  user: any;
+  user: unknown;
   userRole: UserRole | null;
   mapProvider: string;
   setMapProvider: (val: string) => void;
@@ -81,11 +81,11 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   userNoteInput,
   setUserNoteInput,
   onSaveNote,
-  isAnalyzing,
   isEditingNote,
   showDashboard,
   closeDashboard,
   currentUserId,
+  currentUserEmail,
   currentUserProfile,
   onlineUsers,
   allProfiles,
@@ -127,7 +127,6 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         userNoteInput={userNoteInput}
         setUserNoteInput={setUserNoteInput}
         onSave={onSaveNote}
-        isAnalyzing={isAnalyzing}
         mode={isEditingNote ? 'edit' : 'create'}
       />
 
@@ -135,6 +134,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         isOpen={showDashboard} 
         onClose={closeDashboard} 
         currentUserId={currentUserId}
+        currentUserEmail={currentUserEmail}
         currentUserProfile={currentUserProfile}
         onFilterByUser={onFilterByUser}
         onlineUsersList={onlineUsers}

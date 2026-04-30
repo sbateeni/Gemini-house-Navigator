@@ -1,7 +1,8 @@
 
 import React from 'react';
-import { Activity, Users, ShieldAlert, Target, Zap, BarChart3, TrendingUp } from 'lucide-react';
+import { Activity, Users, ShieldAlert, Target, Zap } from 'lucide-react';
 import { MapUser, MapNote } from '../types';
+import { normalizeWantedStatus } from '../utils/status';
 
 interface StrategicDashboardProps {
   onlineUsers: MapUser[];
@@ -14,14 +15,14 @@ export const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onlineUs
 
   const activeSOS = onlineUsers.filter(u => u.isSOS).length;
   const busyUnits = onlineUsers.filter(u => u.status === 'busy' || u.status === 'pursuit').length;
-  const completedTasks = notes.filter(n => n.status === 'caught').length;
+  const completedTasks = notes.filter(n => normalizeWantedStatus(n.status) === 'closed').length;
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[1000] p-4 pointer-events-none" dir="rtl">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-4">
         
         {/* Unit Status Card */}
-        <div className="glass-panel p-4 rounded-2xl border-t-2 border-blue-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 duration-300">
+        <div className="glass-panel bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl border-t-2 border-blue-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 duration-300 overflow-hidden">
            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">إجمالي القوة نشطة</span>
               <Users size={14} className="text-blue-400" />
@@ -38,7 +39,7 @@ export const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onlineUs
         </div>
 
         {/* SOS Monitor Card */}
-        <div className={`glass-panel p-4 rounded-2xl border-t-2 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-75 duration-300 ${activeSOS > 0 ? 'border-red-500 animate-pulse' : 'border-slate-700'}`}>
+        <div className={`glass-panel bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl border-t-2 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-75 duration-300 overflow-hidden ${activeSOS > 0 ? 'border-red-500 animate-pulse' : 'border-slate-700'}`}>
            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">تنبيهات الاستغاثة</span>
               <ShieldAlert size={14} className={activeSOS > 0 ? 'text-red-500' : 'text-slate-500'} />
@@ -50,19 +51,19 @@ export const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onlineUs
         </div>
 
         {/* Operational Efficiency */}
-        <div className="glass-panel p-4 rounded-2xl border-t-2 border-emerald-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-150 duration-300">
+        <div className="glass-panel bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl border-t-2 border-emerald-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-150 duration-300 overflow-hidden">
            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">كفاءة العمليات</span>
               <Target size={14} className="text-emerald-400" />
            </div>
            <div className="flex items-end gap-2">
               <span className="text-3xl font-black text-white">%{Math.round((completedTasks / (notes.length || 1)) * 100)}</span>
-              <span className="text-[10px] text-emerald-400 mb-1">إنجاز الأهداف</span>
+              <span className="text-[10px] text-emerald-400 mb-1">إغلاق البلاغات</span>
            </div>
         </div>
 
         {/* Live Traffic/Activity Analytics */}
-        <div className="glass-panel p-4 rounded-2xl border-t-2 border-purple-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-200 duration-300">
+        <div className="glass-panel bg-slate-900/95 backdrop-blur-md p-4 rounded-2xl border-t-2 border-purple-500 shadow-lg pointer-events-auto animate-in slide-in-from-top-4 delay-200 duration-300 overflow-hidden">
            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ضغط العمليات</span>
               <Activity size={14} className="text-purple-400" />

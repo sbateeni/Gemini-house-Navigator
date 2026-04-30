@@ -10,7 +10,6 @@ const __dirname = path.dirname(__filename);
 
 // قائمة المفاتيح التي قد يوفرها Vercel أو Supabase Integration
 const envKeys = [
-  'API_KEY',
   'VITE_SUPABASE_URL',
   'VITE_SUPABASE_ANON_KEY',
   'SUPABASE_URL',

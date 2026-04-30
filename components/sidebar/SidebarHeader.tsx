@@ -78,7 +78,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="بحث عن موقع..." 
+            placeholder="بحث عن بلاغ أو مطلوب..." 
             className="w-full bg-slate-950/50 border border-slate-700 rounded-xl py-2.5 pr-10 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-right"
             disabled={isSearching}
           />

@@ -8,7 +8,7 @@ export interface MapNote {
   aiAnalysis: string;
   createdAt: number;
   sources?: GroundingSource[];
-  status?: 'caught' | 'not_caught';
+  status?: WantedStatus | 'caught' | 'not_caught';
   // Hierarchy Fields
   governorate?: string;
   center?: string;
@@ -121,9 +121,13 @@ export interface SourceSession {
 export interface ActiveCampaign {
   id?: string; // Database ID
   name: string;
+  status?: CampaignStatus;
   participantIds: Set<string>;
   targetIds: Set<string>;
   commanderIds: Set<string>;
   startTime: number;
   createdBy?: string;
 }
+
+export type WantedStatus = 'new' | 'tracking' | 'in_campaign' | 'closed';
+export type CampaignStatus = 'planned' | 'active' | 'paused' | 'completed';

@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
-import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCcw, Wifi, WifiOff } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { X, Shield, Loader2, UserPlus, Users, KeyRound, Copy, Check, Trash2, RefreshCcw } from 'lucide-react';
 import { db } from '../services/db';
 import { UserProfile, UserPermissions, UserRole, AccessCode, MapUser } from '../types';
 import { UserTable } from './dashboard/UserTable';
@@ -10,6 +10,7 @@ interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserId: string;
+  currentUserEmail?: string;
   currentUserProfile: UserProfile | null;
   onFilterByUser: (userId: string, userName: string) => void;
   onlineUsersList: MapUser[]; // Receive the live list from App.tsx
@@ -22,7 +23,7 @@ const PALESTINE_GOVERNORATES = [
 ];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-    isOpen, onClose, currentUserId, currentUserProfile, onFilterByUser, onlineUsersList
+    isOpen, onClose, currentUserId, currentUserEmail, currentUserProfile, onFilterByUser, onlineUsersList
 }) => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
@@ -32,6 +33,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [generatingCode, setGeneratingCode] = useState(false);
   const [newCodeLabel, setNewCodeLabel] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [nowTs, setNowTs] = useState(0);
 
   // Convert Array to Set for fast lookup in the table
   const onlineUserIds = new Set(onlineUsersList.map(u => u.id));
@@ -39,7 +41,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const isOfficerOrAbove = ['super_admin', 'governorate_admin', 'center_admin', 'admin', 'officer'].includes(currentUserProfile?.role || '');
   const isSuperAdmin = currentUserProfile?.role === 'super_admin';
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     // Fix: db.getAllProfiles takes 0 arguments in services/db.ts
     const users = await db.getAllProfiles();
@@ -52,14 +54,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             : await db.getMyAccessCodes();
         setAccessCodes(codes);
     }
+    setNowTs(Date.now());
     setLoading(false);
-  };
+  }, [isOfficerOrAbove, isSuperAdmin]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchData();
+      void Promise.resolve().then(fetchData);
     }
-  }, [isOpen]);
+  }, [isOpen, fetchData]);
 
   const toggleApproval = async (user: UserProfile) => {
     const newValue = !user.isApproved;
@@ -91,7 +94,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
      try {
          await db.updateProfile(user.id, updates);
-     } catch (e) {
+     } catch {
          fetchData();
      }
   };
@@ -102,7 +105,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setSelectedUserForPerms(updatedUser);
       try {
           await db.updateProfile(user.id, { role: newRole });
-      } catch (error) {
+      } catch {
           fetchData();
       }
   };
@@ -115,7 +118,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         setProfiles(prev => prev.map(p => p.id === user.id ? { ...p, role: newRole, isApproved: isBanned } : p));
         try {
             await db.updateProfile(user.id, { role: newRole, isApproved: isBanned });
-        } catch (error) {
+        } catch {
             fetchData();
         }
     }
@@ -139,7 +142,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           const newCode = await db.createAccessCode(newCodeLabel);
           setAccessCodes([newCode, ...accessCodes]);
           setNewCodeLabel("");
-      } catch (e) {
+      } catch {
           alert("فشل إنشاء الكود");
       } finally {
           setGeneratingCode(false);
@@ -151,7 +154,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           try {
               setAccessCodes(prev => prev.filter(c => c.code !== codeStr));
               await db.revokeAccessCode(codeStr);
-          } catch (e) {
+          } catch {
               alert("فشل الحذف. يرجى المحاولة مرة أخرى.");
               fetchData();
           }
@@ -163,9 +166,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           try {
               await db.renewAccessCode(codeStr);
               const newExpires = Date.now() + 30 * 60 * 1000;
+              setNowTs(Date.now());
               setAccessCodes(prev => prev.map(c => c.code === codeStr ? { ...c, is_active: true, expires_at: newExpires } : c));
               alert("تم تمديد الوقت بنجاح");
-          } catch (e) {
+          } catch {
               alert("فشل التمديد");
           }
       }
@@ -193,12 +197,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const pendingCount = profiles.filter(p => !p.isApproved && p.role !== 'banned').length;
-  const activeCodesCount = accessCodes.filter(c => c.is_active && c.expires_at > Date.now()).length;
+  const activeCodesCount = accessCodes.filter(c => c.is_active && c.expires_at > nowTs).length;
 
   const filteredProfiles = profiles.filter(user => {
       if (filter === 'pending') return !user.isApproved && user.role !== 'banned';
       return true;
   });
+  const normalizedProfiles = filteredProfiles.map((profile) =>
+    profile.id === currentUserId && !profile.email && currentUserEmail
+      ? { ...profile, email: currentUserEmail }
+      : profile
+  );
 
   if (!isOpen) return null;
 
@@ -291,8 +300,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    <div className="space-y-3">
                        {accessCodes.length === 0 && <p className="text-center text-slate-500 py-8">لم يتم العثور على أكواد مصادر نشطة.</p>}
                        {accessCodes.map(ac => {
-                           const isExpired = Date.now() > ac.expires_at;
-                           const timeLeft = Math.max(0, Math.ceil((ac.expires_at - Date.now()) / 60000));
+                           const isExpired = nowTs > ac.expires_at;
+                           const timeLeft = Math.max(0, Math.ceil((ac.expires_at - nowTs) / 60000));
                            const isActive = ac.is_active && !isExpired;
                            const creatorName = getCreatorName(ac.created_by);
                            
@@ -352,7 +361,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                </div>
            ) : (
              <UserTable 
-                users={filteredProfiles}
+               users={normalizedProfiles}
                 currentUserId={currentUserId}
                 onlineUsers={onlineUserIds}
                 onToggleApproval={toggleApproval}

@@ -64,7 +64,7 @@ export function useNoteForm(
           aiAnalysis: "",
           sources: [],
           createdAt: Date.now(),
-          status: 'not_caught',
+          status: 'new',
           // Auto-tag hierarchy
           governorate: userProfile?.governorate,
           center: userProfile?.center,

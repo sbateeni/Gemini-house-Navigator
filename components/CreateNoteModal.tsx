@@ -9,7 +9,6 @@ interface CreateNoteModalProps {
   userNoteInput: string;
   setUserNoteInput: (val: string) => void;
   onSave: (visibility: 'public' | 'private', title?: string) => void;
-  isAnalyzing: boolean;
   mode?: 'create' | 'edit';
 }
 
@@ -20,7 +19,6 @@ export const CreateNoteModal: React.FC<CreateNoteModalProps> = ({
   userNoteInput,
   setUserNoteInput,
   onSave,
-  isAnalyzing,
   mode = 'create'
 }) => {
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');

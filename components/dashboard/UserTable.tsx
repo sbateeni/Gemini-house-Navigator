@@ -57,7 +57,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                         {user.username}
                         {isMe && <span className="text-[10px] bg-slate-700 px-1.5 rounded text-slate-300">أنت</span>}
                      </div>
-                     <div className="text-slate-500 text-xs">{user.email || 'No email'}</div>
+                    <div className="text-slate-500 text-xs">{user.email || 'غير متوفر'}</div>
                    </div>
                  </div>
                  
@@ -85,7 +85,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                     user.role === 'governorate_admin' ? 'مدير محافظة' : 
                     user.role === 'center_admin' ? 'مدير مركز' : 
                     user.role === 'officer' ? 'ضابط' :
-                    user.role === 'admin' ? 'Admin' : 'عنصر'}
+                   user.role === 'admin' ? 'مسؤول' : 'عنصر'}
                  </div>
                </td>
                <td className="p-4 text-slate-400">

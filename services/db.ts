@@ -1,6 +1,7 @@
 
 import { supabase } from './supabase';
 import { MapNote, UserProfile, UserPermissions, Assignment, LogEntry, AccessCode, ActiveCampaign } from '../types';
+import { normalizeWantedStatus, toLegacyWantedStatus } from '../utils/status';
 
 const DEFAULT_PERMISSIONS: UserPermissions = {
   can_create: true,
@@ -12,14 +13,14 @@ const DEFAULT_PERMISSIONS: UserPermissions = {
   can_manage_content: false 
 };
 
-const CACHE_KEY_NOTES = 'gemini_offline_notes';
-const CACHE_KEY_PENDING_NOTES = 'gemini_pending_notes';
+const CACHE_KEY_NOTES = 'ops_offline_notes';
+const CACHE_KEY_PENDING_NOTES = 'ops_pending_notes';
 
 const getDeviceId = () => {
-    let id = localStorage.getItem('gemini_device_id');
+    let id = localStorage.getItem('ops_device_id');
     if (!id) {
         id = crypto.randomUUID();
-        localStorage.setItem('gemini_device_id', id);
+        localStorage.setItem('ops_device_id', id);
     }
     return id;
 };
@@ -75,7 +76,7 @@ export const db = {
         locationName: row.location_name,
         aiAnalysis: row.ai_analysis,
         createdAt: row.created_at,
-        status: row.status,
+        status: normalizeWantedStatus(row.status),
         sources: row.sources,
         governorate: row.governorate,
         center: row.center,
@@ -120,7 +121,7 @@ export const db = {
       location_name: note.locationName,
       ai_analysis: note.aiAnalysis,
       created_at: note.createdAt,
-      status: note.status || 'not_caught',
+      status: toLegacyWantedStatus(note.status),
       sources: note.sources || [],
       governorate: note.governorate, 
       center: note.center,
@@ -224,6 +225,7 @@ export const db = {
       return {
           id: data.id,
           name: data.name,
+          status: 'active',
           participantIds: new Set(data.participants || []),
           targetIds: new Set(data.targets || []),
           commanderIds: new Set(data.commanders || []),

@@ -1,40 +1,48 @@
 
 import React, { useState } from 'react';
-import { MapIcon, BookOpen, Edit3, Trash2, Navigation2, Loader2, Sparkles, CheckSquare, XSquare, Search, SortAsc, Calendar, Globe, Lock, ChevronDown, ChevronUp } from 'lucide-react';
-import { MapNote } from '../../types';
+import { MapIcon, BookOpen, Edit3, Trash2, Navigation2, Search, SortAsc, Calendar, Globe, Lock, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapNote, WantedStatus } from '../../types';
+import { normalizeWantedStatus, wantedStatusBadgeClass, wantedStatusLabel } from '../../utils/status';
+import { getNoteDisplayTitle } from '../../utils/noteDisplay';
 
 interface SidebarNotesProps {
   notes: MapNote[];
-  selectedNote: MapNote | null;
   canCreate: boolean;
-  isAnalyzing: boolean;
   onFlyToNote: (n: MapNote) => void;
   onEditNote: (n: MapNote, e: React.MouseEvent) => void;
   onDeleteNote: (id: string, e: React.MouseEvent) => void;
   onNavigateToNote: (n: MapNote) => void;
-  onAnalyzeNote: (n: MapNote) => void;
-  onUpdateStatus: (id: string, s: 'caught' | 'not_caught') => void;
+  onUpdateStatus: (id: string, s: WantedStatus) => void;
   noteSearchQuery: string; 
   setNoteSearchQuery: (q: string) => void; 
 }
 
 export const SidebarNotes: React.FC<SidebarNotesProps> = ({
-  notes, selectedNote, canCreate, isAnalyzing, onFlyToNote, onEditNote, onDeleteNote, onNavigateToNote, onAnalyzeNote, onUpdateStatus,
+  notes, canCreate, onFlyToNote, onEditNote, onDeleteNote, onNavigateToNote, onUpdateStatus,
   noteSearchQuery, setNoteSearchQuery
 }) => {
   const [sortMode, setSortMode] = useState<'date' | 'name'>('date');
+  const [statusFilter, setStatusFilter] = useState<'all' | WantedStatus>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filter Notes
-  const filteredNotes = notes.filter(note => 
-    note.locationName.toLowerCase().includes(noteSearchQuery.toLowerCase()) || 
-    note.userNote.toLowerCase().includes(noteSearchQuery.toLowerCase())
-  );
+  const filteredNotes = notes.filter(note => {
+    const title = getNoteDisplayTitle(note).toLowerCase();
+    const matchesText =
+      title.includes(noteSearchQuery.toLowerCase()) ||
+      note.userNote.toLowerCase().includes(noteSearchQuery.toLowerCase());
+    const isPublicPlace = note.visibility === 'public';
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : !isPublicPlace && normalizeWantedStatus(note.status) === statusFilter;
+    return matchesText && matchesStatus;
+  });
 
   // Sort Notes
   const sortedNotes = [...filteredNotes].sort((a, b) => {
       if (sortMode === 'name') {
-          return a.locationName.localeCompare(b.locationName);
+          return getNoteDisplayTitle(a).localeCompare(getNoteDisplayTitle(b));
       }
       return b.createdAt - a.createdAt; // Date Descending
   });
@@ -71,7 +79,7 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
   return (
     <div className="mt-2">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase px-2 mb-2 flex items-center justify-between">
-            <span>المواقع المسجلة ({filteredNotes.length})</span>
+            <span>البلاغات المسجلة ({filteredNotes.length})</span>
             <MapIcon size={12} />
         </h3>
 
@@ -102,6 +110,25 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
                     <SortAsc size={10} /> الاسم
                 </button>
             </div>
+            <div className="flex flex-wrap gap-1.5">
+                {(['all', 'new', 'tracking', 'in_campaign', 'closed'] as const).map((status) => {
+                    const isActive = statusFilter === status;
+                    const label = status === 'all' ? 'الكل' : wantedStatusLabel[status];
+                    return (
+                        <button
+                            key={status}
+                            onClick={() => setStatusFilter(status)}
+                            className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                                isActive
+                                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                                    : 'bg-slate-800/70 border-slate-700 text-slate-400 hover:text-slate-200'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
         
         {sortedNotes.length === 0 ? (
@@ -115,6 +142,7 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
                     const styles = getStyles(note.visibility);
                     const isExpanded = expandedId === note.id;
                     const isPublic = note.visibility === 'public';
+                    const currentStatus = normalizeWantedStatus(note.status);
 
                     return (
                         <div 
@@ -133,9 +161,16 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
                                     <div className={`p-1.5 rounded-md ${styles.iconBg}`}>
                                         {isPublic ? <Globe size={14} className={styles.icon} /> : <Lock size={14} className={styles.icon} />}
                                     </div>
-                                    <span className={`text-sm font-bold ${styles.text}`}>
-                                        {note.locationName}
-                                    </span>
+                                    <div className="flex flex-col items-start gap-1">
+                                        <span className={`text-sm font-bold ${styles.text}`}>
+                                            {getNoteDisplayTitle(note)}
+                                        </span>
+                                        {!isPublic && (
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${wantedStatusBadgeClass[currentStatus]}`}>
+                                                {wantedStatusLabel[currentStatus]}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 {isExpanded ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
@@ -155,44 +190,37 @@ export const SidebarNotes: React.FC<SidebarNotesProps> = ({
                                     <div className="flex gap-2 mb-3">
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); onNavigateToNote(note); }}
-                                            className="flex-1 bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 text-[10px] py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+                                            className="w-full bg-slate-800 hover:bg-blue-600/20 hover:text-blue-400 text-slate-300 text-[10px] py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
                                         >
                                             <Navigation2 size={12} /> ذهاب
-                                        </button>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); onAnalyzeNote(note); }}
-                                            disabled={isAnalyzing}
-                                            className="flex-1 bg-slate-800 hover:bg-purple-600/20 hover:text-purple-400 text-slate-300 text-[10px] py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
-                                        >
-                                            {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} 
-                                            تحليل
                                         </button>
                                     </div>
 
                                     {/* Status Toggles (PRIVATE ONLY) */}
                                     {!isPublic && (
-                                        <div className="flex gap-2 mb-3">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'caught'); }}
-                                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border 
-                                                    ${note.status === 'caught' 
-                                                        ? 'bg-green-500/20 text-green-400 border-green-500/30' 
-                                                        : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-green-400'}`}
-                                            >
-                                                <CheckSquare size={14} />
-                                                تم الإنجاز
-                                            </button>
-                                            
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, 'not_caught'); }}
-                                                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border 
-                                                    ${note.status === 'not_caught' 
-                                                        ? 'bg-red-500/20 text-red-400 border-red-500/30' 
-                                                        : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-red-400'}`}
-                                            >
-                                                <XSquare size={14} />
-                                                قيد العمل
-                                            </button>
+                                        <div className="grid grid-cols-2 gap-2 mb-3">
+                                            {(['new', 'tracking', 'in_campaign', 'closed'] as WantedStatus[]).map((status) => {
+                                                const isActive = normalizeWantedStatus(note.status) === status;
+                                                return (
+                                                    <button
+                                                        key={status}
+                                                        onClick={(e) => { e.stopPropagation(); onUpdateStatus(note.id, status); }}
+                                                        className={`py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                                                            isActive
+                                                                ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                                                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-blue-300'
+                                                        }`}
+                                                    >
+                                                        {wantedStatusLabel[status]}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {!isPublic && (
+                                        <div className="text-[10px] text-slate-500 mb-2">
+                                            الحالة الحالية: {wantedStatusLabel[currentStatus]}
                                         </div>
                                     )}
 

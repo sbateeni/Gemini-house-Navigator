@@ -160,9 +160,9 @@ export function useAuth() {
   }, [session?.user?.id, userRole]);
 
   const handleLogout = async () => {
-    const mapMode = localStorage.getItem('gemini_map_mode');
+    const mapMode = localStorage.getItem('ops_map_mode');
     localStorage.clear(); // Aggressive clear
-    if (mapMode) localStorage.setItem('gemini_map_mode', mapMode);
+    if (mapMode) localStorage.setItem('ops_map_mode', mapMode);
 
     try {
         const signOutPromise = auth.signOut();
