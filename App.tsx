@@ -118,6 +118,16 @@ export default function App() {
           setMyStatus={setMyStatus}
           onlineUsers={onlineUsers}
           currentUserId={session?.user?.id}
+          // Integrated Map Controls
+          isSatellite={isSatellite}
+          setIsSatellite={setIsSatellite}
+          onLocateUser={locateUser}
+          isLocating={isLocating}
+          assignments={assignments}
+          onAcceptAssignment={handleAcceptAssignment}
+          hasActiveRoute={!!currentRoute || !!secondaryRoute}
+          onClearRoute={handleStopNavigation}
+          onExpandLogs={() => setShowFullLogs(true)}
       />
 
       {/* 2. Main Content Area */}
@@ -197,18 +207,9 @@ export default function App() {
         />
 
         {/* Map Control Buttons */}
-        <MapControls 
+        <MapControls
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          isSatellite={isSatellite}
-          setIsSatellite={setIsSatellite}
-          onLocateUser={locateUser}
-          isLocating={isLocating}
-          assignments={assignments} 
-          onAcceptAssignment={handleAcceptAssignment}
-          hasActiveRoute={!!currentRoute || !!secondaryRoute}
-          onClearRoute={handleStopNavigation}
-          hasActiveCampaign={!!activeCampaign}
         />
 
         {/* Tactical Hub Toggle (Dubai Style) */}

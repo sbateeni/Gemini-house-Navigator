@@ -1,85 +1,21 @@
-
 import React from 'react';
-import { Menu, Navigation, Layers, Globe, Loader2, X } from 'lucide-react';
-import { NotificationBell } from '../../dispatch/NotificationBell';
-import { Assignment } from '../../../types';
+import { Menu } from 'lucide-react';
 
 interface MapControlsProps {
   sidebarOpen: boolean;
   setSidebarOpen: (o: boolean) => void;
-  isSatellite: boolean;
-  setIsSatellite: (s: boolean) => void;
-  onLocateUser: () => void;
-  isLocating?: boolean;
-  assignments: Assignment[];
-  // Fix: changed from (a: Assignment) => void to (id: string) => void
-  onAcceptAssignment: (id: string) => void;
-  hasActiveRoute: boolean;
-  onClearRoute: () => void;
-  hasActiveCampaign?: boolean; // New prop to adjust position
 }
 
-export const MapControls: React.FC<MapControlsProps> = ({
-  sidebarOpen,
-  setSidebarOpen,
-  isSatellite,
-  setIsSatellite,
-  onLocateUser,
-  isLocating = false,
-  assignments,
-  onAcceptAssignment,
-  hasActiveRoute,
-  onClearRoute,
-  hasActiveCampaign = false
-}) => {
-  return (
-    <div 
-      className={`absolute left-4 z-[400] flex flex-col gap-3 transition-all duration-300 ease-in-out ${hasActiveCampaign ? 'top-20' : 'top-4'}`}
+export const MapControls: React.FC<MapControlsProps> = ({ sidebarOpen, setSidebarOpen }) => (
+  <div className="absolute left-4 top-4 z-[1000]">
+    <button
+      onClick={() => setSidebarOpen(!sidebarOpen)}
+      className={`w-12 h-12 backdrop-blur text-white rounded-full shadow-xl border border-slate-700 flex items-center justify-center active:scale-95 transition-all ${
+        sidebarOpen ? 'bg-blue-600 border-blue-500' : 'bg-slate-900/90 hover:bg-slate-800'
+      }`}
+      title={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
     >
-       {/* Sidebar Toggle */}
-       <button 
-         onClick={() => setSidebarOpen(!sidebarOpen)}
-         className={`w-12 h-12 backdrop-blur text-white rounded-full shadow-xl border border-slate-700 flex items-center justify-center active:scale-95 transition-all
-           ${sidebarOpen ? 'bg-blue-600 border-blue-500' : 'bg-slate-900/90 hover:bg-slate-800'}
-         `}
-         title={sidebarOpen ? "إغلاق القائمة" : "فتح القائمة"}
-       >
-         <Menu size={24} />
-       </button>
-
-       {/* Clear Route Button - Only shows when routing */}
-       {hasActiveRoute && (
-         <button 
-           onClick={onClearRoute}
-           className="w-12 h-12 bg-red-600 text-white rounded-full shadow-xl border border-red-500 flex items-center justify-center hover:bg-red-500 active:scale-95 transition-all animate-in zoom-in duration-300"
-           title="إلغاء المسار الحالي"
-         >
-           <X size={24} />
-         </button>
-       )}
-
-       <button 
-         onClick={onLocateUser}
-         disabled={isLocating}
-         className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-xl border border-blue-500 flex items-center justify-center hover:bg-blue-500 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-wait"
-         title="موقعي الحالي"
-       >
-         {isLocating ? <Loader2 size={24} className="animate-spin" /> : <Navigation size={24} />}
-       </button>
-       
-       <button 
-         onClick={() => setIsSatellite(!isSatellite)}
-         className={`w-12 h-12 rounded-full shadow-xl border flex items-center justify-center transition-all active:scale-95 ${isSatellite ? 'bg-slate-900 text-white border-slate-700' : 'bg-slate-900 text-slate-400 border-slate-700'}`}
-         title="تغيير نمط الخريطة"
-       >
-         {isSatellite ? <Globe size={24} /> : <Layers size={24} />}
-       </button>
-
-       {/* Notifications Bell */}
-       <NotificationBell 
-         assignments={assignments}
-         onAccept={onAcceptAssignment}
-       />
-    </div>
-  );
-};
+      <Menu size={24} />
+    </button>
+  </div>
+);
