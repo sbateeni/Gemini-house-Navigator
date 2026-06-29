@@ -105,10 +105,16 @@ export function useAppLogic(isSourceMode: boolean = false) {
     );
   };
 
-  const locateSOSUser = () => {
-      if (!distressedUser) return;
-      const lat = distressedUser.lat ?? 0;
-      const lng = distressedUser.lng ?? 0;
+  const locateSOSUser = (lat: number, lng: number) => {
+      if (lat === 0 && lng === 0) return;
+      setFlyToTarget({ lat, lng, zoom: 17, timestamp: Date.now(), showPulse: true });
+  };
+
+  const locateLogUser = (userId: string) => {
+      const user = onlineUsers.find(u => u.id === userId);
+      if (!user) return;
+      const lat = user.lat ?? 0;
+      const lng = user.lng ?? 0;
       if (lat === 0 && lng === 0) return;
       setFlyToTarget({ lat, lng, zoom: 17, timestamp: Date.now(), showPulse: true });
   };
@@ -175,7 +181,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
     notes, isConnected, tableMissing, updateStatus, setNotes,
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment: acceptAssignment,
-    onlineUsers, userLocation, distressedUser, handleLocateSOSUser: locateSOSUser, allProfiles,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser: locateSOSUser, locateLogUser, allProfiles,
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,

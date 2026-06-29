@@ -30,7 +30,7 @@ export default function App() {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned,
     notes, isConnected, updateStatus,
     myStatus, setMyStatus, isSOS, handleToggleSOS, assignments, handleAcceptAssignment,
-    onlineUsers, userLocation, distressedUser, handleLocateSOSUser, allProfiles,
+    onlineUsers, userLocation, distressedUser, handleLocateSOSUser, locateLogUser, allProfiles,
     currentRoute, secondaryRoute, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
     searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
@@ -210,6 +210,7 @@ export default function App() {
             onExpandLogs={() => setShowFullLogs(true)}
             distressedUser={distressedUser}
             onLocateSOS={handleLocateSOSUser}
+            onLocateLogUser={locateLogUser}
             canViewLogs={permissions.can_view_logs}
         />
 

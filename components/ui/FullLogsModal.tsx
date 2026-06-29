@@ -9,9 +9,10 @@ interface FullLogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   userRole?: UserRole | null;
+  onLocateUser?: (userId: string) => void;
 }
 
-export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose, userRole }) => {
+export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose, userRole, onLocateUser }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
@@ -88,42 +89,42 @@ export const FullLogsModal: React.FC<FullLogsModalProps> = ({ isOpen, onClose, u
              <div className="p-10 text-center text-slate-500">لا توجد سجلات.</div>
            ) : (
              <div className="divide-y divide-slate-800/50">
-               {logs.map(log => (
-                 <div key={log.id} className="p-4 hover:bg-slate-800/30 transition-colors flex items-start gap-4">
-                    <div className="shrink-0 mt-1">
-                       {log.type === 'alert' && <AlertTriangle className="text-red-500" size={18} />}
-                       {log.type === 'dispatch' && <Radio className="text-purple-500" size={18} />}
-                       {log.type === 'status' && <Info className="text-blue-500" size={18} />}
-                       {log.type === 'info' && <Info className="text-slate-500" size={18} />}
-                    </div>
-                    <div className="flex-1">
-                       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-1">
-                           <span className={`font-bold text-base leading-snug ${log.type === 'alert' ? 'text-red-400' : 'text-slate-200'}`}>
-                             {log.message}
-                           </span>
-                           <span className="text-xs text-slate-500 whitespace-nowrap font-mono dir-ltr text-right">
-                             {formatTime(log.timestamp)}
-                           </span>
-                        </div>
+                {logs.map(log => (
+                  <div key={log.id} className={`p-4 transition-colors flex items-start gap-4 ${log.type === 'alert' && log.userId && onLocateUser ? 'cursor-pointer hover:bg-red-900/20' : 'hover:bg-slate-800/30'}`} onClick={() => { if (log.type === 'alert' && log.userId && onLocateUser) { onLocateUser(log.userId); onClose(); } }}>
+                     <div className="shrink-0 mt-1">
+                        {log.type === 'alert' && <AlertTriangle className="text-red-500" size={18} />}
+                        {log.type === 'dispatch' && <Radio className="text-purple-500" size={18} />}
+                        {log.type === 'status' && <Info className="text-blue-500" size={18} />}
+                        {log.type === 'info' && <Info className="text-slate-500" size={18} />}
+                     </div>
+                     <div className="flex-1">
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-1">
+                            <span className={`font-bold text-base leading-snug ${log.type === 'alert' ? 'text-red-400' : 'text-slate-200'}`}>
+                              {log.message}
+                            </span>
+                            <span className="text-xs text-slate-500 whitespace-nowrap font-mono dir-ltr text-right">
+                              {formatTime(log.timestamp)}
+                            </span>
+                         </div>
+                         
+                         {log.userId && userMap[log.userId] && (
+                           <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-400">
+                              <User size={11} />
+                              <span className="font-bold">{userMap[log.userId]}</span>
+                           </div>
+                         )}
                         
-                        {log.userId && userMap[log.userId] && (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-slate-400">
-                             <User size={11} />
-                             <span className="font-bold">{userMap[log.userId]}</span>
+                        {(log.governorate || log.center) && (
+                          <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-500 bg-slate-900/50 w-fit px-2 py-1 rounded border border-slate-800">
+                             <MapPin size={10} />
+                             <span>{log.governorate || '---'}</span>
+                             <span className="text-slate-700">/</span>
+                             <span>{log.center || '---'}</span>
                           </div>
                         )}
-                       
-                       {(log.governorate || log.center) && (
-                         <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-500 bg-slate-900/50 w-fit px-2 py-1 rounded border border-slate-800">
-                            <MapPin size={10} />
-                            <span>{log.governorate || '---'}</span>
-                            <span className="text-slate-700">/</span>
-                            <span>{log.center || '---'}</span>
-                         </div>
-                       )}
-                    </div>
-                 </div>
-               ))}
+                     </div>
+                  </div>
+                ))}
              </div>
            )}
         </div>

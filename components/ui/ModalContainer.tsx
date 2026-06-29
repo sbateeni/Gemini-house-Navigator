@@ -59,6 +59,7 @@ interface ModalContainerProps {
   // Logs Props
   showFullLogs: boolean;
   closeFullLogs: () => void;
+  onLocateLogUser?: (userId: string) => void;
 
   // Campaigns Props
   showCampaigns: boolean;
@@ -113,6 +114,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   onSendDispatch,
   showFullLogs,
   closeFullLogs,
+  onLocateLogUser,
   showCampaigns,
   closeCampaigns,
   activeCampaign,

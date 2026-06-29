@@ -7,11 +7,17 @@ import { MapUser } from '../../../types';
 
 interface SOSAlertOverlayProps {
   sosUser: MapUser | undefined;
-  onLocate: () => void;
+  onLocate: (lat: number, lng: number) => void;
 }
 
 export const SOSAlertOverlay: React.FC<SOSAlertOverlayProps> = ({ sosUser, onLocate }) => {
   if (!sosUser) return null;
+
+  const handleLocate = () => {
+      const lat = sosUser.lat ?? 0;
+      const lng = sosUser.lng ?? 0;
+      if (lat !== 0 || lng !== 0) onLocate(lat, lng);
+  };
 
   return (
     <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1500] w-[90%] max-w-md animate-in slide-in-from-top-10 fade-in duration-300">
@@ -34,7 +40,7 @@ export const SOSAlertOverlay: React.FC<SOSAlertOverlayProps> = ({ sosUser, onLoc
         </div>
 
         <button 
-          onClick={onLocate}
+          onClick={handleLocate}
           className="bg-white text-red-600 px-4 py-3 rounded-xl font-bold text-sm shadow-xl flex items-center gap-2 hover:scale-105 active:scale-95 transition-all z-10 border border-red-200"
         >
           <Navigation size={18} className="fill-current" />

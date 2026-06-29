@@ -6,9 +6,10 @@ import { Activity, AlertTriangle, Radio, Maximize2 } from 'lucide-react';
 
 interface OperationsLogProps {
   onExpand?: () => void;
+  onLocateUser?: (userId: string) => void;
 }
 
-export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
+export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand, onLocateUser }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
   const [hasAlert, setHasAlert] = useState(false);
@@ -86,21 +87,27 @@ export const OperationsLog: React.FC<OperationsLogProps> = ({ onExpand }) => {
          <span className="text-[9px] font-mono text-slate-500 border-r border-slate-700 pr-2 mr-1">{liveTime}</span>
       </div>
       
-      <div className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-none flex items-center gap-10 px-4" ref={scrollRef}>
-         {logs.map(log => (
-            <div key={log.id} className={`flex items-center gap-3 shrink-0 transition-all duration-300 rounded-lg px-2 py-0.5 ${newLogIds.has(log.id) ? 'animate-flash' : ''} ${log.type === 'alert' ? 'text-red-400' : 'text-slate-400'}`}>
-               <span className="text-slate-600 font-mono font-bold">[{formatTime(log.timestamp)}]</span>
-               <div className="flex items-center gap-2">
-                   {log.type === 'alert' && <AlertTriangle size={14} className="animate-bounce" />}
-                   {log.type === 'dispatch' && <Radio size={14} className="text-purple-400" />}
-                   <span className={`text-[11px] font-bold ${log.type === 'alert' ? 'text-red-500' : 'text-slate-200'}`}>
-                     {log.message}
-                   </span>
-               </div>
-            </div>
-         ))}
-         {logs.length === 0 && <span className="text-slate-600 italic tracking-widest animate-pulse">جاري استلام البيانات من الأقمار الصناعية...</span>}
-      </div>
+       <div className="flex-1 overflow-x-auto whitespace-nowrap scrollbar-none flex items-center gap-10 px-4" ref={scrollRef}>
+          {logs.map(log => (
+             <div key={log.id} className={`flex items-center gap-3 shrink-0 transition-all duration-300 rounded-lg px-2 py-0.5 ${newLogIds.has(log.id) ? 'animate-flash' : ''} ${log.type === 'alert' ? 'text-red-400' : 'text-slate-400'}`}>
+                <span className="text-slate-600 font-mono font-bold">[{formatTime(log.timestamp)}]</span>
+                <div className="flex items-center gap-2">
+                    {log.type === 'alert' && <AlertTriangle size={14} className="animate-bounce" />}
+                    {log.type === 'dispatch' && <Radio size={14} className="text-purple-400" />}
+                    {log.type === 'alert' && log.userId && onLocateUser ? (
+                      <button onClick={(e) => { e.stopPropagation(); onLocateUser(log.userId!); }} className="text-[11px] font-bold text-red-500 hover:text-red-300 hover:underline cursor-pointer">
+                        {log.message}
+                      </button>
+                    ) : (
+                      <span className={`text-[11px] font-bold ${log.type === 'alert' ? 'text-red-500' : 'text-slate-200'}`}>
+                        {log.message}
+                      </span>
+                    )}
+                </div>
+             </div>
+          ))}
+          {logs.length === 0 && <span className="text-slate-600 italic tracking-widest animate-pulse">جاري استلام البيانات من الأقمار الصناعية...</span>}
+       </div>
 
       <div className="mr-6 text-slate-500 group-hover:text-blue-400 transition-all p-2 bg-slate-900/50 rounded-xl border border-white/5">
           <Maximize2 size={18} />
