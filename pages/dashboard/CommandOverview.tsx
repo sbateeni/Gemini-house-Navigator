@@ -28,7 +28,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color }: {
   </div>
 );
 
-export const CommandOverview: React.FC<CommandOverviewProps> = ({ profiles, onlineUsersList, currentUserProfile }) => {
+export const CommandOverview: React.FC<CommandOverviewProps> = ({ profiles, onlineUsersList }) => {
   const onlineUserIds = new Set(onlineUsersList.map(u => u.id));
   const totalUsers = profiles.length;
   const onlineCount = onlineUsersList.length;
@@ -43,7 +43,7 @@ export const CommandOverview: React.FC<CommandOverviewProps> = ({ profiles, onli
   })).filter(g => g.total > 0);
 
   const recentOnline = [...onlineUsersList]
-    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+    .sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0))
     .slice(0, 8);
 
   return (

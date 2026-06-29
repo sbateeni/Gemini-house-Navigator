@@ -1,5 +1,6 @@
 
 import React, { useState, useId } from 'react';
+import { ShieldCheck, Mail, Lock, Check, KeyRound, Loader2 } from 'lucide-react';
 import { auth } from '../../services/auth';
 import { db } from '../../services/db';
 import { SourceSession } from '../../types';

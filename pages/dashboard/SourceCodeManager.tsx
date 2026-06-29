@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { KeyRound, Copy, Check, Trash2, RefreshCcw, Loader2, X, Plus } from 'lucide-react';
+import { KeyRound, Copy, Check, Trash2, RefreshCcw, Loader2, X } from 'lucide-react';
 import { db } from '../../services/db';
 import { AccessCode } from '../../types';
 

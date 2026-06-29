@@ -42,6 +42,19 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env': JSON.stringify(processEnv)
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'vendor-react';
+            if (id.includes('node_modules/leaflet')) return 'vendor-leaflet';
+            if (id.includes('node_modules/@supabase/supabase-js')) return 'vendor-supabase';
+            if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
+            if (id.includes('node_modules')) return 'vendor-other';
+          }
+        }
+      }
+    },
     test: {
       environment: 'jsdom',
       globals: true,

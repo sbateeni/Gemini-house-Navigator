@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Database, Copy, ExternalLink, Check, ShieldAlert, X, ShieldCheck, Lock } from 'lucide-react';
+import { Copy, ExternalLink, Check, ShieldAlert, X, Lock } from 'lucide-react';
 
 interface DatabaseSetupModalProps {
     onClose?: () => void;

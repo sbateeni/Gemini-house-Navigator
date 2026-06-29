@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Activity, AlertTriangle, Radio, Info, MapPin, Trash2, User } from 'lucide-react';
 import { db } from '../../services/db';
-import { LogEntry, UserProfile, UserRole } from '../types';
+import { LogEntry, UserProfile, UserRole } from '../../types';
 import { isAdmin } from '../../constants/roles';
 
 interface FullLogsModalProps {

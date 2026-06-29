@@ -31,7 +31,7 @@ export const notesDb = {
     localStorage.removeItem(PENDING_KEY);
   },
 
-  async getAll(currentUserProfile?: UserProfile, sourceCode?: string): Promise<MapNote[]> {
+  async getAll(_currentUserProfile?: UserProfile, sourceCode?: string): Promise<MapNote[]> {
     try {
       if (!navigator.onLine) throw new Error('Offline');
       if (sourceCode) await supabase.rpc('set_source_context', { p_code: sourceCode });

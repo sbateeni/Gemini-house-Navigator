@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Wifi, WifiOff, MapPin, Building2, CheckCircle2, Settings, Ban, Eye, Users, X } from 'lucide-react';
-import { UserProfile, MapUser } from '../../types';
+import { Search, Wifi, WifiOff, MapPin, Building2, CheckCircle2, Settings, Ban, Eye, X } from 'lucide-react';
+import { UserProfile } from '../../types';
 
 interface UsersPanelProps {
   users: UserProfile[];
@@ -30,7 +30,7 @@ const CONNECTION_OPTIONS = [
 ];
 
 export const UsersPanel: React.FC<UsersPanelProps> = ({
-  users, currentUserId, onlineUsers, onToggleApproval, onOpenEdit, onBanUser, onFilterByUser, canEditUsers,
+  users, currentUserId, onlineUsers, onToggleApproval, onOpenEdit, onBanUser, onFilterByUser,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');

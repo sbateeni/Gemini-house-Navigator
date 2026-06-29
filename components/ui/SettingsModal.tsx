@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Wrench, LogOut, Mountain, Satellite, EyeOff, Map, KeyRound, Copy, RefreshCcw, Plus } from 'lucide-react';
+import { X, Mail, Shield, Globe, Layers, Download, CheckCircle2, Trash2, Wrench, LogOut, Mountain, Satellite, EyeOff, Map, Copy, Plus } from 'lucide-react';
 import { offlineMaps } from '../../services/offlineMaps';
 import { db } from '../../services/db';
-import { UserRole, AccessCode } from '../types';
-import { isAdmin, isOfficerOrAbove } from '../../constants/roles';
+import { UserRole, AccessCode } from '../../types';
+import { isOfficerOrAbove } from '../../constants/roles';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,7 +36,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [generatingCode, setGeneratingCode] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
-  const isUserAdmin = isAdmin(userRole);
   const isUserOfficerOrAbove = isOfficerOrAbove(userRole);
   const isSource = userRole === 'source';
 

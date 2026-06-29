@@ -70,7 +70,7 @@ export function useNotes(session: any, isApproved: boolean, isAccountDeleted: bo
         { event: '*', schema: 'public', table: 'notes' },
         () => { refreshNotes(); }
       )
-      .subscribe((status) => {
+      .subscribe((status: string) => {
           if (status === 'SUBSCRIBED') setIsConnected(true);
           // Don't mark offline immediately on CHANNEL_ERROR, just retry silently
       });

@@ -112,7 +112,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const pendingCount = profiles.filter(p => !p.isApproved && p.role !== 'banned').length;
 
-  const filteredProfiles = profiles.filter(user => {
+  const filteredProfiles = profiles.filter(() => {
       if (activeTab === 'users') {
         const ftab = document.querySelector('[data-filter="users"]');
         if (ftab) return true;

@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { CreateNoteModal } from '../../features/notes/components/CreateNoteModal';
-import { AdminDashboard } from '../../pages/dashboard/AdminDashboard';
 import { SettingsModal } from './SettingsModal';
+
+const AdminDashboard = lazy(() => import('../../pages/dashboard/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import { UserCommandModal } from './UserCommandModal';
 import { LocationPickerModal } from '../../features/map/components/LocationPickerModal';
 import { DispatchModal } from '../../features/dispatch/DispatchModal';
@@ -138,16 +139,18 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         mode={isEditingNote ? 'edit' : 'create'}
       />
 
-      <AdminDashboard 
-        isOpen={showDashboard} 
-        onClose={closeDashboard} 
-        currentUserId={currentUserId}
-        currentUserEmail={currentUserEmail}
-        currentUserProfile={currentUserProfile}
-        onFilterByUser={onFilterByUser}
-        canEditUsers={canEditUsers}
-        onlineUsersList={onlineUsers}
-      />
+      <Suspense fallback={null}>
+        <AdminDashboard 
+          isOpen={showDashboard} 
+          onClose={closeDashboard} 
+          currentUserId={currentUserId}
+          currentUserEmail={currentUserEmail}
+          currentUserProfile={currentUserProfile}
+          onFilterByUser={onFilterByUser}
+          canEditUsers={canEditUsers}
+          onlineUsersList={onlineUsers}
+        />
+      </Suspense>
 
       <SettingsModal 
         isOpen={showSettings}

@@ -137,7 +137,7 @@ export function usePresence(
         setPresenceUsers(users);
     });
 
-    channel.subscribe(async (status) => {
+    channel.subscribe(async (status: string) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({
           user_id: userId,

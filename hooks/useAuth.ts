@@ -70,7 +70,7 @@ export function useAuth() {
     refreshAuth();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       if (event === 'SIGNED_OUT') {
           setSession(null);
           setUserRole(null);

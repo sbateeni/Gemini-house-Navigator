@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppLogic } from './hooks/useAppLogic';
 import { SourceSession } from './types';
 import { Monitor, Siren, Users, Clock } from 'lucide-react';
@@ -9,13 +9,15 @@ import { isAdmin } from './constants/roles';
 import { ModalContainer } from './components/ui/ModalContainer';
 import { Sidebar } from './components/layout/Sidebar';
 import { MapControls } from './features/map/components/MapControls';
-import { LeafletMap } from './features/map/components/LeafletMap';
 import { DatabaseSetupModal } from './components/ui/DatabaseSetupModal';
 import { AuthPage } from './pages/AuthPage';
 import { PendingApproval } from './pages/PendingApproval';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { TacticalOverlay } from './components/ui/TacticalOverlay';
-import { StrategicDashboard } from './components/ui/StrategicDashboard';
+
+const StrategicDashboard = lazy(() => import('./components/ui/StrategicDashboard').then(m => ({ default: m.StrategicDashboard })));
+
+const LeafletMap = lazy(() => import('./features/map/components/LeafletMap').then(m => ({ default: m.LeafletMap })));
 
 export default function App() {
   const [sourceSession, setSourceSession] = useState<SourceSession | null>(null);
@@ -179,29 +181,31 @@ export default function App() {
         )}
 
         {/* Map Background */}
-        <LeafletMap 
-          isSatellite={isSatellite}
-          mapProvider={mapProvider}
-          notes={notes} 
-          selectedNote={selectedNote}
-          setSelectedNote={setSelectedNote}
-          onMapClick={handleMapClick}
-          flyToTarget={flyToTarget}
-          tempMarkerCoords={tempCoords}
-          userLocation={userLocation}
-          currentRoute={currentRoute}
-          secondaryRoute={secondaryRoute}
-          otherUsers={onlineUsers}
-          onUserClick={onUserClick}
-          onNavigate={handleNavigateToNote}
-          onDispatch={handleOpenDispatchModal}
-          canSeeOthers={permissions.can_see_others}
-          canNavigate={permissions.can_navigate}
-          canDispatch={permissions.can_dispatch}
-          currentUserId={userProfile?.id}
-          userRole={userRole}
-          userGovernorate={userProfile?.governorate}
-        />
+        <Suspense fallback={<div className="w-full h-full bg-slate-950 flex items-center justify-center"><div className="text-slate-600 text-sm">جاري تحميل الخريطة...</div></div>}>
+          <LeafletMap 
+            isSatellite={isSatellite}
+            mapProvider={mapProvider}
+            notes={notes} 
+            selectedNote={selectedNote}
+            setSelectedNote={setSelectedNote}
+            onMapClick={handleMapClick}
+            flyToTarget={flyToTarget}
+            tempMarkerCoords={tempCoords}
+            userLocation={userLocation}
+            currentRoute={currentRoute}
+            secondaryRoute={secondaryRoute}
+            otherUsers={onlineUsers}
+            onUserClick={onUserClick}
+            onNavigate={handleNavigateToNote}
+            onDispatch={handleOpenDispatchModal}
+            canSeeOthers={permissions.can_see_others}
+            canNavigate={permissions.can_navigate}
+            canDispatch={permissions.can_dispatch}
+            currentUserId={userProfile?.id}
+            userRole={userRole}
+            userGovernorate={userProfile?.governorate}
+          />
+        </Suspense>
 
         {/* HUD: Tactical Overlay (SOS, Logs) */}
         <TacticalOverlay 
