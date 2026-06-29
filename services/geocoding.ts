@@ -6,7 +6,7 @@ export const searchPlace = async (
 
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=ps&q=${encodeURIComponent(
         normalized
       )}`,
       {

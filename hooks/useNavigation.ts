@@ -15,6 +15,7 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
   // Dynamic Rerouting for Main Route (Me -> Target) with debounce
   useEffect(() => {
     if (!userLocation || !navigationTarget) return;
+    if (userLocation.lat === 0 && userLocation.lng === 0) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -30,13 +31,13 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
   };
 
   const handleNavigateToNote = async (note: MapNote, locateUserCallback: () => void) => {
+      setNavigationTarget({ lat: note.lat, lng: note.lng });
       if (!userLocation) {
           warnGpsRequired();
           locateUserCallback();
           return;
       }
       setIsRouting(true);
-      setNavigationTarget({ lat: note.lat, lng: note.lng });
       const route = await getRoute(userLocation.lat, userLocation.lng, note.lat, note.lng);
       setIsRouting(false);
       if (route) setCurrentRoute(route);
@@ -47,13 +48,13 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
   };
 
   const handleNavigateToPoint = async (lat: number, lng: number, locateUserCallback?: () => void) => {
+      setNavigationTarget({ lat, lng });
       if (!userLocation) {
           warnGpsRequired();
           locateUserCallback?.();
           return;
       }
       setIsRouting(true);
-      setNavigationTarget({ lat, lng });
       const route = await getRoute(userLocation.lat, userLocation.lng, lat, lng);
       setIsRouting(false);
       if (route) setCurrentRoute(route);
