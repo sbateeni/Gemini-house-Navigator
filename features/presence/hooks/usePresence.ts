@@ -173,21 +173,27 @@ export function usePresence(
       
       // 1. Add DB users first (Background/History)
       dbUsers.forEach(u => {
-          mergedMap.set(u.id, u);
+          mergedMap.set(u.id, { ...u, isSOS: false });
       });
 
-      // 2. Add/Override with Presence users (Live) - they are fresher
+      // 2. Merge Presence users (Live) - they are fresher, merge isSOS with OR
       presenceUsers.forEach(u => {
-          mergedMap.set(u.id, u);
+          const existing = mergedMap.get(u.id);
+          if (existing) {
+              mergedMap.set(u.id, { ...existing, ...u, isSOS: existing.isSOS || u.isSOS });
+          } else {
+              mergedMap.set(u.id, u);
+          }
       });
 
-      // 3. Always include the current user (so they see themselves in dashboard/sidebar)
-      if (session?.user?.id && !mergedMap.has(session.user.id)) {
+      // 3. Always set the current user's isSOS from this device
+      if (session?.user?.id) {
           mergedMap.set(session.user.id, {
+              ...mergedMap.get(session.user.id) || {} as MapUser,
               id: session.user.id,
               username: getSafeUsername(session.user),
-              lat: userLocation?.lat || 0,
-              lng: userLocation?.lng || 0,
+              lat: userLocation?.lat || mergedMap.get(session.user.id)?.lat || 0,
+              lng: userLocation?.lng || mergedMap.get(session.user.id)?.lng || 0,
               color: getUserColor(session.user.id),
               lastUpdated: Date.now(),
               status: myStatus,

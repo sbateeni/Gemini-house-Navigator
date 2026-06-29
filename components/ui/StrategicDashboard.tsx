@@ -79,8 +79,8 @@ export const StrategicDashboard: React.FC<StrategicDashboardProps> = ({ onlineUs
               <ShieldAlert size={14} className={activeSOS > 0 ? 'text-red-500' : 'text-slate-500'} />
            </div>
            <div className="flex items-end gap-2">
-              <span className={`text-3xl font-black ${activeSOS > 0 ? 'text-red-500' : 'text-white'}`}>{animatedSOS}</span>
-              <span className="text-[10px] text-slate-500 mb-1">بلاغات معلقة</span>
+               <span className={`text-3xl font-black ${activeSOS > 0 ? 'text-red-500' : 'text-white'}`}>{animatedSOS}</span>
+               <span className="text-[10px] text-slate-500 mb-1">نداء استغاثة نشط</span>
            </div>
         </div>
 
