@@ -3,12 +3,14 @@ import type { LogEntry } from '../types';
 
 export const logsApi = {
   async create(entry: Omit<LogEntry, 'id'>): Promise<void> {
-    await supabase.from('logs').insert({
+    const payload: any = {
       message: entry.message, type: entry.type,
       user_id: entry.userId, timestamp: entry.timestamp,
-      governorate: entry.governorate, center: entry.center,
-      lat: entry.lat ?? null, lng: entry.lng ?? null
-    });
+      governorate: entry.governorate, center: entry.center
+    };
+    if (entry.lat !== null && entry.lat !== undefined) payload.lat = entry.lat;
+    if (entry.lng !== null && entry.lng !== undefined) payload.lng = entry.lng;
+    await supabase.from('logs').insert(payload);
   },
 
   async getRecent(): Promise<LogEntry[]> {

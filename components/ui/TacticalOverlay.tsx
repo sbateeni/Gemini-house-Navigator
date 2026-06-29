@@ -28,7 +28,7 @@ export const TacticalOverlay: React.FC<TacticalOverlayProps> = ({
     <>
         {/* SOS Alert HUD (Top Center) */}
         {distressedUser && onLocateSOS && (
-            <SOSAlertOverlay sosUser={distressedUser} onLocate={onLocateSOS} />
+            <SOSAlertOverlay sosUser={distressedUser} onLocate={onLocateSOS} onLocateUser={onLocateLogUser} />
         )}
 
         {/* HUD Elements */}

@@ -32,7 +32,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
     notes, isConnected, tableMissing, addNote, updateNote, deleteNote, updateStatus, setNotes, setIsConnected 
   } = useNotes(session, hasAccess, isAccountDeleted, userProfile);
   
-  const { userLocation, requestLocation } = useGeolocation(hasAccess || isSourceMode);
+  const { userLocation, requestLocation, permissionDenied } = useGeolocation(hasAccess || isSourceMode);
   const { assignments, acceptAssignment } = useAssignments(session?.user?.id);
   const { onlineUsers } = usePresence(session, hasAccess, userLocation, myStatus, isSOS); 
   const { 
@@ -131,10 +131,11 @@ export function useAppLogic(isSourceMode: boolean = false) {
   };
 
   const handleToggleSOS = () => {
-     setIsSOS(!isSOS);
      if (session?.user) {
+         const newIsSOS = !isSOS;
+         setIsSOS(newIsSOS);
          db.createLogEntry({
-             message: !isSOS ? `🚨 استغاثة عاجلة 🚨` : `إلغاء الاستغاثة`,
+             message: newIsSOS ? `🚨 استغاثة عاجلة 🚨` : `إلغاء الاستغاثة`,
              type: 'alert',
              userId: session.user.id,
              timestamp: Date.now(),
@@ -142,7 +143,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
              center: userProfile?.center,
              lat: userLocation?.lat ?? null,
              lng: userLocation?.lng ?? null
-         }).catch(() => {});
+         }).catch((e) => console.error("SOS log creation failed:", e));
      }
   };
 
@@ -197,7 +198,7 @@ export function useAppLogic(isSourceMode: boolean = false) {
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser: locateSOSUser, locateLogUser, allProfiles,
     currentRoute, secondaryRoute, isRouting, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
-    searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, requestLocation, isLocating,
+    searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, requestLocation, permissionDenied, isLocating,
     selectedNote, setSelectedNote, flyToNote, handleDeleteNote: deleteNote,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,

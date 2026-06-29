@@ -33,7 +33,7 @@ export default function App() {
     onlineUsers, userLocation, distressedUser, handleLocateSOSUser, locateLogUser, allProfiles,
     currentRoute, secondaryRoute, handleNavigateToNote, handleStopNavigation,
     sidebarOpen, setSidebarOpen, isSatellite, setIsSatellite, mapProvider, setMapProvider,
-    searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, isLocating,
+    searchQuery, setSearchQuery, isSearching, handleSearch, flyToTarget, locateUser, requestLocation, permissionDenied, isLocating,
     selectedNote, setSelectedNote, flyToNote, handleDeleteNote,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,
@@ -213,6 +213,18 @@ export default function App() {
             onLocateLogUser={locateLogUser}
             canViewLogs={permissions.can_view_logs}
         />
+
+        {/* Location Permission Prompt */}
+        {permissionDenied && !userLocation && (
+            <div className="absolute top-36 left-1/2 -translate-x-1/2 z-[1500]">
+                <div className="bg-amber-600/90 backdrop-blur border border-amber-400 rounded-xl shadow-lg px-5 py-3 flex items-center gap-3 text-sm">
+                    <span className="text-amber-100">الموقع غير مفعل — بعض الميزات لن تعمل</span>
+                    <button onClick={requestLocation} className="bg-white text-amber-700 font-bold px-4 py-1.5 rounded-lg hover:scale-105 transition-all text-xs">
+                        تفعيل الموقع
+                    </button>
+                </div>
+            </div>
+        )}
 
         {/* Map Control Buttons */}
         <MapControls

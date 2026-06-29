@@ -1,51 +1,68 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useGeolocation(enabled: boolean) {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!enabled) return;
-    
-    if (navigator.geolocation) {
-        const watchId = navigator.geolocation.watchPosition(
-            (pos) => {
-                setUserLocation({
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude
-                });
-            },
-            (err) => {
-                if (err.code === 1) {
-                    navigator.permissions.query({ name: 'geolocation' as any }).then(result => {
-                        if (result.state === 'prompt') {
-                            navigator.geolocation.getCurrentPosition(
-                                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                                () => {}
-                            );
-                        }
-                    });
-                }
-                console.log("Location access denied or error", err);
-            },
-            { 
-              enableHighAccuracy: true,
-              maximumAge: 10000,
-              timeout: 20000
-            }
-        );
-        return () => navigator.geolocation.clearWatch(watchId);
+  const startWatching = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
     }
-  }, [enabled]);
-
-  const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.log("Manual location request denied", err),
-        { enableHighAccuracy: true, timeout: 10000 }
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            setPermissionDenied(false);
+        },
+        (err) => {
+            if (err.code === 1) setPermissionDenied(true);
+            console.log("Location watch error", err);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
     );
   }, []);
 
-  return { userLocation, requestLocation };
+  useEffect(() => {
+    if (!enabled) return;
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            setPermissionDenied(false);
+            startWatching();
+        },
+        (err) => {
+            if (err.code === 1) setPermissionDenied(true);
+            console.log("Initial location request", err);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [enabled, startWatching]);
+
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setPermissionDenied(false);
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            startWatching();
+        },
+        (err) => {
+            if (err.code === 1) setPermissionDenied(true);
+            console.log("Manual location request denied", err);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [startWatching]);
+
+  return { userLocation, requestLocation, permissionDenied };
 }

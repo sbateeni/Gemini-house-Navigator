@@ -8,15 +8,20 @@ import { MapUser } from '../../../types';
 interface SOSAlertOverlayProps {
   sosUser: MapUser | undefined;
   onLocate: (lat: number, lng: number) => void;
+  onLocateUser?: (userId: string) => void;
 }
 
-export const SOSAlertOverlay: React.FC<SOSAlertOverlayProps> = ({ sosUser, onLocate }) => {
+export const SOSAlertOverlay: React.FC<SOSAlertOverlayProps> = ({ sosUser, onLocate, onLocateUser }) => {
   if (!sosUser) return null;
 
   const handleLocate = () => {
       const lat = sosUser.lat ?? 0;
       const lng = sosUser.lng ?? 0;
-      if (lat !== 0 || lng !== 0) onLocate(lat, lng);
+      if (lat !== 0 || lng !== 0) {
+          onLocate(lat, lng);
+      } else if (onLocateUser) {
+          onLocateUser(sosUser.id);
+      }
   };
 
   return (

@@ -117,7 +117,19 @@ export function usePresence(
                         lastUpdated: p.online_at,
                         status: (p.status || 'patrol') as UnitStatus,
                         isSOS: p.isSOS || false,
-                        isOnline: true // Active WebSocket connection
+                        isOnline: true
+                    });
+                } else if (p.isSOS) {
+                    users.push({
+                        id: p.user_id,
+                        username: typeof p.username === 'string' ? p.username : 'Unknown',
+                        lat: 0,
+                        lng: 0,
+                        color: p.color,
+                        lastUpdated: p.online_at,
+                        status: (p.status || 'patrol') as UnitStatus,
+                        isSOS: true,
+                        isOnline: true
                     });
                 }
             });

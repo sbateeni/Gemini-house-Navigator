@@ -83,8 +83,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   );
 
   const filteredOtherUsers = currentUserId 
-    ? otherUsers.filter(u => u.id !== currentUserId) 
-    : otherUsers;
+    ? otherUsers.filter(u => u.id !== currentUserId && (u.lat !== 0 || u.lng !== 0)) 
+    : otherUsers.filter(u => u.lat !== 0 || u.lng !== 0);
 
   // 4. Manage Other Users Markers
   useMapUsers(mapInstanceRef, filteredOtherUsers, onUserClick, canSeeOthers, userRole, userGovernorate);
