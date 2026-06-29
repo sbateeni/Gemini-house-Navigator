@@ -105,7 +105,6 @@ export default function App() {
           onDeleteNote={handleDeleteNote}
           onEditNote={handleEditNote} 
           onNavigateToNote={handleNavigateToNote}
-          onStopNavigation={handleStopNavigation}
           routeData={currentRoute}
           onUpdateStatus={updateStatus}
           isConnected={isConnected}
