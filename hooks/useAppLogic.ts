@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapNote, MapUser, UnitStatus, ActiveCampaign, UserProfile } from '../types';
 import { db } from '../services/db';
 import { supabase } from '../services/supabase';
@@ -38,7 +38,8 @@ export function useAppLogic(isSourceMode: boolean = false) {
   const { 
     currentRoute, secondaryRoute, isRouting, 
     handleNavigateToNote: rawHandleNavigateToNote, 
-    handleNavigateToPoint, handleStopNavigation
+    handleNavigateToPoint, handleStopNavigation,
+    calculateRoute, setSecondaryRoute
   } = useNavigation(userLocation);
 
   const [selectedNote, setSelectedNote] = useState<MapNote | null>(null);
@@ -191,6 +192,41 @@ export function useAppLogic(isSourceMode: boolean = false) {
     }
   };
 
+  const [nearestRouteTarget, setNearestRouteTarget] = useState<{ nearestUserId: string; targetLat: number; targetLng: number } | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Dynamic rerouting for nearest-user-to-target
+  useEffect(() => {
+    if (!nearestRouteTarget) return;
+    const uid = nearestRouteTarget.nearestUserId;
+    const doRoute = async () => {
+      const src = onlineUsers.find(u => u.id === uid);
+      if (!src || (src.lat === 0 && src.lng === 0)) return;
+      const route = await calculateRoute({ lat: src.lat, lng: src.lng }, { lat: nearestRouteTarget.targetLat, lng: nearestRouteTarget.targetLng });
+      if (route) setSecondaryRoute(route);
+    };
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(doRoute, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [nearestRouteTarget, onlineUsers, calculateRoute, setSecondaryRoute]);
+
+  const handleNavigateNearest = async (nearestLat: number, nearestLng: number, targetLat: number, targetLng: number) => {
+    const nearestId = onlineUsers.find(u => u.lat === nearestLat && u.lng === nearestLng)?.id;
+    if (!nearestId) {
+      const route = await calculateRoute({ lat: nearestLat, lng: nearestLng }, { lat: targetLat, lng: targetLng });
+      if (route) setSecondaryRoute(route);
+    } else {
+      setNearestRouteTarget({ nearestUserId: nearestId, targetLat, targetLng });
+    }
+    setFlyToTarget({ lat: (nearestLat + targetLat) / 2, lng: (nearestLng + targetLng) / 2, zoom: 13, timestamp: Date.now() });
+    setCommandUser(null);
+  };
+
+  const clearNearestRoute = () => {
+    setNearestRouteTarget(null);
+    setSecondaryRoute(null);
+  };
+
   return {
     session, authLoading, userRole, isApproved, isAccountDeleted, permissions, handleLogout, refreshAuth, userProfile, isBanned, hasAccess,
     notes, isConnected, tableMissing, updateStatus, setNotes,
@@ -202,11 +238,11 @@ export function useAppLogic(isSourceMode: boolean = false) {
     selectedNote, setSelectedNote, flyToNote, handleDeleteNote: deleteNote,
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,
+    handleNavigateNearest, clearNearestRoute,
     commandUser, setCommandUser, onUserClick: (u: MapUser) => setCommandUser(u), handleIntercept: () => {
-        if (commandUser) {
-            handleNavigateToPoint(commandUser.lat, commandUser.lng, locateUser);
-            setCommandUser(null);
-        }
+        if (!commandUser) return;
+        handleNavigateToPoint(commandUser.lat, commandUser.lng, locateUser);
+        setCommandUser(null);
     }, handleDispatch: () => {
         setShowLocationPicker(true);
     },

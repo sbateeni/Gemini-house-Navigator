@@ -43,6 +43,7 @@ interface ModalContainerProps {
   closeCommandUser: () => void;
   onIntercept: () => void;
   onDispatch: () => void;
+  onNavigateNearest?: (nearestLat: number, nearestLng: number, targetLat: number, targetLng: number) => void;
 
   // Location Picker Props
   showLocationPickerModal: boolean;
@@ -104,6 +105,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
   closeCommandUser,
   onIntercept,
   onDispatch,
+  onNavigateNearest,
   showLocationPickerModal,
   closeLocationPicker,
   notes,
@@ -164,6 +166,8 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
         user={commandUser}
         onIntercept={onIntercept}
         onDispatch={onDispatch}
+        onlineUsers={onlineUsers}
+        onNavigateNearest={onNavigateNearest}
       />
 
       <LocationPickerModal 

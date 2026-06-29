@@ -1,7 +1,7 @@
 
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getRoute } from '../services/routing';
 import { RouteData, MapNote } from '../types';
 
@@ -10,17 +10,19 @@ export function useNavigation(userLocation: {lat: number, lng: number} | null) {
   const [secondaryRoute, setSecondaryRoute] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
   const [navigationTarget, setNavigationTarget] = useState<{lat: number, lng: number} | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Dynamic Rerouting for Main Route (Me -> Target)
+  // Dynamic Rerouting for Main Route (Me -> Target) with debounce
   useEffect(() => {
     if (!userLocation || !navigationTarget) return;
 
-    const updateRoute = async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
         const route = await getRoute(userLocation.lat, userLocation.lng, navigationTarget.lat, navigationTarget.lng);
         if (route) setCurrentRoute(route);
-    };
+    }, 500);
 
-    updateRoute();
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [userLocation, navigationTarget]);
 
   const warnGpsRequired = () => {

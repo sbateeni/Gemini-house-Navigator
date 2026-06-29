@@ -38,6 +38,7 @@ export default function App() {
     showDashboard, setShowDashboard, showSettings, setShowSettings, showFullLogs, setShowFullLogs,
     showCampaigns, setShowCampaigns,
     commandUser, setCommandUser, onUserClick, handleIntercept, handleDispatch,
+    handleNavigateNearest,
     showLocationPicker, setShowLocationPicker, handleSelectDispatchLocation,
     dispatchTargetLocation, setDispatchTargetLocation, handleOpenDispatchModal, handleSendDispatchOrder,
     showModal, tempCoords, userNoteInput, setUserNoteInput, isEditingNote,
@@ -271,6 +272,7 @@ export default function App() {
             closeCommandUser={() => setCommandUser(null)}
             onIntercept={handleIntercept}
             onDispatch={handleDispatch}
+            onNavigateNearest={handleNavigateNearest}
             showLocationPickerModal={showLocationPicker}
             closeLocationPicker={() => setShowLocationPicker(false)}
             notes={notes}
